@@ -6,7 +6,7 @@
     ''' Whether or not to compress the code.bin.  If null, no action will be taken (including not updating the exheader)
     ''' </summary>
     ''' <returns></returns>
-    Public Property CompressCodeBin As Boolean?
+    Public Property CompressCodeBin As Boolean
 
     Public Property RomFSDirName As String = "RomFS"
     Public Property ExeFSDirName As String = "ExeFS"

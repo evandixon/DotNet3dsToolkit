@@ -1,7 +1,6 @@
 ﻿Public Class ExtractionOptions
     Public Property SourceRom As String
     Public Property DestinationDirectory As String
-    Public Property DecompressCodeBin As Boolean
 
     Public Property RomFSDirName As String = "RomFS"
     Public Property ExeFSDirName As String = "ExeFS"

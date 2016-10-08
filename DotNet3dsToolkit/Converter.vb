@@ -107,11 +107,12 @@ Public Class Converter
 
         '- exefs
         Dim exefsExtractionOptions As String
-        If options.DecompressCodeBin Then
-            exefsExtractionOptions = "-xutf"
-        Else
-            exefsExtractionOptions = "-xtf"
-        End If
+        'If options.DecompressCodeBin Then
+        exefsExtractionOptions = "-xutf"
+        'Else
+        '    exefsExtractionOptions = "-xtf"
+        'End If
+
         tasks.Add(Task.Run(Async Function() As Task
                                '- exefs
                                Await RunProgram(Path_3dstool, $"{exefsExtractionOptions} exefs DecryptedExeFS.bin --exefs-dir ""{exefsDir}"" --header ""{exefsHeaderPath}""")
@@ -194,6 +195,30 @@ Public Class Converter
 #End Region
 
 #Region "Building"
+    Private Sub UpdateExheader(options As BuildOptions, isCia As Boolean)
+        Using f As New FileStream(Path.Combine(options.SourceDirectory, options.ExheaderName), FileMode.Open, FileAccess.ReadWrite)
+            f.Seek(&HD, SeekOrigin.Begin)
+            Dim sciD = f.ReadByte
+
+            If options.CompressCodeBin Then
+                sciD = sciD Or 1     'We want to set bit 1 to 1 to force using a compressed code.bin
+            Else
+                sciD = sciD And &HFE 'We want to set bit 1 to 0 to avoid using a compressed code.bin
+            End If
+
+            If isCia Then
+                sciD = sciD Or 2 'Set bit 2 to 1
+            Else
+                sciD = sciD And &HFD 'Set bit 2 to 0
+            End If
+
+
+            f.Seek(&HD, IO.SeekOrigin.Begin)
+            f.WriteByte(sciD)
+            f.Flush()
+        End Using
+    End Sub
+
     Private Async Function BuildRomFS(options As BuildOptions) As Task
         Dim romfsDir = Path.Combine(options.SourceDirectory, options.RomFSDirName)
         Await RunProgram(Path_3dstool, $" -ctf romfs CustomRomFS.bin --romfs-dir ""{romfsDir}""")
@@ -275,8 +300,8 @@ Public Class Converter
 
         If Directory.Exists(options.DestinationDirectory) Then
             Directory.Delete(options.DestinationDirectory, True)
-            Directory.CreateDirectory(options.DestinationDirectory)
         End If
+        Directory.CreateDirectory(options.DestinationDirectory)
 
         Await ExtractPartitions(options)
 
@@ -309,12 +334,14 @@ Public Class Converter
     ''' <param name="options"></param>
     ''' <returns></returns>
     Public Async Function Build3DSDecrypted(options As BuildOptions) As Task
+        UpdateExheader(options, False)
+
         Await BuildPartitions(options)
 
         Dim partitionArgs As String = ""
 
         'Delete partitions that are too small
-        For Each item In {0, 1, 2, 6, 7} '{"CustomPartition0.bin", "CustomPartition1.bin", "CustomPartition2.bin", "CustomPartition6.bin", "CustomPartition7.bin"}
+        For Each item In {0, 1, 2, 6, 7}
             Dim info As New FileInfo(Path.Combine(ToolDirectory, "CustomPartition" & item.ToString & ".bin"))
             If info.Length <= 20000 Then
                 File.Delete(info.FullName)
@@ -346,44 +373,34 @@ Public Class Converter
     Public Async Function Build3DS0Key(options As BuildOptions) As Task
         Copy3DSBuilder()
 
+        UpdateExheader(options, False)
+
         Dim exHeader As String = Path.Combine(options.SourceDirectory, options.ExheaderName)
         Dim exeFS As String = Path.Combine(options.SourceDirectory, options.ExeFSDirName)
         Dim romFS As String = Path.Combine(options.SourceDirectory, options.RomFSDirName)
 
-        If options.CompressCodeBin.HasValue Then
-            'Update the exHeader to reflect code.bin compression preference
-            Using f As New IO.FileStream(exHeader, IO.FileMode.Open, IO.FileAccess.ReadWrite)
-                f.Seek(&HD, IO.SeekOrigin.Begin)
-                Dim sciD = f.ReadByte
-
-
-                If options.CompressCodeBin Then
-                    sciD = sciD Or 1    'We want to set bit 1 to 1 to force using a compressed code.bin
-                Else
-                    sciD = sciD And &HFE 'We want to set bit 1 to 0 to avoid using a compressed code.bin
-                End If
-
-                f.Seek(&HD, IO.SeekOrigin.Begin)
-                f.WriteByte(sciD)
-                f.Flush()
-            End Using
-        End If
-
-        If options.CompressCodeBin OrElse Not options.CompressCodeBin.HasValue Then
-            Await RunProgram(Path_3dsbuilder, $"""{exeFS}"" ""{romFS}"" ""{exHeader}"" ""{options.DestinationROM}""")
+        If options.CompressCodeBin Then
+            Await RunProgram(Path_3dsbuilder, $"""{exeFS}"" ""{romFS}"" ""{exHeader}"" ""{options.DestinationROM}""-compressCode")
+            Console.WriteLine("WARNING: .code.bin is still compressed, and other operations may be affected.")
         Else
-            Await RunProgram(Path_3dsbuilder, $"""{exeFS}"" ""{romFS}"" ""{exHeader}"" ""{options.DestinationROM}"" -compressCode")
+            Await RunProgram(Path_3dsbuilder, $"""{exeFS}"" ""{romFS}"" ""{exHeader}"" ""{options.DestinationROM}""")
+            Dim dotCodeBin = Path.Combine(options.SourceDirectory, options.ExeFSDirName, ".code.bin")
+            Dim codeBin = Path.Combine(options.SourceDirectory, options.ExeFSDirName, "code.bin")
+            If File.Exists(dotCodeBin) Then
+                File.Move(dotCodeBin, codeBin)
+            End If
         End If
     End Function
 
     Public Async Function BuildCia(options As BuildOptions) As Task
+        UpdateExheader(options, True)
         CopyMakeRom()
         Await BuildPartitions(options)
 
         Dim partitionArgs As String = ""
 
         'Delete partitions that are too small
-        For Each item In {0, 1, 2, 6, 7} '{"CustomPartition0.bin", "CustomPartition1.bin", "CustomPartition2.bin", "CustomPartition6.bin", "CustomPartition7.bin"}
+        For Each item In {0, 1, 2, 6, 7}
             Dim info As New FileInfo(Path.Combine(ToolDirectory, "CustomPartition" & item.ToString & ".bin"))
             If info.Length <= 20000 Then
                 File.Delete(info.FullName)
@@ -396,7 +413,6 @@ Public Class Converter
         Dim headerPath As String = Path.Combine(options.SourceDirectory, options.RootHeaderName)
         Dim outputPath As String = Path.Combine(options.SourceDirectory, options.DestinationROM)
 
-        'makerom -f cia -o [PATCHED].cia -content patched.cxi:0
         Await RunProgram(Path_makerom, $"-f cia -o ""{outputPath}""{partitionArgs}")
 
         'Cleanup

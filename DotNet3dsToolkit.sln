@@ -7,6 +7,11 @@ Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "DotNet3dsToolkit", "DotNet3
 EndProject
 Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "ToolkitConsole", "ToolkitConsole\ToolkitConsole.vbproj", "{319C3B52-4F2F-4DFE-B79F-30950CD89AA6}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{8A06ABB2-F37F-4C31-9895-B6DACDFA7F6F}"
+	ProjectSection(SolutionItems) = preProject
+		README.MD = README.MD
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
