@@ -58,22 +58,22 @@ Public Class Converter
 
 #Region "Extraction"
     Private Async Function ExtractPartitions(options As ExtractionOptions) As Task
-        Dim headerNcchPath As String = Path.Combine(options.DestinationDirectory, "HeaderNCCH.bin")
+        Dim headerNcchPath As String = Path.Combine(options.DestinationDirectory, options.RootHeaderName)
         Await RunProgram(Path_3dstool, $"-xtf 3ds ""{options.SourceRom}"" --header ""{headerNcchPath}"" -0 DecryptedPartition0.bin -1 DecryptedPartition1.bin -2 DecryptedPartition2.bin -6 DecryptedPartition6.bin -7 DecryptedPartition7.bin")
     End Function
 
     Private Async Function ExtractPartition0(options As ExtractionOptions) As Task
         'Extract partitions
-        Dim exheaderPath As String = Path.Combine(options.DestinationDirectory, "DecryptedExHeader.bin")
-        Dim headerPath As String = Path.Combine(options.DestinationDirectory, "HeaderNCCH0.bin")
-        Dim logoPath As String = Path.Combine(options.DestinationDirectory, "LogoLZ.bin")
-        Dim plainPath As String = Path.Combine(options.DestinationDirectory, "PlainRGN.bin")
+        Dim exheaderPath As String = Path.Combine(options.DestinationDirectory, options.ExheaderName)
+        Dim headerPath As String = Path.Combine(options.DestinationDirectory, options.Partition0HeaderName)
+        Dim logoPath As String = Path.Combine(options.DestinationDirectory, options.LogoLZName)
+        Dim plainPath As String = Path.Combine(options.DestinationDirectory, options.PlainRGNName)
         Await RunProgram(Path_3dstool, $"-xtf cxi DecryptedPartition0.bin --header ""{headerPath}"" --exh ""{exheaderPath}"" --exefs DecryptedExeFS.bin --romfs DecryptedRomFS.bin --logo ""{logoPath}"" --plain ""{plainPath}""")
 
         'Extract romfs and exefs
-        Dim romfsDir As String = Path.Combine(options.DestinationDirectory, "ExtractedRomFS")
-        Dim exefsDir As String = Path.Combine(options.DestinationDirectory, "ExtractedExeFS")
-        Dim exefsHeaderPath As String = Path.Combine(options.DestinationDirectory, "HeaderExeFS.bin")
+        Dim romfsDir As String = Path.Combine(options.DestinationDirectory, options.RomFSDirName)
+        Dim exefsDir As String = Path.Combine(options.DestinationDirectory, options.ExeFSDirName)
+        Dim exefsHeaderPath As String = Path.Combine(options.DestinationDirectory, options.ExeFSHeaderName)
         Dim tasks As New List(Of Task)
 
         '- romfs
@@ -90,11 +90,11 @@ Public Class Converter
                                '- exefs
                                Await RunProgram(Path_3dstool, $"{exefsExtractionOptions} exefs DecryptedExeFS.bin --exefs-dir ""{exefsDir}"" --header ""{exefsHeaderPath}""")
 
-                               File.Move(Path.Combine(options.DestinationDirectory, "ExtractedExeFS", "banner.bnr"), Path.Combine(options.DestinationDirectory, "ExtractedExeFS", "banner.bin"))
-                               File.Move(Path.Combine(options.DestinationDirectory, "ExtractedExeFS", "icon.icn"), Path.Combine(options.DestinationDirectory, "ExtractedExeFS", "icon.bin"))
+                               File.Move(Path.Combine(options.DestinationDirectory, options.ExeFSDirName, "banner.bnr"), Path.Combine(options.DestinationDirectory, options.ExeFSDirName, "banner.bin"))
+                               File.Move(Path.Combine(options.DestinationDirectory, options.ExeFSDirName, "icon.icn"), Path.Combine(options.DestinationDirectory, options.ExeFSDirName, "icon.bin"))
 
                                '- banner
-                               Await RunProgram(Path_3dstool, $"-x -t banner -f ""{Path.Combine(options.DestinationDirectory, "ExtractedExeFS", "banner.bin")}"" --banner-dir ""{Path.Combine(options.DestinationDirectory, "ExtractedBanner")}""")
+                               Await RunProgram(Path_3dstool, $"-x -t banner -f ""{Path.Combine(options.DestinationDirectory, options.ExeFSDirName, "banner.bin")}"" --banner-dir ""{Path.Combine(options.DestinationDirectory, "ExtractedBanner")}""")
 
                                File.Move(Path.Combine(options.DestinationDirectory, "ExtractedBanner", "banner0.bcmdl"), Path.Combine(options.DestinationDirectory, "ExtractedBanner", "banner.cgfx"))
                            End Function))
@@ -113,8 +113,8 @@ Public Class Converter
     Private Async Function ExtractPartition1(options As ExtractionOptions) As Task
         If File.Exists(Path.Combine(ToolDirectory, "DecryptedPartition1.bin")) Then
             'Extract
-            Dim headerPath As String = Path.Combine(options.DestinationDirectory, "HeaderNCCH1.bin")
-            Dim extractedPath As String = Path.Combine(options.DestinationDirectory, "ExtractedManual")
+            Dim headerPath As String = Path.Combine(options.DestinationDirectory, options.Partition1HeaderName)
+            Dim extractedPath As String = Path.Combine(options.DestinationDirectory, options.ExtractedManualDirName)
             Await RunProgram(Path_3dstool, $"-xtf cfa DecryptedPartition1.bin --header ""{headerPath}"" --romfs DecryptedManual.bin")
             Await RunProgram(Path_3dstool, $"-xtf romfs DecryptedManual.bin --romfs-dir ""{extractedPath}""")
 
@@ -127,8 +127,8 @@ Public Class Converter
     Private Async Function ExtractPartition2(options As ExtractionOptions) As Task
         If File.Exists(Path.Combine(ToolDirectory, "DecryptedPartition2.bin")) Then
             'Extract
-            Dim headerPath As String = Path.Combine(options.DestinationDirectory, "HeaderNCCH2.bin")
-            Dim extractedPath As String = Path.Combine(options.DestinationDirectory, "ExtractedDownloadPlay")
+            Dim headerPath As String = Path.Combine(options.DestinationDirectory, options.Partition2HeaderName)
+            Dim extractedPath As String = Path.Combine(options.DestinationDirectory, options.ExtractedDownloadPlayDirName)
             Await RunProgram(Path_3dstool, $"-xtf cfa DecryptedPartition2.bin --header ""{headerPath}"" --romfs DecryptedDownloadPlay.bin")
             Await RunProgram(Path_3dstool, $"-xtf romfs DecryptedDownloadPlay.bin --romfs-dir ""{extractedPath}""")
 
@@ -141,8 +141,8 @@ Public Class Converter
     Private Async Function ExtractPartition6(options As ExtractionOptions) As Task
         If File.Exists(Path.Combine(ToolDirectory, "DecryptedPartition6.bin")) Then
             'Extract
-            Dim headerPath As String = Path.Combine(options.DestinationDirectory, "HeaderNCCH6.bin")
-            Dim extractedPath As String = Path.Combine(options.DestinationDirectory, "ExtractedN3DSUpdate")
+            Dim headerPath As String = Path.Combine(options.DestinationDirectory, options.Partition6HeaderName)
+            Dim extractedPath As String = Path.Combine(options.DestinationDirectory, options.N3DSUpdateDirName)
             Await RunProgram(Path_3dstool, $"-xtf cfa DecryptedPartition6.bin --header ""{headerPath}"" --romfs DecryptedN3DSUpdate.bin")
             Await RunProgram(Path_3dstool, $"-xtf romfs DecryptedN3DSUpdate.bin --romfs-dir ""{extractedPath}""")
 
@@ -155,8 +155,8 @@ Public Class Converter
     Private Async Function ExtractPartition7(options As ExtractionOptions) As Task
         If File.Exists(Path.Combine(ToolDirectory, "DecryptedPartition7.bin")) Then
             'Extract
-            Dim headerPath As String = Path.Combine(options.DestinationDirectory, "HeaderNCCH7.bin")
-            Dim extractedPath As String = Path.Combine(options.DestinationDirectory, "ExtractedO3DSUpdate")
+            Dim headerPath As String = Path.Combine(options.DestinationDirectory, options.Partition7HeaderName)
+            Dim extractedPath As String = Path.Combine(options.DestinationDirectory, options.O3DSUpdateDirName)
             Await RunProgram(Path_3dstool, $"-xtf cfa DecryptedPartition7.bin --header ""{headerPath}"" --romfs DecryptedO3DSUpdate.bin")
             Await RunProgram(Path_3dstool, $"-xtf romfs DecryptedO3DSUpdate.bin --romfs-dir ""{extractedPath}""")
 
@@ -165,6 +165,82 @@ Public Class Converter
             File.Delete(Path.Combine(ToolDirectory, "DecryptedO3DSUpdate.bin"))
         End If
     End Function
+#End Region
+
+#Region "Building"
+    Private Async Function BuildRomFS(options As BuildOptions) As Task
+        Dim romfsDir = Path.Combine(options.SourceDirectory, options.RomFSDirName)
+        Await RunProgram(Path_3dstool, $" -ctf romfs CustomRomFS.bin --romfs-dir ""{romfsDir}""")
+    End Function
+
+    Private Async Function BuildExeFS(options As BuildOptions) As Task
+        File.Move(Path.Combine(options.SourceDirectory, options.ExeFSDirName, "banner.bin"), Path.Combine(options.SourceDirectory, options.ExeFSDirName, "banner.bnr"))
+        File.Move(Path.Combine(options.SourceDirectory, options.ExeFSDirName, "icon.bin"), Path.Combine(options.SourceDirectory, options.ExeFSDirName, "icon.icn"))
+
+        If options.CompressCodeBin Then
+            Throw New NotImplementedException
+        End If
+
+        Dim headerPath As String = Path.Combine(options.SourceDirectory, options.ExeFSHeaderName)
+        Dim exefsPath As String = Path.Combine(options.SourceDirectory, options.ExeFSDirName)
+        Await RunProgram(Path_3dstool, $"-ctf exefs CustomExeFS.bin --exefs-dir ""{exefsPath}"" --header ""{headerPath}""")
+
+        File.Move(Path.Combine(options.SourceDirectory, options.ExeFSDirName, "banner.bnr"), Path.Combine(options.SourceDirectory, options.ExeFSDirName, "banner.bin"))
+        File.Move(Path.Combine(options.SourceDirectory, options.ExeFSDirName, "icon.icn"), Path.Combine(options.SourceDirectory, options.ExeFSDirName, "icon.bin"))
+    End Function
+
+    Private Async Function BuildPartition0(options As BuildOptions) As Task
+        'Build romfs and exefs
+        Dim romfsTask = BuildRomFS(options)
+        Dim exefsTask = BuildExeFS(options)
+        Await romfsTask
+        Await exefsTask
+
+        'Build cxi
+        Dim exheaderPath As String = Path.Combine(options.SourceDirectory, options.ExheaderName)
+        Dim headerPath As String = Path.Combine(options.SourceDirectory, options.Partition0HeaderName)
+        Dim logoPath As String = Path.Combine(options.SourceDirectory, options.LogoLZName)
+        Dim plainPath As String = Path.Combine(options.SourceDirectory, options.PlainRGNName)
+        Await RunProgram(Path_3dstool, $"-ctf cxi CustomPartition0.bin --header ""{headerPath}"" --exh ""{exheaderPath}"" --exefs CustomExeFS.bin --romfs CustomRomFS.bin --logo ""{logoPath}"" --plain ""{plainPath}""")
+
+        'Cleanup
+        File.Delete(Path.Combine(ToolDirectory, "CustomExeFS.bin"))
+        File.Delete(Path.Combine(ToolDirectory, "CustomRomFS.bin"))
+    End Function
+
+    Private Async Function BuildPartition1(options As BuildOptions) As Task
+        Dim headerPath As String = Path.Combine(options.SourceDirectory, options.Partition1HeaderName)
+        Dim extractedPath As String = Path.Combine(options.SourceDirectory, options.ExtractedManualDirName)
+        Await RunProgram(Path_3dstool, $"-ctf romfs CustomManual.bin --romfs-dir ""{extractedPath}""")
+        Await RunProgram(Path_3dstool, $"-ctf cfa CustomPartition1.bin --header ""{headerPath}"" --romfs CustomManual.bin")
+        File.Delete(Path.Combine(ToolDirectory, "CustomManual.bin"))
+    End Function
+
+    Private Async Function BuildPartition2(options As BuildOptions) As Task
+        Dim headerPath As String = Path.Combine(options.SourceDirectory, options.Partition2HeaderName)
+        Dim extractedPath As String = Path.Combine(options.SourceDirectory, options.ExtractedDownloadPlayDirName)
+        Await RunProgram(Path_3dstool, $"-ctf romfs CustomDownloadPlay.bin --romfs-dir ""{extractedPath}""")
+        Await RunProgram(Path_3dstool, $"-ctf cfa CustomPartition2.bin --header ""{headerPath}"" --romfs CustomDownloadPlay.bin")
+        File.Delete(Path.Combine(ToolDirectory, "CustomDownloadPlay.bin"))
+    End Function
+
+    Private Async Function BuildPartition6(options As BuildOptions) As Task
+        Dim headerPath As String = Path.Combine(options.SourceDirectory, options.Partition6HeaderName)
+        Dim extractedPath As String = Path.Combine(options.SourceDirectory, options.N3DSUpdateDirName)
+        Await RunProgram(Path_3dstool, $"-ctf romfs CustomN3DSUpdate.bin --romfs-dir ""{extractedPath}""")
+        Await RunProgram(Path_3dstool, $"-ctf cfa CustomPartition6.bin --header ""{headerPath}"" --romfs CustomN3DSUpdate.bin")
+        File.Delete(Path.Combine(ToolDirectory, "CustomN3DSUpdate.bin"))
+    End Function
+
+    Private Async Function BuildPartition7(options As BuildOptions) As Task
+        Dim headerPath As String = Path.Combine(options.SourceDirectory, options.Partition7HeaderName)
+        Dim extractedPath As String = Path.Combine(options.SourceDirectory, options.O3DSUpdateDirName)
+        Await RunProgram(Path_3dstool, $"-ctf romfs CustomO3DSUpdate.bin --romfs-dir ""{extractedPath}""")
+        Await RunProgram(Path_3dstool, $"-ctf cfa CustomPartition7.bin --header ""{headerPath}"" --romfs CustomO3DSUpdate.bin")
+        File.Delete(Path.Combine(ToolDirectory, "CustomO3DSUpdate.bin"))
+    End Function
+
+
 #End Region
 
     Public Async Function Extract(options As ExtractionOptions) As Task
@@ -183,6 +259,43 @@ Public Class Converter
         partitionExtractions.Add(ExtractPartition6(options))
         partitionExtractions.Add(ExtractPartition7(options))
         Await Task.WhenAll(partitionExtractions)
+    End Function
+
+    Public Async Function Build3DSDecrypted(options As BuildOptions) As Task
+        Dim partitionTasks As New List(Of Task)
+        partitionTasks.Add(BuildPartition0(options))
+        partitionTasks.Add(BuildPartition1(options))
+        partitionTasks.Add(BuildPartition2(options))
+        partitionTasks.Add(BuildPartition6(options))
+        partitionTasks.Add(BuildPartition7(options))
+        Await Task.WhenAll(partitionTasks)
+
+        Dim partitionArgs As String = ""
+
+        'Delete partitions that are too small
+        For Each item In {0, 1, 2, 6, 7} '{"CustomPartition0.bin", "CustomPartition1.bin", "CustomPartition2.bin", "CustomPartition6.bin", "CustomPartition7.bin"}
+            Dim info As New FileInfo(Path.Combine(ToolDirectory, "CustomPartition" & item.ToString & ".bin"))
+            If info.Length <= 20000 Then
+                File.Delete(info.FullName)
+            Else
+                Dim num = item.ToString
+                partitionArgs &= $" -{num} CustomPartition{num}.bin"
+            End If
+        Next
+
+        Dim headerPath As String = Path.Combine(options.SourceDirectory, options.RootHeaderName)
+        Dim outputPath As String = Path.Combine(options.SourceDirectory, options.DestinationROM)
+
+        '"3dstool.exe" -ctf 3ds PatchedRom-Test.3ds --header HeaderNCCH.bin -0 CustomPartition0.bin -1 CustomPartition1.bin -6 CustomPartition6.bin -7 CustomPartition7.bin
+        Await RunProgram(Path_3dstool, $"-ctf 3ds ""{outputPath}"" --header ""{headerPath}""{partitionArgs}")
+
+        'Cleanup
+        For Each item In {0, 1, 2, 6, 7}
+            Dim partition = Path.Combine(ToolDirectory, "CustomPartition" & item.ToString & ".bin")
+            If File.Exists(partition) Then
+                File.Delete(partition)
+            End If
+        Next
     End Function
 
 

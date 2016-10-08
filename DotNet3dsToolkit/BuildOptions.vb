@@ -1,7 +1,7 @@
-﻿Public Class ExtractionOptions
-    Public Property SourceRom As String
-    Public Property DestinationDirectory As String
-    Public Property DecompressCodeBin As Boolean
+﻿Public Class BuildOptions
+    Public Property SourceDirectory As String
+    Public Property DestinationROM As String
+    Public Property CompressCodeBin As Boolean
 
     Public Property RomFSDirName As String = "RomFS"
     Public Property ExeFSDirName As String = "ExeFS"
