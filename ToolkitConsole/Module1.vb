@@ -46,9 +46,9 @@ Module Module1
 
                     If key0 Then
                         BuildKey0(source, destination)
-                    ElseIf Path.GetExtension(destination).ToLower = "cia" Then
+                    ElseIf Path.GetExtension(destination).ToLower = ".cia" Then
                         BuildCIA(source, destination)
-                    ElseIf Path.GetExtension(destination).ToLower = "3dz" Then
+                    ElseIf Path.GetExtension(destination).ToLower = ".3dz" Then
                         BuildKey0(source, destination)
                     Else
                         BuildDecryptedCCI(source, destination)
