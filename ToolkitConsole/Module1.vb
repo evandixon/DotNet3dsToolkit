@@ -14,7 +14,7 @@ Module Module1
                 Console.WriteLine("<destination> can be a *.3DS, *.3DZ, *.CCI, or *.CIA file, or a directory if the source is a ROM.")
                 Console.WriteLine("Output format is detected by the extension.  *.CIA files are outputted as CIA files, *.3DZ files are outputted as 0-key encrypted CCI ROMs, all others are outputted as decrypted CCI ROMs.  Use the -key0 flag to output as a 0-key encrypted CCI ROM instead.")
             Else
-                Dim key0 As Boolean = args.Contains("key0")
+                Dim key0 As Boolean = args.Contains("-key0")
                 Dim source As String = args(1)
                 Dim destination As String = args(2)
 
