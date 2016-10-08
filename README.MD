@@ -5,13 +5,13 @@ Supported formats for extraction:
 - Decrypted CCI (aka .3DS)
 
 Supported formats for building:
-- Decrypted CCI (aka .3DS)
--- For use with Citra
--- Can be used for Gateway and Sky 3DS (with CFW) if encrypted using Decrypt9
-- 0-Key Encrypted CCI
--- For use with Gateway
-- CIA
--- For use with CFW
+* Decrypted CCI (aka .3DS)
+  * For use with Citra
+  * Can be used for Gateway and Sky 3DS (with CFW) if encrypted using Decrypt9
+* 0-Key Encrypted CCI
+  * For use with Gateway
+* CIA
+  * For use with CFW
 
 Planned Features
 - Build files for HANS
