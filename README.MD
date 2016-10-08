@@ -16,6 +16,7 @@ Supported formats for building:
 Planned Features
 * Build files for HANS
 * More supported source formats (more might work, but only decrypted CCI's have been tested)
+* Automatically add private header to 0-key encrypted CCI's.
 
 Using the library (VB.Net):
 ```
