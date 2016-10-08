@@ -18,6 +18,7 @@ Public Class Converter
 #Region "Tool Management"
     Private Property ToolDirectory As String
     Private Property Path_3dstool As String
+    Private Property Path_3dsbuilder As String
 
     Private Sub ResetToolDirectory()
         ToolDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DotNet3DSToolkit-" & Guid.NewGuid.ToString)
@@ -46,6 +47,18 @@ Public Class Converter
 
         If Not File.Exists(txtPath) Then
             File.WriteAllText(Path.Combine(ToolDirectory, "ignore_3dstool.txt"), My.Resources.ignore_3dstool)
+        End If
+    End Sub
+
+    Private Sub Copy3DSBuilder()
+        If String.IsNullOrEmpty(ToolDirectory) Then
+            ResetToolDirectory()
+        End If
+
+        Dim exePath = Path.Combine(ToolDirectory, "3DS Builder.exe")
+        If Not File.Exists(exePath) Then
+            File.WriteAllBytes(exePath, My.Resources._3DS_Builder)
+            Path_3dsbuilder = exePath
         End If
     End Sub
 
@@ -246,7 +259,8 @@ Public Class Converter
     Public Async Function Extract(options As ExtractionOptions) As Task
         Copy3DSTool()
 
-        If Not Directory.Exists(options.DestinationDirectory) Then
+        If Directory.Exists(options.DestinationDirectory) Then
+            Directory.Delete(options.DestinationDirectory, True)
             Directory.CreateDirectory(options.DestinationDirectory)
         End If
 
@@ -261,7 +275,14 @@ Public Class Converter
         Await Task.WhenAll(partitionExtractions)
     End Function
 
+    ''' <summary>
+    ''' Builds a decrypted CCI/3DS file, for use with Citra or Decrypt9
+    ''' </summary>
+    ''' <param name="options"></param>
+    ''' <returns></returns>
     Public Async Function Build3DSDecrypted(options As BuildOptions) As Task
+        Copy3DSTool()
+
         Dim partitionTasks As New List(Of Task)
         partitionTasks.Add(BuildPartition0(options))
         partitionTasks.Add(BuildPartition1(options))
@@ -296,6 +317,44 @@ Public Class Converter
                 File.Delete(partition)
             End If
         Next
+    End Function
+
+    ''' <summary>
+    ''' Builds a CCI/3DS file encrypted with a 0-key, for use with Gateway.  Excludes update partitions, download play, and manual.
+    ''' </summary>
+    ''' <param name="options"></param>
+    ''' <returns></returns>
+    Public Async Function Build3DS0Key(options As BuildOptions) As Task
+        Copy3DSBuilder()
+
+        Dim exHeader As String = Path.Combine(options.SourceDirectory, options.ExheaderName)
+        Dim exeFS As String = Path.Combine(options.SourceDirectory, options.ExeFSDirName)
+        Dim romFS As String = Path.Combine(options.SourceDirectory, options.RomFSDirName)
+
+        If options.CompressCodeBin.HasValue Then
+            'Update the exHeader to reflect code.bin compression preference
+            Using f As New IO.FileStream(exHeader, IO.FileMode.Open, IO.FileAccess.ReadWrite)
+                f.Seek(&HD, IO.SeekOrigin.Begin)
+                Dim sciD = f.ReadByte
+
+
+                If options.CompressCodeBin Then
+                    sciD = sciD Or 1    'We want to set bit 1 to 1 to force using a compressed code.bin
+                Else
+                    sciD = sciD And &HFE 'We want to set bit 1 to 0 to avoid using a compressed code.bin
+                End If
+
+                f.Seek(&HD, IO.SeekOrigin.Begin)
+                f.WriteByte(sciD)
+                f.Flush()
+            End Using
+        End If
+
+        If options.CompressCodeBin OrElse Not options.CompressCodeBin.HasValue Then
+            Await RunProgram(Path_3dsbuilder, $"""{exeFS}"" ""{romFS}"" ""{exHeader}"" ""{options.DestinationROM}""")
+        Else
+            Await RunProgram(Path_3dsbuilder, $"""{exeFS}"" ""{romFS}"" ""{exHeader}"" ""{options.DestinationROM}"" -compressCode")
+        End If
     End Function
 
 

@@ -1,7 +1,12 @@
 ﻿Public Class BuildOptions
     Public Property SourceDirectory As String
     Public Property DestinationROM As String
-    Public Property CompressCodeBin As Boolean
+
+    ''' <summary>
+    ''' Whether or not to compress the code.bin.  If null, no action will be taken (including not updating the exheader)
+    ''' </summary>
+    ''' <returns></returns>
+    Public Property CompressCodeBin As Boolean?
 
     Public Property RomFSDirName As String = "RomFS"
     Public Property ExeFSDirName As String = "ExeFS"
