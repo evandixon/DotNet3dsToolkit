@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>DotNet3dsToolkit</id>
+    <version>$version$</version>
+    <title>.Net 3DS Toolkit</title>
+    <authors>evandixon</authors>
+    <owners>evandixon</owners>
+    <licenseUrl>https://github.com/evandixon/DotNet3dsToolkit/blob/master/LICENSE</licenseUrl>
+    <projectUrl>https://github.com/evandixon/DotNet3dsToolkit</projectUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>Collection of 3DS tools in a .Net wrapper</description>
+    <copyright>Copyright 2016</copyright>
+  </metadata>
+</package>

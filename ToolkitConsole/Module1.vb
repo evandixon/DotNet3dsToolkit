@@ -18,6 +18,14 @@ Module Module1
                 Dim source As String = args(1)
                 Dim destination As String = args(2)
 
+                If Not Path.IsPathRooted(source) Then
+                    source = Path.Combine(Environment.CurrentDirectory, source)
+                End If
+
+                If Not Path.IsPathRooted(destination) Then
+                    destination = Path.Combine(Environment.CurrentDirectory, destination)
+                End If
+
                 If File.Exists(source) Then
 
                     'Extraction mode
