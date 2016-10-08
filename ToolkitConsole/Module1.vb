@@ -26,6 +26,14 @@
                 options3.CompressCodeBin = Nothing
 
                 c.Build3DS0Key(options3).Wait()
+
+                Console.WriteLine("Building cia...")
+                Dim options4 As New DotNet3dsToolkit.BuildOptions
+                options4.SourceDirectory = IO.Path.Combine(Environment.CurrentDirectory, "RawFiles")
+                options4.DestinationROM = IO.Path.Combine(Environment.CurrentDirectory, "PatchedRom-Test-Decrypted.cia")
+                options4.CompressCodeBin = Nothing
+
+                c.BuildCia(options4).Wait()
             End Using
         Catch ex As Exception
             Throw

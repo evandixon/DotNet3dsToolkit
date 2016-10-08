@@ -89,5 +89,15 @@ Namespace My.Resources
                 Return ResourceManager.GetString("ignore_3dstool", resourceCulture)
             End Get
         End Property
+        
+        '''<summary>
+        '''  Looks up a localized resource of type System.Byte[].
+        '''</summary>
+        Friend ReadOnly Property makerom() As Byte()
+            Get
+                Dim obj As Object = ResourceManager.GetObject("makerom", resourceCulture)
+                Return CType(obj,Byte())
+            End Get
+        End Property
     End Module
 End Namespace

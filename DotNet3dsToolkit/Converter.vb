@@ -19,6 +19,7 @@ Public Class Converter
     Private Property ToolDirectory As String
     Private Property Path_3dstool As String
     Private Property Path_3dsbuilder As String
+    Private Property Path_makerom As String
 
     Private Sub ResetToolDirectory()
         ToolDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DotNet3DSToolkit-" & Guid.NewGuid.ToString)
@@ -59,6 +60,18 @@ Public Class Converter
         If Not File.Exists(exePath) Then
             File.WriteAllBytes(exePath, My.Resources._3DS_Builder)
             Path_3dsbuilder = exePath
+        End If
+    End Sub
+
+    Private Sub CopyMakeRom()
+        If String.IsNullOrEmpty(ToolDirectory) Then
+            ResetToolDirectory()
+        End If
+
+        Dim exePath = Path.Combine(ToolDirectory, "makerom.exe")
+        If Not File.Exists(exePath) Then
+            File.WriteAllBytes(exePath, My.Resources.makerom)
+            Path_makerom = exePath
         End If
     End Sub
 
@@ -192,6 +205,7 @@ Public Class Converter
 
         If options.CompressCodeBin Then
             Throw New NotImplementedException
+            '"3dstool -zvf code-patched.bin --compress-type blz --compress-out exefs/code.bin"
         End If
 
         Dim headerPath As String = Path.Combine(options.SourceDirectory, options.ExeFSHeaderName)
@@ -275,12 +289,7 @@ Public Class Converter
         Await Task.WhenAll(partitionExtractions)
     End Function
 
-    ''' <summary>
-    ''' Builds a decrypted CCI/3DS file, for use with Citra or Decrypt9
-    ''' </summary>
-    ''' <param name="options"></param>
-    ''' <returns></returns>
-    Public Async Function Build3DSDecrypted(options As BuildOptions) As Task
+    Private Async Function BuildPartitions(options As BuildOptions) As Task
         Copy3DSTool()
 
         Dim partitionTasks As New List(Of Task)
@@ -290,6 +299,17 @@ Public Class Converter
         partitionTasks.Add(BuildPartition6(options))
         partitionTasks.Add(BuildPartition7(options))
         Await Task.WhenAll(partitionTasks)
+
+
+    End Function
+
+    ''' <summary>
+    ''' Builds a decrypted CCI/3DS file, for use with Citra or Decrypt9
+    ''' </summary>
+    ''' <param name="options"></param>
+    ''' <returns></returns>
+    Public Async Function Build3DSDecrypted(options As BuildOptions) As Task
+        Await BuildPartitions(options)
 
         Dim partitionArgs As String = ""
 
@@ -307,7 +327,6 @@ Public Class Converter
         Dim headerPath As String = Path.Combine(options.SourceDirectory, options.RootHeaderName)
         Dim outputPath As String = Path.Combine(options.SourceDirectory, options.DestinationROM)
 
-        '"3dstool.exe" -ctf 3ds PatchedRom-Test.3ds --header HeaderNCCH.bin -0 CustomPartition0.bin -1 CustomPartition1.bin -6 CustomPartition6.bin -7 CustomPartition7.bin
         Await RunProgram(Path_3dstool, $"-ctf 3ds ""{outputPath}"" --header ""{headerPath}""{partitionArgs}")
 
         'Cleanup
@@ -355,6 +374,38 @@ Public Class Converter
         Else
             Await RunProgram(Path_3dsbuilder, $"""{exeFS}"" ""{romFS}"" ""{exHeader}"" ""{options.DestinationROM}"" -compressCode")
         End If
+    End Function
+
+    Public Async Function BuildCia(options As BuildOptions) As Task
+        CopyMakeRom()
+        Await BuildPartitions(options)
+
+        Dim partitionArgs As String = ""
+
+        'Delete partitions that are too small
+        For Each item In {0, 1, 2, 6, 7} '{"CustomPartition0.bin", "CustomPartition1.bin", "CustomPartition2.bin", "CustomPartition6.bin", "CustomPartition7.bin"}
+            Dim info As New FileInfo(Path.Combine(ToolDirectory, "CustomPartition" & item.ToString & ".bin"))
+            If info.Length <= 20000 Then
+                File.Delete(info.FullName)
+            Else
+                Dim num = item.ToString
+                partitionArgs &= $" -content CustomPartition{num}.bin:{num}"
+            End If
+        Next
+
+        Dim headerPath As String = Path.Combine(options.SourceDirectory, options.RootHeaderName)
+        Dim outputPath As String = Path.Combine(options.SourceDirectory, options.DestinationROM)
+
+        'makerom -f cia -o [PATCHED].cia -content patched.cxi:0
+        Await RunProgram(Path_makerom, $"-f cia -o ""{outputPath}""{partitionArgs}")
+
+        'Cleanup
+        For Each item In {0, 1, 2, 6, 7}
+            Dim partition = Path.Combine(ToolDirectory, "CustomPartition" & item.ToString & ".bin")
+            If File.Exists(partition) Then
+                File.Delete(partition)
+            End If
+        Next
     End Function
 
 

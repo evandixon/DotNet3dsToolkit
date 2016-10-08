@@ -124,6 +124,9 @@
   <data name="_3dstool" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\3dstool.exe;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
+  <data name="makerom" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\makerom.exe;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="_3DS_Builder" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\3DS Builder.exe;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
