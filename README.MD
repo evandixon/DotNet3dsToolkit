@@ -26,7 +26,7 @@ Using c As New DotNet3dsToolkit.Converter
     options.SourceRom = "C:/MyROM.3ds"
     options.DestinationDirectory = "C:/RawFiles/"
 
-    Await c.Extract(options)
+    Await c.ExtractCCI(options)
 End Using 'It is important to dispose of the converter when finished.  This will delete temporary files created during extraction.
 
 ' To Build

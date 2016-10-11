@@ -295,7 +295,22 @@ Public Class Converter
 
 #End Region
 
-    Public Async Function Extract(options As ExtractionOptions) As Task
+    ''' <summary>
+    ''' Extracts a CCI ROM.
+    ''' </summary>
+    ''' <param name="filename">Full path of the ROM to extract.</param>
+    ''' <param name="outputDirectory">Directory into which to extract the files.</param>
+    Public Async Function ExtractCCI(filename As String, outputDirectory As String) As Task
+        Dim options As New ExtractionOptions
+        options.SourceRom = filename
+        options.DestinationDirectory = outputDirectory
+        Await ExtractCCI(options)
+    End Function
+
+    ''' <summary>
+    ''' Extracts a CCI ROM.
+    ''' </summary>
+    Public Async Function ExtractCCI(options As ExtractionOptions) As Task
         Copy3DSTool()
 
         If Directory.Exists(options.DestinationDirectory) Then
@@ -312,6 +327,22 @@ Public Class Converter
         partitionExtractions.Add(ExtractPartition6(options))
         partitionExtractions.Add(ExtractPartition7(options))
         Await Task.WhenAll(partitionExtractions)
+    End Function
+
+    ''' <summary>
+    ''' Extracts a CXI partition.
+    ''' </summary>
+    Public Async Function ExtractCXI(options As ExtractionOptions) As Task
+        Copy3DSTool()
+
+        If Directory.Exists(options.DestinationDirectory) Then
+            Directory.Delete(options.DestinationDirectory, True)
+        End If
+        Directory.CreateDirectory(options.DestinationDirectory)
+
+        'Todo: extract partition 1, which is the only partition we have
+
+        Throw New NotImplementedException
     End Function
 
     Private Async Function BuildPartitions(options As BuildOptions) As Task
