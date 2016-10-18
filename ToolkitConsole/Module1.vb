@@ -9,7 +9,7 @@ Module Module1
 
             Dim args = Environment.GetCommandLineArgs
             If args.Length < 3 Then
-                Console.WriteLine("Usage: ToolkitConsole.exe <source> <destination> [-key0]")
+                Console.WriteLine("Usage: ToolkitConsole.exe <source> [-source-cxi] <destination> [-key0]")
                 Console.WriteLine("<source> can either be a decrypted CCI/3DS ROM, or a directory created by ToolkitConsole.exe")
                 Console.WriteLine("<destination> can be a *.3DS, *.3DZ, *.CCI, or *.CIA file, or a directory if the source is a ROM.")
                 Console.WriteLine("Output format is detected by the extension.  *.CIA files are outputted as CIA files, *.3DZ files are outputted as 0-key encrypted CCI ROMs, all others are outputted as decrypted CCI ROMs.  Use the -key0 flag to output as a 0-key encrypted CCI ROM instead.")
@@ -36,7 +36,13 @@ Module Module1
 
                         Console.WriteLine("Extracting to ""{0}""...", destination)
 
-                        c.Extract(options).Wait()
+                        If Path.GetExtension(source).ToLower = ".cxi" OrElse args.Contains("-source-cxi") Then
+                            c.ExtractCXI(options).Wait()
+                        Else
+                            c.ExtractCCI(options).Wait()
+                        End If
+
+
 
                         Console.WriteLine("Extraction complete!")
                     End Using

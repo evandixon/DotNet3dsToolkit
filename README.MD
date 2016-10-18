@@ -3,6 +3,7 @@
 
 Supported formats for extraction:
 * Decrypted CCI (aka .3DS)
+* Decrypted CXI (like what Braindump would give you)
 
 Supported formats for building:
 * Decrypted CCI (aka .3DS)
@@ -25,8 +26,12 @@ Using c As New DotNet3dsToolkit.Converter
     Dim options As New DotNet3dsToolkit.ExtractionOptions
     options.SourceRom = "C:/MyROM.3ds"
     options.DestinationDirectory = "C:/RawFiles/"
+	
+	' To extract a decrypted CCI
+    Await c.ExtractCCI(options) 'Do not run these functions concurrently.  If you need to do so, create another instance of DotNet3dsToolkit.Converter to build another directory.
 
-    Await c.ExtractCCI(options)
+	' To extract a decrypted CXI
+	Await c.ExtractCXI(options)
 End Using 'It is important to dispose of the converter when finished.  This will delete temporary files created during extraction.
 
 ' To Build
@@ -57,7 +62,11 @@ using (DotNet3dsToolkit.Converter c = new DotNet3dsToolkit.Converter()) {
 	options.SourceRom = "C:/MyROM.3ds";
 	options.DestinationDirectory = "C:/RawFiles/";
 
-	await c.Extract(options);
+	// To extract a decrypted CCI
+    await c.ExtractCCI(options); 'Do not run these functions concurrently.  If you need to do so, create another instance of DotNet3dsToolkit.Converter to build another directory.
+
+	// To extract a decrypted CXI
+	await c.ExtractCXI(options);
 } // It is important to dispose of the converter when finished.  This will delete temporary files created during extraction.
 
 // To Build
@@ -81,9 +90,12 @@ using (DotNet3dsToolkit.Converter c = new DotNet3dsToolkit.Converter()) {
 ```
 
 Using the ToolkitConsole.exe:
-`ToolkitConsole.exe <source> <destination> [-key0]`
-* <source> can either be a decrypted CCI/3DS ROM, or a directory created by ToolkitConsole.exe.
+`ToolkitConsole.exe <source> [source-cxi] <destination> [-key0]`
+* <source> can be a decrypted CCI/3DS ROM or a decrypted CXI, or a directory created by ToolkitConsole.exe.
 * <destination> can be a *.3DS, *.3DZ, *.CCI, or *.CIA file, or a directory if the source is a ROM.
+* Input format is detected by the extension.
+  * *.CXI files are treated as decrypted CXI files.
+  * All others are treated as decrypted CCI files.  This can be overridden by using the -source-cxi flag to treat input as a CXI.
 * Output format is detected by the extension.
   * *.CIA files are outputted as CIA files.
   * *.3DZ files are outputted as 0-key encrypted CCI ROMs.

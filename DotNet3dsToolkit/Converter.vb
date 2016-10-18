@@ -9,11 +9,27 @@ Public Class Converter
         p.StartInfo.WorkingDirectory = Path.GetDirectoryName(program)
         p.StartInfo.Arguments = arguments
         p.StartInfo.WindowStyle = ProcessWindowStyle.Hidden
+        p.StartInfo.RedirectStandardOutput = True
+        p.StartInfo.RedirectStandardError = True
+        p.StartInfo.UseShellExecute = False
+
+        AddHandler p.OutputDataReceived, AddressOf OnInputRecieved
+        AddHandler p.ErrorDataReceived, AddressOf OnInputRecieved
 
         p.Start()
 
         Await Task.Run(Sub() p.WaitForExit())
+
+        RemoveHandler p.OutputDataReceived, AddressOf OnInputRecieved
+        RemoveHandler p.ErrorDataReceived, AddressOf OnInputRecieved
     End Function
+
+    Private Sub OnInputRecieved(sender As Object, e As DataReceivedEventArgs)
+        If TypeOf sender Is Process Then
+            Console.Write($"[{Path.GetFileNameWithoutExtension(DirectCast(sender, Process).StartInfo.FileName)}] ")
+            Console.WriteLine(e.Data)
+        End If
+    End Sub
 
 #Region "Tool Management"
     Private Property ToolDirectory As String
@@ -88,13 +104,13 @@ Public Class Converter
         Await RunProgram(Path_3dstool, $"-xtf 3ds ""{options.SourceRom}"" --header ""{headerNcchPath}"" -0 DecryptedPartition0.bin -1 DecryptedPartition1.bin -2 DecryptedPartition2.bin -6 DecryptedPartition6.bin -7 DecryptedPartition7.bin")
     End Function
 
-    Private Async Function ExtractPartition0(options As ExtractionOptions) As Task
+    Private Async Function ExtractPartition0(options As ExtractionOptions, partitionFilename As String) As Task
         'Extract partitions
         Dim exheaderPath As String = Path.Combine(options.DestinationDirectory, options.ExheaderName)
         Dim headerPath As String = Path.Combine(options.DestinationDirectory, options.Partition0HeaderName)
         Dim logoPath As String = Path.Combine(options.DestinationDirectory, options.LogoLZName)
         Dim plainPath As String = Path.Combine(options.DestinationDirectory, options.PlainRGNName)
-        Await RunProgram(Path_3dstool, $"-xtf cxi DecryptedPartition0.bin --header ""{headerPath}"" --exh ""{exheaderPath}"" --exefs DecryptedExeFS.bin --romfs DecryptedRomFS.bin --logo ""{logoPath}"" --plain ""{plainPath}""")
+        Await RunProgram(Path_3dstool, $"-xtf cxi ""{partitionFilename}"" --header ""{headerPath}"" --exh ""{exheaderPath}"" --exefs DecryptedExeFS.bin --romfs DecryptedRomFS.bin --logo ""{logoPath}"" --plain ""{plainPath}""")
 
         'Extract romfs and exefs
         Dim romfsDir As String = Path.Combine(options.DestinationDirectory, options.RomFSDirName)
@@ -321,7 +337,7 @@ Public Class Converter
         Await ExtractPartitions(options)
 
         Dim partitionExtractions As New List(Of Task)
-        partitionExtractions.Add(ExtractPartition0(options))
+        partitionExtractions.Add(ExtractPartition0(options, "DecryptedPartition0.bin"))
         partitionExtractions.Add(ExtractPartition1(options))
         partitionExtractions.Add(ExtractPartition2(options))
         partitionExtractions.Add(ExtractPartition6(options))
@@ -340,9 +356,8 @@ Public Class Converter
         End If
         Directory.CreateDirectory(options.DestinationDirectory)
 
-        'Todo: extract partition 1, which is the only partition we have
-
-        Throw New NotImplementedException
+        'Extract partition 0, which is the only partition we have
+        Await ExtractPartition0(options, options.SourceRom)
     End Function
 
     Private Async Function BuildPartitions(options As BuildOptions) As Task
@@ -355,7 +370,6 @@ Public Class Converter
         partitionTasks.Add(BuildPartition6(options))
         partitionTasks.Add(BuildPartition7(options))
         Await Task.WhenAll(partitionTasks)
-
 
     End Function
 
