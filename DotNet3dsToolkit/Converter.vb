@@ -399,7 +399,11 @@ Public Class Converter
         Dim headerPath As String = Path.Combine(options.SourceDirectory, options.RootHeaderName)
         Dim outputPath As String = Path.Combine(options.SourceDirectory, options.DestinationROM)
 
-        Await RunProgram(Path_3dstool, $"-ctf 3ds ""{outputPath}"" --header ""{headerPath}""{partitionArgs}")
+        If File.Exists(headerPath) Then
+            Await RunProgram(Path_3dstool, $"-ctf 3ds ""{outputPath}"" --header ""{headerPath}""{partitionArgs}")
+        Else
+            Console.WriteLine("Error: missing NCCH header.  This can happen if you extracted a CXI and are trying to rebuild a decrypted CCI.  Try building as a key-0 encrypted CCI instead.")
+        End If
 
         'Cleanup
         For Each item In {0, 1, 2, 6, 7}
