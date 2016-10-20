@@ -42,23 +42,29 @@ Module Module1
                             c.ExtractCCI(options).Wait()
                         End If
 
-
-
                         Console.WriteLine("Extraction complete!")
                     End Using
 
                 ElseIf Directory.Exists(source) Then
                     'Building mode
 
-                    If key0 Then
-                        BuildKey0(source, destination)
-                    ElseIf Path.GetExtension(destination).ToLower = ".cia" Then
-                        BuildCIA(source, destination)
-                    ElseIf Path.GetExtension(destination).ToLower = ".3dz" Then
-                        BuildKey0(source, destination)
-                    Else
-                        BuildDecryptedCCI(source, destination)
-                    End If
+                    Using c As New DotNet3dsToolkit.Converter
+                        If key0 Then
+                            Console.WriteLine("Building as 0-key encrypted CCI...")
+                            c.Build3DS0Key(source, destination)
+                        ElseIf Path.GetExtension(destination).ToLower = ".cia" Then
+                            Console.WriteLine("Building as CIA...")
+                            c.BuildCia(source, destination)
+                        ElseIf Path.GetExtension(destination).ToLower = ".3dz" Then
+                            Console.WriteLine("Building as 0-key encrypted CCI...")
+                            c.Build3DS0Key(source, destination)
+                        Else
+                            Console.WriteLine("Building as decrypted CCI...")
+                            c.Build3DSDecrypted(source, destination)
+                        End If
+
+                        Console.WriteLine("Build complete!")
+                    End Using
 
                 Else
                     Console.WriteLine("Error: The given source is neither a file nor a directory.")
@@ -69,48 +75,6 @@ Module Module1
         Catch ex As Exception
             Console.WriteLine(ex.ToString)
         End Try
-    End Sub
-
-    Private Sub BuildKey0(source As String, destination As String)
-        Using c As New DotNet3dsToolkit.Converter
-            Dim options As New DotNet3dsToolkit.BuildOptions
-            options.SourceDirectory = source
-            options.DestinationROM = destination
-
-            Console.WriteLine("Building as key-0 encrypted CCI to ""{0}""...", destination)
-
-            c.Build3DS0Key(options).Wait()
-
-            Console.WriteLine("Build complete!")
-        End Using
-    End Sub
-
-    Private Sub BuildCIA(source As String, destination As String)
-        Using c As New DotNet3dsToolkit.Converter
-            Dim options As New DotNet3dsToolkit.BuildOptions
-            options.SourceDirectory = source
-            options.DestinationROM = destination
-
-            Console.WriteLine("Building as CIA to ""{0}""...", destination)
-
-            c.BuildCia(options).Wait()
-
-            Console.WriteLine("Build complete!")
-        End Using
-    End Sub
-
-    Private Sub BuildDecryptedCCI(source As String, destination As String)
-        Using c As New DotNet3dsToolkit.Converter
-            Dim options As New DotNet3dsToolkit.BuildOptions
-            options.SourceDirectory = source
-            options.DestinationROM = destination
-
-            Console.WriteLine("Building as decrypted CCI to ""{0}""...", destination)
-
-            c.Build3DSDecrypted(options).Wait()
-
-            Console.WriteLine("Build complete!")
-        End Using
     End Sub
 
 End Module
