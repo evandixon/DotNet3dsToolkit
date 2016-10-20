@@ -308,6 +308,19 @@ Public Class Converter
         File.Delete(Path.Combine(ToolDirectory, "CustomO3DSUpdate.bin"))
     End Function
 
+    Private Async Function BuildPartitions(options As BuildOptions) As Task
+        Copy3DSTool()
+
+        Dim partitionTasks As New List(Of Task)
+        partitionTasks.Add(BuildPartition0(options))
+        partitionTasks.Add(BuildPartition1(options))
+        partitionTasks.Add(BuildPartition2(options))
+        partitionTasks.Add(BuildPartition6(options))
+        partitionTasks.Add(BuildPartition7(options))
+        Await Task.WhenAll(partitionTasks)
+
+    End Function
+
 
 #End Region
 
@@ -360,16 +373,7 @@ Public Class Converter
         Await ExtractPartition0(options, options.SourceRom)
     End Function
 
-    Private Async Function BuildPartitions(options As BuildOptions) As Task
-        Copy3DSTool()
-
-        Dim partitionTasks As New List(Of Task)
-        partitionTasks.Add(BuildPartition0(options))
-        partitionTasks.Add(BuildPartition1(options))
-        partitionTasks.Add(BuildPartition2(options))
-        partitionTasks.Add(BuildPartition6(options))
-        partitionTasks.Add(BuildPartition7(options))
-        Await Task.WhenAll(partitionTasks)
+    Public Async Function ExtractAuto(sourceROM As String, outputDirectory As String) As Task
 
     End Function
 
@@ -414,10 +418,22 @@ Public Class Converter
     End Function
 
     ''' <summary>
+    ''' Builds a decrypted CCI from the given files.
+    ''' </summary>
+    ''' <param name="sourceDirectory">Path of the files to build.  Must have been created with <see cref="ExtractAuto(String, String)"/> or equivalent function using default settings.</param>
+    ''' <param name="outputROM">Destination of the output ROM.</param>
+    Public Async Function Build3DSDecrypted(sourceDirectory As String, outputROM As String) As Task
+        Dim options As New BuildOptions
+        options.SourceDirectory = sourceDirectory
+        options.DestinationROM = outputROM
+
+        Await Build3DSDecrypted(options)
+    End Function
+
+    ''' <summary>
     ''' Builds a CCI/3DS file encrypted with a 0-key, for use with Gateway.  Excludes update partitions, download play, and manual.
     ''' </summary>
     ''' <param name="options"></param>
-    ''' <returns></returns>
     Public Async Function Build3DS0Key(options As BuildOptions) As Task
         Copy3DSBuilder()
 
@@ -440,6 +456,23 @@ Public Class Converter
         End If
     End Function
 
+    ''' <summary>
+    ''' Builds a 0-key encrypted CCI from the given files.
+    ''' </summary>
+    ''' <param name="sourceDirectory">Path of the files to build.  Must have been created with <see cref="ExtractAuto(String, String)"/> or equivalent function using default settings.</param>
+    ''' <param name="outputROM">Destination of the output ROM.</param>
+    Public Async Function Build3DS0Key(sourceDirectory As String, outputROM As String) As Task
+        Dim options As New BuildOptions
+        options.SourceDirectory = sourceDirectory
+        options.DestinationROM = outputROM
+
+        Await Build3DS0Key(options)
+    End Function
+
+    ''' <summary>
+    ''' Builds a CCI/3DS file encrypted with a 0-key, for use with Gateway.  Excludes update partitions, download play, and manual.
+    ''' </summary>
+    ''' <param name="options"></param>
     Public Async Function BuildCia(options As BuildOptions) As Task
         UpdateExheader(options, True)
         CopyMakeRom()
@@ -470,6 +503,35 @@ Public Class Converter
                 File.Delete(partition)
             End If
         Next
+    End Function
+
+    ''' <summary>
+    ''' Builds a CIA from the given files.
+    ''' </summary>
+    ''' <param name="sourceDirectory">Path of the files to build.  Must have been created with <see cref="ExtractAuto(String, String)"/> or equivalent function using default settings.</param>
+    ''' <param name="outputROM">Destination of the output ROM.</param>
+    Public Async Function BuildCia(sourceDirectory As String, outputROM As String) As Task
+        Dim options As New BuildOptions
+        options.SourceDirectory = sourceDirectory
+        options.DestinationROM = outputROM
+
+        Await BuildCia(options)
+    End Function
+
+    ''' <summary>
+    ''' Builds a ROM from the given files.
+    ''' </summary>
+    ''' <param name="sourceDirectory">Path of the files to build.  Must have been created with <see cref="ExtractAuto(String, String)"/> or equivalent function using default settings.</param>
+    ''' <param name="outputROM">Destination of the output ROM.</param>
+    ''' <remarks>Output format is determined by file extension.  Extensions of ".cia" build a CIA, extensions of ".3dz" build a 0-key encrypted CCI, and all others build a decrypted CCI.  To force a different behavior, use a more specific Build function.</remarks>
+    Public Async Function BuildAuto(sourceDirectory As String, outputROM As String) As Task
+        If Path.GetExtension(outputROM).ToLower = ".cia" Then
+            Await BuildCia(sourceDirectory, outputROM)
+        ElseIf Path.GetExtension(outputROM).ToLower = ".3dz" Then
+            Await Build3DS0Key(sourceDirectory, outputROM)
+        Else
+            Await Build3DSDecrypted(sourceDirectory, outputROM)
+        End If
     End Function
 
 
