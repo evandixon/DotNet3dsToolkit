@@ -3,31 +3,46 @@
 Public Class Converter
     Implements IDisposable
 
+    ''' <summary>
+    ''' Whether or not to forward console output of child processes to the current process.
+    ''' </summary>
+    ''' <returns></returns>
+    Public Property OutputConsoleOutput As Boolean = True
+
     Private Async Function RunProgram(program As String, arguments As String) As Task
+        Dim handlersRegistered As Boolean = False
+
         Dim p As New Process
         p.StartInfo.FileName = program
         p.StartInfo.WorkingDirectory = Path.GetDirectoryName(program)
         p.StartInfo.Arguments = arguments
         p.StartInfo.WindowStyle = ProcessWindowStyle.Hidden
-        p.StartInfo.RedirectStandardOutput = True
-        p.StartInfo.RedirectStandardError = True
+        p.StartInfo.RedirectStandardOutput = OutputConsoleOutput
+        p.StartInfo.RedirectStandardError = p.StartInfo.RedirectStandardOutput
         p.StartInfo.UseShellExecute = False
 
-        AddHandler p.OutputDataReceived, AddressOf OnInputRecieved
-        AddHandler p.ErrorDataReceived, AddressOf OnInputRecieved
+        If p.StartInfo.RedirectStandardOutput Then
+            AddHandler p.OutputDataReceived, AddressOf OnInputRecieved
+            AddHandler p.ErrorDataReceived, AddressOf OnInputRecieved
+            handlersRegistered = True
+        End If
 
         p.Start()
 
         Await Task.Run(Sub() p.WaitForExit())
 
-        RemoveHandler p.OutputDataReceived, AddressOf OnInputRecieved
-        RemoveHandler p.ErrorDataReceived, AddressOf OnInputRecieved
+        If handlersRegistered Then
+            RemoveHandler p.OutputDataReceived, AddressOf OnInputRecieved
+            RemoveHandler p.ErrorDataReceived, AddressOf OnInputRecieved
+        End If
     End Function
 
     Private Sub OnInputRecieved(sender As Object, e As DataReceivedEventArgs)
-        If TypeOf sender Is Process Then
-            Console.Write($"[{Path.GetFileNameWithoutExtension(DirectCast(sender, Process).StartInfo.FileName)}] ")
-            Console.WriteLine(e.Data)
+        If OutputConsoleOutput Then
+            If TypeOf sender Is Process Then
+                Console.Write($"[{Path.GetFileNameWithoutExtension(DirectCast(sender, Process).StartInfo.FileName)}] ")
+                Console.WriteLine(e.Data)
+            End If
         End If
     End Sub
 
