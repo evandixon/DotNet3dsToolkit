@@ -3,17 +3,48 @@
 Public Class Converter
     Implements IDisposable
 
+    ''' <summary>
+    ''' Whether or not to forward console output of child processes to the current process.
+    ''' </summary>
+    ''' <returns></returns>
+    Public Property OutputConsoleOutput As Boolean = True
+
     Private Async Function RunProgram(program As String, arguments As String) As Task
+        Dim handlersRegistered As Boolean = False
+
         Dim p As New Process
         p.StartInfo.FileName = program
         p.StartInfo.WorkingDirectory = Path.GetDirectoryName(program)
         p.StartInfo.Arguments = arguments
         p.StartInfo.WindowStyle = ProcessWindowStyle.Hidden
+        p.StartInfo.RedirectStandardOutput = OutputConsoleOutput
+        p.StartInfo.RedirectStandardError = p.StartInfo.RedirectStandardOutput
+        p.StartInfo.UseShellExecute = False
+
+        If p.StartInfo.RedirectStandardOutput Then
+            AddHandler p.OutputDataReceived, AddressOf OnInputRecieved
+            AddHandler p.ErrorDataReceived, AddressOf OnInputRecieved
+            handlersRegistered = True
+        End If
 
         p.Start()
 
         Await Task.Run(Sub() p.WaitForExit())
+
+        If handlersRegistered Then
+            RemoveHandler p.OutputDataReceived, AddressOf OnInputRecieved
+            RemoveHandler p.ErrorDataReceived, AddressOf OnInputRecieved
+        End If
     End Function
+
+    Private Sub OnInputRecieved(sender As Object, e As DataReceivedEventArgs)
+        If OutputConsoleOutput Then
+            If TypeOf sender Is Process Then
+                Console.Write($"[{Path.GetFileNameWithoutExtension(DirectCast(sender, Process).StartInfo.FileName)}] ")
+                Console.WriteLine(e.Data)
+            End If
+        End If
+    End Sub
 
 #Region "Tool Management"
     Private Property ToolDirectory As String
@@ -88,13 +119,13 @@ Public Class Converter
         Await RunProgram(Path_3dstool, $"-xtf 3ds ""{options.SourceRom}"" --header ""{headerNcchPath}"" -0 DecryptedPartition0.bin -1 DecryptedPartition1.bin -2 DecryptedPartition2.bin -6 DecryptedPartition6.bin -7 DecryptedPartition7.bin")
     End Function
 
-    Private Async Function ExtractPartition0(options As ExtractionOptions) As Task
+    Private Async Function ExtractPartition0(options As ExtractionOptions, partitionFilename As String) As Task
         'Extract partitions
         Dim exheaderPath As String = Path.Combine(options.DestinationDirectory, options.ExheaderName)
         Dim headerPath As String = Path.Combine(options.DestinationDirectory, options.Partition0HeaderName)
         Dim logoPath As String = Path.Combine(options.DestinationDirectory, options.LogoLZName)
         Dim plainPath As String = Path.Combine(options.DestinationDirectory, options.PlainRGNName)
-        Await RunProgram(Path_3dstool, $"-xtf cxi DecryptedPartition0.bin --header ""{headerPath}"" --exh ""{exheaderPath}"" --exefs DecryptedExeFS.bin --romfs DecryptedRomFS.bin --logo ""{logoPath}"" --plain ""{plainPath}""")
+        Await RunProgram(Path_3dstool, $"-xtf cxi ""{partitionFilename}"" --header ""{headerPath}"" --exh ""{exheaderPath}"" --exefs DecryptedExeFS.bin --romfs DecryptedRomFS.bin --logo ""{logoPath}"" --plain ""{plainPath}""")
 
         'Extract romfs and exefs
         Dim romfsDir As String = Path.Combine(options.DestinationDirectory, options.RomFSDirName)
@@ -292,28 +323,6 @@ Public Class Converter
         File.Delete(Path.Combine(ToolDirectory, "CustomO3DSUpdate.bin"))
     End Function
 
-
-#End Region
-
-    Public Async Function Extract(options As ExtractionOptions) As Task
-        Copy3DSTool()
-
-        If Directory.Exists(options.DestinationDirectory) Then
-            Directory.Delete(options.DestinationDirectory, True)
-        End If
-        Directory.CreateDirectory(options.DestinationDirectory)
-
-        Await ExtractPartitions(options)
-
-        Dim partitionExtractions As New List(Of Task)
-        partitionExtractions.Add(ExtractPartition0(options))
-        partitionExtractions.Add(ExtractPartition1(options))
-        partitionExtractions.Add(ExtractPartition2(options))
-        partitionExtractions.Add(ExtractPartition6(options))
-        partitionExtractions.Add(ExtractPartition7(options))
-        Await Task.WhenAll(partitionExtractions)
-    End Function
-
     Private Async Function BuildPartitions(options As BuildOptions) As Task
         Copy3DSTool()
 
@@ -325,20 +334,102 @@ Public Class Converter
         partitionTasks.Add(BuildPartition7(options))
         Await Task.WhenAll(partitionTasks)
 
+    End Function
 
+
+#End Region
+
+    ''' <summary>
+    ''' Extracts a decrypted CCI ROM.
+    ''' </summary>
+    ''' <param name="filename">Full path of the ROM to extract.</param>
+    ''' <param name="outputDirectory">Directory into which to extract the files.</param>
+    Public Async Function ExtractCCI(filename As String, outputDirectory As String) As Task
+        Dim options As New ExtractionOptions
+        options.SourceRom = filename
+        options.DestinationDirectory = outputDirectory
+        Await ExtractCCI(options)
+    End Function
+
+    ''' <summary>
+    ''' Extracts a CCI ROM.
+    ''' </summary>
+    Public Async Function ExtractCCI(options As ExtractionOptions) As Task
+        Copy3DSTool()
+
+        If Directory.Exists(options.DestinationDirectory) Then
+            Directory.Delete(options.DestinationDirectory, True)
+        End If
+        Directory.CreateDirectory(options.DestinationDirectory)
+
+        Await ExtractPartitions(options)
+
+        Dim partitionExtractions As New List(Of Task)
+        partitionExtractions.Add(ExtractPartition0(options, "DecryptedPartition0.bin"))
+        partitionExtractions.Add(ExtractPartition1(options))
+        partitionExtractions.Add(ExtractPartition2(options))
+        partitionExtractions.Add(ExtractPartition6(options))
+        partitionExtractions.Add(ExtractPartition7(options))
+        Await Task.WhenAll(partitionExtractions)
+    End Function
+
+    ''' <summary>
+    ''' Extracts a decrypted CXI ROM.
+    ''' </summary>
+    ''' <param name="filename">Full path of the ROM to extract.</param>
+    ''' <param name="outputDirectory">Directory into which to extract the files.</param>
+    Public Async Function ExtractCXI(filename As String, outputDirectory As String) As Task
+        Dim options As New ExtractionOptions
+        options.SourceRom = filename
+        options.DestinationDirectory = outputDirectory
+        Await ExtractCXI(options)
+    End Function
+
+    ''' <summary>
+    ''' Extracts a CXI partition.
+    ''' </summary>
+    Public Async Function ExtractCXI(options As ExtractionOptions) As Task
+        Copy3DSTool()
+
+        If Directory.Exists(options.DestinationDirectory) Then
+            Directory.Delete(options.DestinationDirectory, True)
+        End If
+        Directory.CreateDirectory(options.DestinationDirectory)
+
+        'Extract partition 0, which is the only partition we have
+        Await ExtractPartition0(options, options.SourceRom)
+    End Function
+
+    ''' <summary>
+    ''' Extracts a decrypted CCI or CXI ROM.
+    ''' </summary>
+    ''' <param name="filename">Full path of the ROM to extract.</param>
+    ''' <param name="outputDirectory">Directory into which to extract the files.</param>
+    ''' <remarks>Extraction type is determined by file extension.  Extensions of ".cxi" are extracted as CXI, all others are extracted as CCI.  To override this behavior, use a more specific extraction function.</remarks>
+    Public Async Function ExtractAuto(filename As String, outputDirectory As String) As Task
+        If Path.GetExtension(filename).ToLower = ".cxi" Then
+            Await ExtractCXI(filename, outputDirectory)
+        Else
+            Await ExtractCCI(filename, outputDirectory)
+        End If
     End Function
 
     ''' <summary>
     ''' Builds a decrypted CCI/3DS file, for use with Citra or Decrypt9
     ''' </summary>
     ''' <param name="options"></param>
-    ''' <returns></returns>
     Public Async Function Build3DSDecrypted(options As BuildOptions) As Task
         UpdateExheader(options, False)
 
-        Await BuildPartitions(options)
-
+        Dim headerPath As String = Path.Combine(options.SourceDirectory, options.RootHeaderName)
+        Dim outputPath As String = Path.Combine(options.SourceDirectory, options.DestinationROM)
         Dim partitionArgs As String = ""
+
+        If Not File.Exists(headerPath) Then
+            Throw New IOException($"NCCH header not found.  This can happen if you extracted a CXI and are trying to rebuild a decrypted CCI.  Try building as a key-0 encrypted CCI instead.  Path of missing header: ""{headerPath}"".")
+        End If
+
+        Await BuildPartitions(options)
 
         'Delete partitions that are too small
         For Each item In {0, 1, 2, 6, 7}
@@ -350,9 +441,6 @@ Public Class Converter
                 partitionArgs &= $" -{num} CustomPartition{num}.bin"
             End If
         Next
-
-        Dim headerPath As String = Path.Combine(options.SourceDirectory, options.RootHeaderName)
-        Dim outputPath As String = Path.Combine(options.SourceDirectory, options.DestinationROM)
 
         Await RunProgram(Path_3dstool, $"-ctf 3ds ""{outputPath}"" --header ""{headerPath}""{partitionArgs}")
 
@@ -366,10 +454,22 @@ Public Class Converter
     End Function
 
     ''' <summary>
+    ''' Builds a decrypted CCI from the given files.
+    ''' </summary>
+    ''' <param name="sourceDirectory">Path of the files to build.  Must have been created with <see cref="ExtractAuto(String, String)"/> or equivalent function using default settings.</param>
+    ''' <param name="outputROM">Destination of the output ROM.</param>
+    Public Async Function Build3DSDecrypted(sourceDirectory As String, outputROM As String) As Task
+        Dim options As New BuildOptions
+        options.SourceDirectory = sourceDirectory
+        options.DestinationROM = outputROM
+
+        Await Build3DSDecrypted(options)
+    End Function
+
+    ''' <summary>
     ''' Builds a CCI/3DS file encrypted with a 0-key, for use with Gateway.  Excludes update partitions, download play, and manual.
     ''' </summary>
     ''' <param name="options"></param>
-    ''' <returns></returns>
     Public Async Function Build3DS0Key(options As BuildOptions) As Task
         Copy3DSBuilder()
 
@@ -392,6 +492,23 @@ Public Class Converter
         End If
     End Function
 
+    ''' <summary>
+    ''' Builds a 0-key encrypted CCI from the given files.
+    ''' </summary>
+    ''' <param name="sourceDirectory">Path of the files to build.  Must have been created with <see cref="ExtractAuto(String, String)"/> or equivalent function using default settings.</param>
+    ''' <param name="outputROM">Destination of the output ROM.</param>
+    Public Async Function Build3DS0Key(sourceDirectory As String, outputROM As String) As Task
+        Dim options As New BuildOptions
+        options.SourceDirectory = sourceDirectory
+        options.DestinationROM = outputROM
+
+        Await Build3DS0Key(options)
+    End Function
+
+    ''' <summary>
+    ''' Builds a CCI/3DS file encrypted with a 0-key, for use with Gateway.  Excludes update partitions, download play, and manual.
+    ''' </summary>
+    ''' <param name="options"></param>
     Public Async Function BuildCia(options As BuildOptions) As Task
         UpdateExheader(options, True)
         CopyMakeRom()
@@ -422,6 +539,35 @@ Public Class Converter
                 File.Delete(partition)
             End If
         Next
+    End Function
+
+    ''' <summary>
+    ''' Builds a CIA from the given files.
+    ''' </summary>
+    ''' <param name="sourceDirectory">Path of the files to build.  Must have been created with <see cref="ExtractAuto(String, String)"/> or equivalent function using default settings.</param>
+    ''' <param name="outputROM">Destination of the output ROM.</param>
+    Public Async Function BuildCia(sourceDirectory As String, outputROM As String) As Task
+        Dim options As New BuildOptions
+        options.SourceDirectory = sourceDirectory
+        options.DestinationROM = outputROM
+
+        Await BuildCia(options)
+    End Function
+
+    ''' <summary>
+    ''' Builds a ROM from the given files.
+    ''' </summary>
+    ''' <param name="sourceDirectory">Path of the files to build.  Must have been created with <see cref="ExtractAuto(String, String)"/> or equivalent function using default settings.</param>
+    ''' <param name="outputROM">Destination of the output ROM.</param>
+    ''' <remarks>Output format is determined by file extension.  Extensions of ".cia" build a CIA, extensions of ".3dz" build a 0-key encrypted CCI, and all others build a decrypted CCI.  To force a different behavior, use a more specific Build function.</remarks>
+    Public Async Function BuildAuto(sourceDirectory As String, outputROM As String) As Task
+        If Path.GetExtension(outputROM).ToLower = ".cia" Then
+            Await BuildCia(sourceDirectory, outputROM)
+        ElseIf Path.GetExtension(outputROM).ToLower = ".3dz" Then
+            Await Build3DS0Key(sourceDirectory, outputROM)
+        Else
+            Await Build3DSDecrypted(sourceDirectory, outputROM)
+        End If
     End Function
 
 
