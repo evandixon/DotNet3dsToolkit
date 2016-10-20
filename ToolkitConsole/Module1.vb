@@ -30,16 +30,12 @@ Module Module1
 
                     'Extraction mode
                     Using c As New DotNet3dsToolkit.Converter
-                        Dim options As New DotNet3dsToolkit.ExtractionOptions
-                        options.SourceRom = source
-                        options.DestinationDirectory = destination
-
                         Console.WriteLine("Extracting to ""{0}""...", destination)
 
                         If Path.GetExtension(source).ToLower = ".cxi" OrElse args.Contains("-source-cxi") Then
-                            c.ExtractCXI(options).Wait()
+                            c.ExtractCXI(source, destination).Wait()
                         Else
-                            c.ExtractCCI(options).Wait()
+                            c.ExtractCCI(source, destination).Wait()
                         End If
 
                         Console.WriteLine("Extraction complete!")
