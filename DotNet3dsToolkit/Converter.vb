@@ -325,7 +325,7 @@ Public Class Converter
 #End Region
 
     ''' <summary>
-    ''' Extracts a CCI ROM.
+    ''' Extracts a decrypted CCI ROM.
     ''' </summary>
     ''' <param name="filename">Full path of the ROM to extract.</param>
     ''' <param name="outputDirectory">Directory into which to extract the files.</param>
@@ -359,6 +359,18 @@ Public Class Converter
     End Function
 
     ''' <summary>
+    ''' Extracts a decrypted CXI ROM.
+    ''' </summary>
+    ''' <param name="filename">Full path of the ROM to extract.</param>
+    ''' <param name="outputDirectory">Directory into which to extract the files.</param>
+    Public Async Function ExtractCXI(filename As String, outputDirectory As String) As Task
+        Dim options As New ExtractionOptions
+        options.SourceRom = filename
+        options.DestinationDirectory = outputDirectory
+        Await ExtractCXI(options)
+    End Function
+
+    ''' <summary>
     ''' Extracts a CXI partition.
     ''' </summary>
     Public Async Function ExtractCXI(options As ExtractionOptions) As Task
@@ -373,15 +385,24 @@ Public Class Converter
         Await ExtractPartition0(options, options.SourceRom)
     End Function
 
-    Public Async Function ExtractAuto(sourceROM As String, outputDirectory As String) As Task
-
+    ''' <summary>
+    ''' Extracts a decrypted CCI or CXI ROM.
+    ''' </summary>
+    ''' <param name="filename">Full path of the ROM to extract.</param>
+    ''' <param name="outputDirectory">Directory into which to extract the files.</param>
+    ''' <remarks>Extraction type is determined by file extension.  Extensions of ".cxi" are extracted as CXI, all others are extracted as CCI.  To override this behavior, use a more specific extraction function.</remarks>
+    Public Async Function ExtractAuto(filename As String, outputDirectory As String) As Task
+        If Path.GetExtension(filename).ToLower = ".cxi" Then
+            Await ExtractCXI(filename, outputDirectory)
+        Else
+            Await ExtractCCI(filename, outputDirectory)
+        End If
     End Function
 
     ''' <summary>
     ''' Builds a decrypted CCI/3DS file, for use with Citra or Decrypt9
     ''' </summary>
     ''' <param name="options"></param>
-    ''' <returns></returns>
     Public Async Function Build3DSDecrypted(options As BuildOptions) As Task
         UpdateExheader(options, False)
 
