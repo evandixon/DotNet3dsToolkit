@@ -381,9 +381,15 @@ Public Class Converter
     Public Async Function Build3DSDecrypted(options As BuildOptions) As Task
         UpdateExheader(options, False)
 
-        Await BuildPartitions(options)
-
+        Dim headerPath As String = Path.Combine(options.SourceDirectory, options.RootHeaderName)
+        Dim outputPath As String = Path.Combine(options.SourceDirectory, options.DestinationROM)
         Dim partitionArgs As String = ""
+
+        If Not File.Exists(headerPath) Then
+            Throw New IOException($"NCCH header not found.  This can happen if you extracted a CXI and are trying to rebuild a decrypted CCI.  Try building as a key-0 encrypted CCI instead.  Path of missing header: ""{headerPath}"".")
+        End If
+
+        Await BuildPartitions(options)
 
         'Delete partitions that are too small
         For Each item In {0, 1, 2, 6, 7}
@@ -396,14 +402,7 @@ Public Class Converter
             End If
         Next
 
-        Dim headerPath As String = Path.Combine(options.SourceDirectory, options.RootHeaderName)
-        Dim outputPath As String = Path.Combine(options.SourceDirectory, options.DestinationROM)
-
-        If File.Exists(headerPath) Then
-            Await RunProgram(Path_3dstool, $"-ctf 3ds ""{outputPath}"" --header ""{headerPath}""{partitionArgs}")
-        Else
-            Console.WriteLine("Error: missing NCCH header.  This can happen if you extracted a CXI and are trying to rebuild a decrypted CCI.  Try building as a key-0 encrypted CCI instead.")
-        End If
+        Await RunProgram(Path_3dstool, $"-ctf 3ds ""{outputPath}"" --header ""{headerPath}""{partitionArgs}")
 
         'Cleanup
         For Each item In {0, 1, 2, 6, 7}
