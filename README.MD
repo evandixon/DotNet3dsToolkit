@@ -84,7 +84,7 @@ using (DotNet3dsToolkit.Converter c = new DotNet3dsToolkit.Converter()) {
 ```
 
 Using the ToolkitConsole.exe:
-`ToolkitConsole.exe <source> [source-cxi] <destination> [-key0]`
+`ToolkitConsole.exe <source> <destination> [source-cxi] [-key0]`
 * <source> can be a decrypted CCI/3DS ROM or a decrypted CXI, or a directory created by ToolkitConsole.exe.
 * <destination> can be a *.3DS, *.3DZ, *.CCI, or *.CIA file, or a directory if the source is a ROM.
 * Input format is detected by the extension.
