@@ -225,7 +225,7 @@ Public Class Converter
     End Function
 #End Region
 
-#Region "Building"
+#Region "Building Parts"
     Private Sub UpdateExheader(options As BuildOptions, isCia As Boolean)
         Using f As New FileStream(Path.Combine(options.SourceDirectory, options.ExheaderName), FileMode.Open, FileAccess.ReadWrite)
             f.Seek(&HD, SeekOrigin.Begin)
@@ -252,7 +252,11 @@ Public Class Converter
 
     Private Async Function BuildRomFS(options As BuildOptions) As Task
         Dim romfsDir = Path.Combine(options.SourceDirectory, options.RomFSDirName)
-        Await RunProgram(Path_3dstool, $" -ctf romfs CustomRomFS.bin --romfs-dir ""{romfsDir}""")
+        Await BuildRomFS(romfsDir, "CustomRomFS.bin")
+    End Function
+
+    Public Async Function BuildRomFS(sourceDirectory As String, outputFile As String) As Task
+        Await RunProgram(Path_3dstool, $"-ctf romfs ""{outputFile}"" --romfs-dir ""{sourceDirectory}""")
     End Function
 
     Private Async Function BuildExeFS(options As BuildOptions) As Task
@@ -339,6 +343,7 @@ Public Class Converter
 
 #End Region
 
+#Region "Top Level Public Methods"
     ''' <summary>
     ''' Extracts a decrypted CCI ROM.
     ''' </summary>
@@ -422,7 +427,7 @@ Public Class Converter
         UpdateExheader(options, False)
 
         Dim headerPath As String = Path.Combine(options.SourceDirectory, options.RootHeaderName)
-        Dim outputPath As String = Path.Combine(options.SourceDirectory, options.DestinationROM)
+        Dim outputPath As String = Path.Combine(options.SourceDirectory, options.Destination)
         Dim partitionArgs As String = ""
 
         If Not File.Exists(headerPath) Then
@@ -461,7 +466,7 @@ Public Class Converter
     Public Async Function Build3DSDecrypted(sourceDirectory As String, outputROM As String) As Task
         Dim options As New BuildOptions
         options.SourceDirectory = sourceDirectory
-        options.DestinationROM = outputROM
+        options.Destination = outputROM
 
         Await Build3DSDecrypted(options)
     End Function
@@ -480,10 +485,10 @@ Public Class Converter
         Dim romFS As String = Path.Combine(options.SourceDirectory, options.RomFSDirName)
 
         If options.CompressCodeBin Then
-            Await RunProgram(Path_3dsbuilder, $"""{exeFS}"" ""{romFS}"" ""{exHeader}"" ""{options.DestinationROM}""-compressCode")
+            Await RunProgram(Path_3dsbuilder, $"""{exeFS}"" ""{romFS}"" ""{exHeader}"" ""{options.Destination}""-compressCode")
             Console.WriteLine("WARNING: .code.bin is still compressed, and other operations may be affected.")
         Else
-            Await RunProgram(Path_3dsbuilder, $"""{exeFS}"" ""{romFS}"" ""{exHeader}"" ""{options.DestinationROM}""")
+            Await RunProgram(Path_3dsbuilder, $"""{exeFS}"" ""{romFS}"" ""{exHeader}"" ""{options.Destination}""")
             Dim dotCodeBin = Path.Combine(options.SourceDirectory, options.ExeFSDirName, ".code.bin")
             Dim codeBin = Path.Combine(options.SourceDirectory, options.ExeFSDirName, "code.bin")
             If File.Exists(dotCodeBin) Then
@@ -500,7 +505,7 @@ Public Class Converter
     Public Async Function Build3DS0Key(sourceDirectory As String, outputROM As String) As Task
         Dim options As New BuildOptions
         options.SourceDirectory = sourceDirectory
-        options.DestinationROM = outputROM
+        options.Destination = outputROM
 
         Await Build3DS0Key(options)
     End Function
@@ -528,7 +533,7 @@ Public Class Converter
         Next
 
         Dim headerPath As String = Path.Combine(options.SourceDirectory, options.RootHeaderName)
-        Dim outputPath As String = Path.Combine(options.SourceDirectory, options.DestinationROM)
+        Dim outputPath As String = Path.Combine(options.SourceDirectory, options.Destination)
 
         Await RunProgram(Path_makerom, $"-f cia -o ""{outputPath}""{partitionArgs}")
 
@@ -549,9 +554,118 @@ Public Class Converter
     Public Async Function BuildCia(sourceDirectory As String, outputROM As String) As Task
         Dim options As New BuildOptions
         options.SourceDirectory = sourceDirectory
-        options.DestinationROM = outputROM
+        options.Destination = outputROM
 
         Await BuildCia(options)
+    End Function
+#End Region
+
+    ''' <summary>
+    ''' Builds files for use with HANS.
+    ''' </summary>
+    ''' <param name="options">Options to use for the build.  <see cref="BuildOptions.Destination"/> should be the SD card root.</param>
+    ''' <param name="shortcutName">Name of the shortcut.  Should not contain spaces nor special characters.</param>
+    ''' <param name="rawName">Raw name for the destination RomFS and Code files.  Should be short, but the exact requirements are unknown.</param>
+    Public Async Function BuildHans(options As BuildOptions, shortcutName As String, rawName As String) As Task
+
+        'Validate input.  Never trust the user.
+        shortcutName = shortcutName.Replace(" ", "").Replace("é", "e")
+
+        Copy3DSTool()
+
+        'Create variables
+        Dim romfsDir = Path.Combine(options.SourceDirectory, options.RomFSDirName)
+        Dim romfsFile = Path.Combine(ToolDirectory, "romfsRepacked.bin")
+        Dim codeFile = Path.Combine(options.SourceDirectory, options.ExeFSDirName, "code.bin")
+        Dim smdhSourceFile = Path.Combine(options.SourceDirectory, options.ExeFSDirName, "icon.bin")
+        Dim exheaderFile = Path.Combine(options.SourceDirectory, options.ExheaderName)
+        Dim titleID As String
+
+        If File.Exists(exheaderFile) Then
+            Dim exheader = File.ReadAllBytes(exheaderFile)
+            titleID = BitConverter.ToUInt64(exheader, &H200).ToString("X").PadLeft(16, "0"c)
+        Else
+            Throw New IOException($"Could not find exheader at the path ""{exheaderFile}"".")
+        End If
+
+        'Repack romfs
+        Await BuildRomFS(romfsDir, romfsFile)
+
+        'Copy the files
+        '- Create non-existant directories
+        If Not Directory.Exists(options.Destination) Then
+            Directory.CreateDirectory(options.Destination)
+        End If
+        If Not Directory.Exists(Path.Combine(options.Destination, "hans")) Then
+            Directory.CreateDirectory(Path.Combine(options.Destination, "hans"))
+        End If
+
+        '- Copy files if they exist
+        If File.Exists(romfsFile) Then
+            File.Copy(romfsFile, IO.Path.Combine(options.Destination, "hans", rawName & ".romfs"), True)
+        End If
+        If File.Exists(codeFile) Then
+            File.Copy(codeFile, IO.Path.Combine(options.Destination, "hans", rawName & ".code"), True)
+        End If
+
+        'Create the homebrew launcher shortcut
+        If Not Directory.Exists(IO.Path.Combine(options.Destination, "3ds")) Then
+            Directory.CreateDirectory(IO.Path.Combine(options.Destination, "3ds"))
+        End If
+
+        '- Copy smdh
+        Dim iconExists As Boolean = False
+        If File.Exists(smdhSourceFile) Then
+            iconExists = True
+            File.Copy(smdhSourceFile, IO.Path.Combine(options.Destination, "3ds", shortcutName & ".smdh"), True)
+        End If
+
+        '- Write hans shortcut
+        Dim shortcut As New Text.StringBuilder
+        shortcut.AppendLine("<shortcut>")
+        shortcut.AppendLine("	<executable>/3ds/hans/hans.3dsx</executable>")
+        If iconExists Then
+            shortcut.AppendLine($"	<icon>/3ds/{shortcutName}.smdh</icon>")
+        End If
+        shortcut.AppendLine($"	<arg>-f/3ds/hans/titles/{rawName}.txt</arg>")
+        shortcut.AppendLine("</shortcut>")
+        shortcut.AppendLine("<targets selectable=""false"">")
+        shortcut.AppendLine($"	<title mediatype=""2"">{titleID}</title>")
+        shortcut.AppendLine($"	<title mediatype=""1"">{titleID}</title>")
+        shortcut.AppendLine("</targets>")
+        File.WriteAllText(Path.Combine(options.Destination, "3ds", shortcutName & ".xml"), shortcut.ToString)
+
+        '- Write hans title settings
+        Dim preset As New Text.StringBuilder
+        preset.Append("region : -1")
+        preset.Append(vbLf)
+        preset.Append("language : -1")
+        preset.Append(vbLf)
+        preset.Append("clock : 0")
+        preset.Append(vbLf)
+        preset.Append("romfs : 0")
+        preset.Append(vbLf)
+        preset.Append("code : 0")
+        preset.Append(vbLf)
+        preset.Append("nim_checkupdate : 1")
+        preset.Append(vbLf)
+        If Not Directory.Exists(Path.Combine(options.Destination, "3ds", "hans", "titles")) Then
+            Directory.CreateDirectory(Path.Combine(options.Destination, "3ds", "hans", "titles"))
+        End If
+        File.WriteAllText(Path.Combine(options.Destination, "3ds", "hans", "titles", rawName & ".txt"), preset.ToString)
+    End Function
+
+    ''' <summary>
+    ''' Builds files for use with HANS.
+    ''' </summary>
+    ''' <param name="sourceDirectory">Path of the files to build.  Must have been created with <see cref="ExtractAuto(String, String)"/> or equivalent function using default settings.</param>
+    ''' <param name="sdRoot">Root of the SD card</param>
+    ''' <param name="rawName">Raw name for the destination RomFS, Code, and shortcut files.  Should be short, but the exact requirements are unknown.  To use a different name for shortcut files, use <see cref="BuildHans(BuildOptions, String, String)"/>.</param>
+    Public Async Function BuildHans(sourceDirectory As String, sdRoot As String, rawName As String) As Task
+        Dim options As New BuildOptions
+        options.SourceDirectory = sourceDirectory
+        options.Destination = sdRoot
+        Await BuildHans(options, rawName, rawName)
     End Function
 
     ''' <summary>
