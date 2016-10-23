@@ -81,6 +81,16 @@ Namespace My.Resources
         End Property
         
         '''<summary>
+        '''  Looks up a localized resource of type System.Byte[].
+        '''</summary>
+        Friend ReadOnly Property ctrtool() As Byte()
+            Get
+                Dim obj As Object = ResourceManager.GetObject("ctrtool", resourceCulture)
+                Return CType(obj,Byte())
+            End Get
+        End Property
+        
+        '''<summary>
         '''  Looks up a localized string similar to // regex: ECMAScript grammar and case insensitive
         '''.
         '''</summary>

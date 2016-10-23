@@ -13,10 +13,10 @@ Supported formats for building:
   * For use with Gateway
 * CIA
   * For use with CFW
+* HANS RomFS, Code.Bin, and Homebrew Launcher Shortcut
 
 Planned Features
-* Build files for HANS
-* More supported source formats (more might work, but only decrypted CCI's have been tested)
+* Decrypted CIA input
 * Automatically add private header to 0-key encrypted CCI's.
 
 Using the library (VB.Net):
@@ -47,6 +47,9 @@ Using c As New DotNet3dsToolkit.Converter
 
 	' To use the most appropriate format based on the extension
 	Await c.BuildAuto("C:/RawFiles/", "C:/MyRom-Rebuilt.cia")
+
+	' To build files for HANS (not supported by BuildAuto)
+	Await c.BuildHans("C:/RawFiles/", "G:/", "MyHack")
 End Using
 ```
 
@@ -79,14 +82,18 @@ using (DotNet3dsToolkit.Converter c = new DotNet3dsToolkit.Converter()) {
 
 	// To use the most appropriate format based on the extension
 	await c.BuildAuto("C:/RawFiles/", "C:/MyRom-Rebuilt.cia");
+
+	// To build files for HANS (not supported by BuildAuto)
+	await c.BuildHans("C:/RawFiles/", "G:/", "MyHack");
 }
 
 ```
 
 Using the ToolkitConsole.exe:
-`ToolkitConsole.exe <source> <destination> [source-cxi] [-key0]`
+`ToolkitConsole.exe <source> <destination> [hans raw file name] [source-cxi] [-key0]`
 * <source> can be a decrypted CCI/3DS ROM or a decrypted CXI, or a directory created by ToolkitConsole.exe.
 * <destination> can be a *.3DS, *.3DZ, *.CCI, or *.CIA file, or a directory if the source is a ROM.
+* [hans raw file name] is the future name of the raw files for HANS, if the ""-hans"" argument is present.  Shorter strings work better, but the exact requirements are unknown.
 * Input format is detected by the extension.
   * *.CXI files are treated as decrypted CXI files.
   * All others are treated as decrypted CCI files.  This can be overridden by using the -source-cxi flag to treat input as a CXI.

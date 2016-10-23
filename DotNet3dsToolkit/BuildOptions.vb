@@ -1,6 +1,6 @@
 ﻿Public Class BuildOptions
     Public Property SourceDirectory As String
-    Public Property DestinationROM As String
+    Public Property Destination As String
 
     ''' <summary>
     ''' Whether or not to compress the code.bin.  If null, no action will be taken (including not updating the exheader)

@@ -112,6 +112,7 @@
     <None Include="Resources\3DS Builder.exe" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Resources\ctrtool.exe" />
     <Content Include="Resources\makerom.exe" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
