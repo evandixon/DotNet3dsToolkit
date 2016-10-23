@@ -17,10 +17,9 @@ Module Module1
     End Sub
 
     Sub Main()
+        Dim args = Environment.GetCommandLineArgs
         Try
             Console.WriteLine(".Net 3DS Toolkit v{0}", Assembly.GetExecutingAssembly.GetName.Version.ToString(3))
-
-            Dim args = Environment.GetCommandLineArgs
             If args.Length < 3 Then
                 PrintUsage()
             Else
@@ -66,16 +65,16 @@ Module Module1
                             End If
                         ElseIf key0 Then
                             Console.WriteLine("Building as 0-key encrypted CCI...")
-                            c.Build3DS0Key(source, destination)
+                            c.Build3DS0Key(source, destination).Wait()
                         ElseIf Path.GetExtension(destination).ToLower = ".cia" Then
                             Console.WriteLine("Building as CIA...")
-                            c.BuildCia(source, destination)
+                            c.BuildCia(source, destination).Wait()
                         ElseIf Path.GetExtension(destination).ToLower = ".3dz" Then
                             Console.WriteLine("Building as 0-key encrypted CCI...")
-                            c.Build3DS0Key(source, destination)
+                            c.Build3DS0Key(source, destination).Wait()
                         Else
                             Console.WriteLine("Building as decrypted CCI...")
-                            c.Build3DSDecrypted(source, destination)
+                            c.Build3DSDecrypted(source, destination).Wait()
                         End If
 
                         Console.WriteLine("Build complete!")
@@ -90,6 +89,11 @@ Module Module1
         Catch ex As Exception
             Console.WriteLine(ex.ToString)
         End Try
+
+        If args.Contains("-noclose") Then
+            Console.WriteLine("Press the enter key to exit...")
+            Console.ReadLine()
+        End If
     End Sub
 
 End Module

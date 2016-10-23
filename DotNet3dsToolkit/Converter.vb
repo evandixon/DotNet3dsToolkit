@@ -41,7 +41,7 @@ Public Class Converter
     End Function
 
     Private Sub OnInputRecieved(sender As Object, e As DataReceivedEventArgs)
-        If TypeOf sender Is Process Then
+        If TypeOf sender Is Process AndAlso Not String.IsNullOrEmpty(e.Data) Then
             Console.Write($"[{Path.GetFileNameWithoutExtension(DirectCast(sender, Process).StartInfo.FileName)}] ")
             Console.WriteLine(e.Data)
         End If
@@ -128,7 +128,16 @@ Public Class Converter
 #End Region
 
 #Region "Extraction"
-    Private Async Function ExtractPartitions(options As ExtractionOptions) As Task
+    Public Sub ExtractPrivateHeader(sourceCCI As String, outputFile As String)
+        Dim onlineHeaderBinPath = outputFile
+        Using f As New FileStream(sourceCCI, FileMode.Open, FileAccess.Read)
+            Dim buffer(&H2E00 + 1) As Byte
+            f.Seek(&H1200, SeekOrigin.Begin)
+            f.Read(buffer, 0, &H2E00)
+            File.WriteAllBytes(onlineHeaderBinPath, buffer)
+        End Using
+    End Sub
+    Private Async Function ExtractCCIPartitions(options As ExtractionOptions) As Task
         Dim headerNcchPath As String = Path.Combine(options.DestinationDirectory, options.RootHeaderName)
         Await RunProgram(Path_3dstool, $"-xtf 3ds ""{options.SourceRom}"" --header ""{headerNcchPath}"" -0 DecryptedPartition0.bin -1 DecryptedPartition1.bin -2 DecryptedPartition2.bin -6 DecryptedPartition6.bin -7 DecryptedPartition7.bin")
     End Function
@@ -389,7 +398,7 @@ Public Class Converter
         End If
         Directory.CreateDirectory(options.DestinationDirectory)
 
-        Await ExtractPartitions(options)
+        Await ExtractCCIPartitions(options)
 
         Dim partitionExtractions As New List(Of Task)
         partitionExtractions.Add(ExtractPartition0(options, "DecryptedPartition0.bin", False))
