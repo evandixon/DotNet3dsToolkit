@@ -65,6 +65,7 @@ Partial Class Form1
         Me.StatusStrip1 = New System.Windows.Forms.StatusStrip()
         Me.pbProgress = New System.Windows.Forms.ToolStripProgressBar()
         Me.lblStatus = New System.Windows.Forms.ToolStripStatusLabel()
+        Me.rbExtractCIA = New System.Windows.Forms.RadioButton()
         Me.TabControl1.SuspendLayout()
         Me.TabPage1.SuspendLayout()
         Me.GroupBox1.SuspendLayout()
@@ -122,6 +123,7 @@ Partial Class Form1
         Me.GroupBox1.Anchor = CType((((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Bottom) _
             Or System.Windows.Forms.AnchorStyles.Left) _
             Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
+        Me.GroupBox1.Controls.Add(Me.rbExtractCIA)
         Me.GroupBox1.Controls.Add(Me.rbExtractCXIDec)
         Me.GroupBox1.Controls.Add(Me.rbExtractCCIDec)
         Me.GroupBox1.Controls.Add(Me.Label3)
@@ -136,10 +138,10 @@ Partial Class Form1
         'rbExtractCXIDec
         '
         Me.rbExtractCXIDec.AutoSize = True
-        Me.rbExtractCXIDec.Location = New System.Drawing.Point(119, 63)
+        Me.rbExtractCXIDec.Location = New System.Drawing.Point(119, 86)
         Me.rbExtractCXIDec.Name = "rbExtractCXIDec"
         Me.rbExtractCXIDec.Size = New System.Drawing.Size(248, 17)
-        Me.rbExtractCXIDec.TabIndex = 3
+        Me.rbExtractCXIDec.TabIndex = 4
         Me.rbExtractCXIDec.Text = "Decrypted CXI (aka what Braindump gives you)"
         Me.rbExtractCXIDec.UseVisualStyleBackColor = True
         '
@@ -159,7 +161,7 @@ Partial Class Form1
         Me.Label3.Location = New System.Drawing.Point(6, 19)
         Me.Label3.Name = "Label3"
         Me.Label3.Size = New System.Drawing.Size(107, 13)
-        Me.Label3.TabIndex = 1
+        Me.Label3.TabIndex = 0
         Me.Label3.Text = "Source ROM Format:"
         '
         'rbExtractAuto
@@ -169,7 +171,7 @@ Partial Class Form1
         Me.rbExtractAuto.Location = New System.Drawing.Point(119, 17)
         Me.rbExtractAuto.Name = "rbExtractAuto"
         Me.rbExtractAuto.Size = New System.Drawing.Size(47, 17)
-        Me.rbExtractAuto.TabIndex = 0
+        Me.rbExtractAuto.TabIndex = 1
         Me.rbExtractAuto.TabStop = True
         Me.rbExtractAuto.Text = "Auto"
         Me.rbExtractAuto.UseVisualStyleBackColor = True
@@ -532,6 +534,16 @@ Partial Class Form1
         Me.lblStatus.Size = New System.Drawing.Size(39, 17)
         Me.lblStatus.Text = "Ready"
         '
+        'rbExtractCIA
+        '
+        Me.rbExtractCIA.AutoSize = True
+        Me.rbExtractCIA.Location = New System.Drawing.Point(119, 63)
+        Me.rbExtractCIA.Name = "rbExtractCIA"
+        Me.rbExtractCIA.Size = New System.Drawing.Size(94, 17)
+        Me.rbExtractCIA.TabIndex = 3
+        Me.rbExtractCIA.Text = "Decrypted CIA"
+        Me.rbExtractCIA.UseVisualStyleBackColor = True
+        '
         'Form1
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
@@ -606,4 +618,5 @@ Partial Class Form1
     Friend WithEvents StatusStrip1 As StatusStrip
     Friend WithEvents pbProgress As ToolStripProgressBar
     Friend WithEvents lblStatus As ToolStripStatusLabel
+    Friend WithEvents rbExtractCIA As RadioButton
 End Class

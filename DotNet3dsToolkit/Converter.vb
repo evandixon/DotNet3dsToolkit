@@ -1,4 +1,5 @@
 ﻿Imports System.IO
+Imports System.Text.RegularExpressions
 
 Public Class Converter
     Implements IDisposable
@@ -144,6 +145,19 @@ Public Class Converter
     Private Async Function ExtractCCIPartitions(options As ExtractionOptions) As Task
         Dim headerNcchPath As String = Path.Combine(options.DestinationDirectory, options.RootHeaderName)
         Await RunProgram(Path_3dstool, $"-xtf 3ds ""{options.SourceRom}"" --header ""{headerNcchPath}"" -0 DecryptedPartition0.bin -1 DecryptedPartition1.bin -2 DecryptedPartition2.bin -6 DecryptedPartition6.bin -7 DecryptedPartition7.bin")
+    End Function
+
+    Private Async Function ExtractCIAPartitions(options As ExtractionOptions) As Task
+        Dim headerNcchPath As String = Path.Combine(options.DestinationDirectory, options.RootHeaderName)
+        Await RunProgram(Path_ctrtool, $"--content=Partition ""{options.SourceRom}""")
+
+        Dim partitionRegex As New Regex("Partition\.000([0-9])\.[0-9]{8}")
+        Dim replace As String = "DecryptedPartition$1.bin"
+        For Each item In Directory.GetFiles(ToolDirectory)
+            If partitionRegex.IsMatch(item) Then
+                File.Move(item, partitionRegex.Replace(item, replace))
+            End If
+        Next
     End Function
 
     Private Async Function ExtractPartition0(options As ExtractionOptions, partitionFilename As String, ctrTool As Boolean) As Task
@@ -442,6 +456,41 @@ Public Class Converter
     End Function
 
     ''' <summary>
+    ''' Extracts a decrypted CIA.
+    ''' </summary>
+    ''' <param name="filename">Full path of the ROM to extract.</param>
+    ''' <param name="outputDirectory">Directory into which to extract the files.</param>
+    Public Async Function ExtractCIA(filename As String, outputDirectory As String) As Task
+        Dim options As New ExtractionOptions
+        options.SourceRom = filename
+        options.DestinationDirectory = outputDirectory
+        Await ExtractCIA(options)
+    End Function
+
+    ''' <summary>
+    ''' Extracts a CIA.
+    ''' </summary>
+    Public Async Function ExtractCIA(options As ExtractionOptions) As Task
+        Copy3DSTool()
+        CopyCtrTool()
+
+        If Directory.Exists(options.DestinationDirectory) Then
+            Directory.Delete(options.DestinationDirectory, True)
+        End If
+        Directory.CreateDirectory(options.DestinationDirectory)
+
+        Await ExtractCIAPartitions(options)
+
+        Dim partitionExtractions As New List(Of Task)
+        partitionExtractions.Add(ExtractPartition0(options, "DecryptedPartition0.bin", False))
+        partitionExtractions.Add(ExtractPartition1(options))
+        partitionExtractions.Add(ExtractPartition2(options))
+        partitionExtractions.Add(ExtractPartition6(options))
+        partitionExtractions.Add(ExtractPartition7(options))
+        Await Task.WhenAll(partitionExtractions)
+    End Function
+
+    ''' <summary>
     ''' Extracts a decrypted CCI or CXI ROM.
     ''' </summary>
     ''' <param name="filename">Full path of the ROM to extract.</param>
@@ -450,6 +499,8 @@ Public Class Converter
     Public Async Function ExtractAuto(filename As String, outputDirectory As String) As Task
         If Path.GetExtension(filename).ToLower = ".cxi" Then
             Await ExtractCXI(filename, outputDirectory)
+        ElseIf Path.GetExtension(filename).ToLower = ".cia" Then
+            Await ExtractCIA(filename, outputDirectory)
         Else
             Await ExtractCCI(filename, outputDirectory)
         End If
@@ -753,4 +804,5 @@ Public Class Converter
         ' GC.SuppressFinalize(Me)
     End Sub
 #End Region
+
 End Class

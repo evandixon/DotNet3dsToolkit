@@ -117,6 +117,9 @@ Public Class Form1
             ElseIf rbExtractCXIDec.Checked Then
                 lblStatus.Text = "Extracting as decrypted CXI..."
                 Await c.ExtractCXI(txtExtractSource.Text, txtExtractDestination.Text)
+            ElseIf rbExtractCIA.Checked Then
+                lblStatus.Text = "Extracting as decrypted CIA..."
+                Await c.ExtractCIA(txtExtractSource.Text, txtExtractDestination.Text)
             Else
                 MessageBox.Show("Invalid radio button choice.")
             End If
