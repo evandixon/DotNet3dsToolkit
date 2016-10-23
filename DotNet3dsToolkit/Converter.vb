@@ -29,6 +29,9 @@ Public Class Converter
 
         p.Start()
 
+        p.BeginOutputReadLine()
+        p.BeginErrorReadLine()
+
         Await Task.Run(Sub() p.WaitForExit())
 
         If handlersRegistered Then
@@ -38,11 +41,9 @@ Public Class Converter
     End Function
 
     Private Sub OnInputRecieved(sender As Object, e As DataReceivedEventArgs)
-        If OutputConsoleOutput Then
-            If TypeOf sender Is Process Then
-                Console.Write($"[{Path.GetFileNameWithoutExtension(DirectCast(sender, Process).StartInfo.FileName)}] ")
-                Console.WriteLine(e.Data)
-            End If
+        If TypeOf sender Is Process Then
+            Console.Write($"[{Path.GetFileNameWithoutExtension(DirectCast(sender, Process).StartInfo.FileName)}] ")
+            Console.WriteLine(e.Data)
         End If
     End Sub
 
@@ -51,6 +52,7 @@ Public Class Converter
     Private Property Path_3dstool As String
     Private Property Path_3dsbuilder As String
     Private Property Path_makerom As String
+    Private Property Path_ctrtool As String
 
     Private Sub ResetToolDirectory()
         ToolDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DotNet3DSToolkit-" & Guid.NewGuid.ToString)
@@ -94,6 +96,18 @@ Public Class Converter
         End If
     End Sub
 
+    Private Sub CopyCtrTool()
+        If String.IsNullOrEmpty(ToolDirectory) Then
+            ResetToolDirectory()
+        End If
+
+        Dim exePath = Path.Combine(ToolDirectory, "ctrtool.exe")
+        If Not File.Exists(exePath) Then
+            File.WriteAllBytes(exePath, My.Resources.ctrtool)
+            Path_ctrtool = exePath
+        End If
+    End Sub
+
     Private Sub CopyMakeRom()
         If String.IsNullOrEmpty(ToolDirectory) Then
             ResetToolDirectory()
@@ -119,7 +133,7 @@ Public Class Converter
         Await RunProgram(Path_3dstool, $"-xtf 3ds ""{options.SourceRom}"" --header ""{headerNcchPath}"" -0 DecryptedPartition0.bin -1 DecryptedPartition1.bin -2 DecryptedPartition2.bin -6 DecryptedPartition6.bin -7 DecryptedPartition7.bin")
     End Function
 
-    Private Async Function ExtractPartition0(options As ExtractionOptions, partitionFilename As String) As Task
+    Private Async Function ExtractPartition0(options As ExtractionOptions, partitionFilename As String, ctrTool As Boolean) As Task
         'Extract partitions
         Dim exheaderPath As String = Path.Combine(options.DestinationDirectory, options.ExheaderName)
         Dim headerPath As String = Path.Combine(options.DestinationDirectory, options.Partition0HeaderName)
@@ -134,7 +148,11 @@ Public Class Converter
         Dim tasks As New List(Of Task)
 
         '- romfs
-        tasks.Add(RunProgram(Path_3dstool, $"-xtf romfs DecryptedRomFS.bin --romfs-dir ""{romfsDir}"""))
+        If ctrTool Then
+            Await RunProgram(Path_ctrtool, $"-t romfs --romfsdir ""{romfsDir}"" DecryptedRomFS.bin")
+        Else
+            tasks.Add(RunProgram(Path_3dstool, $"-xtf romfs DecryptedRomFS.bin --romfs-dir ""{romfsDir}"""))
+        End If
 
         '- exefs
         Dim exefsExtractionOptions As String
@@ -144,18 +162,22 @@ Public Class Converter
         '    exefsExtractionOptions = "-xtf"
         'End If
 
-        tasks.Add(Task.Run(Async Function() As Task
-                               '- exefs
-                               Await RunProgram(Path_3dstool, $"{exefsExtractionOptions} exefs DecryptedExeFS.bin --exefs-dir ""{exefsDir}"" --header ""{exefsHeaderPath}""")
+        If ctrTool Then
+            Await RunProgram(Path_ctrtool, $"-t exefs --exefsdir=""{exefsDir}"" DecryptedExeFS.bin --decompresscode")
+        Else
+            tasks.Add(Task.Run(Async Function() As Task
+                                   '- exefs
+                                   Await RunProgram(Path_3dstool, $"{exefsExtractionOptions} exefs DecryptedExeFS.bin --exefs-dir ""{exefsDir}"" --header ""{exefsHeaderPath}""")
 
-                               File.Move(Path.Combine(options.DestinationDirectory, options.ExeFSDirName, "banner.bnr"), Path.Combine(options.DestinationDirectory, options.ExeFSDirName, "banner.bin"))
-                               File.Move(Path.Combine(options.DestinationDirectory, options.ExeFSDirName, "icon.icn"), Path.Combine(options.DestinationDirectory, options.ExeFSDirName, "icon.bin"))
+                                   File.Move(Path.Combine(options.DestinationDirectory, options.ExeFSDirName, "banner.bnr"), Path.Combine(options.DestinationDirectory, options.ExeFSDirName, "banner.bin"))
+                                   File.Move(Path.Combine(options.DestinationDirectory, options.ExeFSDirName, "icon.icn"), Path.Combine(options.DestinationDirectory, options.ExeFSDirName, "icon.bin"))
 
-                               '- banner
-                               Await RunProgram(Path_3dstool, $"-x -t banner -f ""{Path.Combine(options.DestinationDirectory, options.ExeFSDirName, "banner.bin")}"" --banner-dir ""{Path.Combine(options.DestinationDirectory, "ExtractedBanner")}""")
+                                   '- banner
+                                   Await RunProgram(Path_3dstool, $"-x -t banner -f ""{Path.Combine(options.DestinationDirectory, options.ExeFSDirName, "banner.bin")}"" --banner-dir ""{Path.Combine(options.DestinationDirectory, "ExtractedBanner")}""")
 
-                               File.Move(Path.Combine(options.DestinationDirectory, "ExtractedBanner", "banner0.bcmdl"), Path.Combine(options.DestinationDirectory, "ExtractedBanner", "banner.cgfx"))
-                           End Function))
+                                   File.Move(Path.Combine(options.DestinationDirectory, "ExtractedBanner", "banner0.bcmdl"), Path.Combine(options.DestinationDirectory, "ExtractedBanner", "banner.cgfx"))
+                               End Function))
+        End If
 
         'Cleanup while we're waiting
         File.Delete(Path.Combine(ToolDirectory, "DecryptedPartition0.bin"))
@@ -370,7 +392,7 @@ Public Class Converter
         Await ExtractPartitions(options)
 
         Dim partitionExtractions As New List(Of Task)
-        partitionExtractions.Add(ExtractPartition0(options, "DecryptedPartition0.bin"))
+        partitionExtractions.Add(ExtractPartition0(options, "DecryptedPartition0.bin", False))
         partitionExtractions.Add(ExtractPartition1(options))
         partitionExtractions.Add(ExtractPartition2(options))
         partitionExtractions.Add(ExtractPartition6(options))
@@ -395,6 +417,7 @@ Public Class Converter
     ''' </summary>
     Public Async Function ExtractCXI(options As ExtractionOptions) As Task
         Copy3DSTool()
+        CopyCtrTool()
 
         If Directory.Exists(options.DestinationDirectory) Then
             Directory.Delete(options.DestinationDirectory, True)
@@ -402,7 +425,7 @@ Public Class Converter
         Directory.CreateDirectory(options.DestinationDirectory)
 
         'Extract partition 0, which is the only partition we have
-        Await ExtractPartition0(options, options.SourceRom)
+        Await ExtractPartition0(options, options.SourceRom, True)
     End Function
 
     ''' <summary>
