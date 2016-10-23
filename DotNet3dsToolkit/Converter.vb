@@ -3,6 +3,8 @@
 Public Class Converter
     Implements IDisposable
 
+    Public Event ConsoleOutputReceived(sender As Object, e As DataReceivedEventArgs)
+
     ''' <summary>
     ''' Whether or not to forward console output of child processes to the current process.
     ''' </summary>
@@ -17,6 +19,7 @@ Public Class Converter
         p.StartInfo.WorkingDirectory = Path.GetDirectoryName(program)
         p.StartInfo.Arguments = arguments
         p.StartInfo.WindowStyle = ProcessWindowStyle.Hidden
+        p.StartInfo.CreateNoWindow = True
         p.StartInfo.RedirectStandardOutput = OutputConsoleOutput
         p.StartInfo.RedirectStandardError = p.StartInfo.RedirectStandardOutput
         p.StartInfo.UseShellExecute = False
@@ -44,6 +47,7 @@ Public Class Converter
         If TypeOf sender Is Process AndAlso Not String.IsNullOrEmpty(e.Data) Then
             Console.Write($"[{Path.GetFileNameWithoutExtension(DirectCast(sender, Process).StartInfo.FileName)}] ")
             Console.WriteLine(e.Data)
+            RaiseEvent ConsoleOutputReceived(Me, e)
         End If
     End Sub
 
@@ -590,7 +594,6 @@ Public Class Converter
 
         Await BuildCia(options)
     End Function
-#End Region
 
     ''' <summary>
     ''' Builds files for use with HANS.
@@ -715,7 +718,7 @@ Public Class Converter
             Await Build3DSDecrypted(sourceDirectory, outputROM)
         End If
     End Function
-
+#End Region
 
 #Region "IDisposable Support"
     Private disposedValue As Boolean ' To detect redundant calls
