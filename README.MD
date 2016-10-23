@@ -104,6 +104,6 @@ Using the ToolkitConsole.exe:
 
 Credits:
 * SciresM for [3DS Builder](https://github.com/SciresM/3DS-Builder) ([modified to use command-line arguments](https://github.com/evandixon/3DS-Builder))
-* profi200 for [Project_CTR](https://github.com/profi200/Project_CTR)'s makerom
+* profi200 for [Project_CTR](https://github.com/profi200/Project_CTR)'s ctrtool and makerom
 * dnasdw for [3dstool](https://github.com/dnasdw/3dstool)
 * Asia81 for HackingToolkit3DS, which provided the usage for 3dstool.
