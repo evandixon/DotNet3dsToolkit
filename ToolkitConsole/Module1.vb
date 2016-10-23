@@ -4,8 +4,8 @@ Imports System.Reflection
 Module Module1
 
     Sub PrintUsage()
-        Console.WriteLine("Usage: ToolkitConsole.exe <source> <destination> [hans raw file name] [-source-cxi] [-key0|-hans]")
-        Console.WriteLine("<source> can either be a decrypted CCI/3DS ROM, or a directory created by ToolkitConsole.exe")
+        Console.WriteLine("Usage: ToolkitConsole.exe <source> <destination> [hans raw file name] [-source-cxi|-source-cia] [-key0|-hans]")
+        Console.WriteLine("<source> can be a decrypted CCI/3DS ROM, a decrypted CIA, a decrypted CXI, or a directory created by ToolkitConsole.exe.")
         Console.WriteLine("<destination> can be a *.3DS, *.3DZ, *.CCI, or *.CIA file, a directory if the source is a ROM, or the root of your SD card if outputting files for HANS.")
         Console.WriteLine("[hans raw file name] is the future name of the raw files for HANS, if the ""-hans"" argument is present.  Shorter strings work better, but the exact requirements are unknown.")
         Console.WriteLine("Output format is detected by the extension.  *.CIA files are outputted as CIA files, *.3DZ files are outputted as 0-key encrypted CCI ROMs, all others are outputted as decrypted CCI ROMs.  Use the -key0 flag to output as a 0-key encrypted CCI ROM instead.")
@@ -44,6 +44,8 @@ Module Module1
 
                         If Path.GetExtension(source).ToLower = ".cxi" OrElse args.Contains("-source-cxi") Then
                             c.ExtractCXI(source, destination).Wait()
+                        ElseIf Path.GetExtension(source).ToLower = ".cia" OrElse args.Contains("-source-cia") Then
+                            c.ExtractCIA(source, destination).Wait()
                         Else
                             c.ExtractCCI(source, destination).Wait()
                         End If

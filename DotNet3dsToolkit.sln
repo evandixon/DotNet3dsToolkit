@@ -12,6 +12,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		README.MD = README.MD
 	EndProjectSection
 EndProject
+Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "ToolkitForm", "ToolkitForm\ToolkitForm.vbproj", "{BFD6D9E3-6B16-44E9-A778-C57730C5F4C0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -26,6 +28,10 @@ Global
 		{319C3B52-4F2F-4DFE-B79F-30950CD89AA6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{319C3B52-4F2F-4DFE-B79F-30950CD89AA6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{319C3B52-4F2F-4DFE-B79F-30950CD89AA6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BFD6D9E3-6B16-44E9-A778-C57730C5F4C0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BFD6D9E3-6B16-44E9-A778-C57730C5F4C0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BFD6D9E3-6B16-44E9-A778-C57730C5F4C0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BFD6D9E3-6B16-44E9-A778-C57730C5F4C0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
