@@ -51,6 +51,7 @@ Public Class Converter
     Private Property Path_3dstool As String
     Private Property Path_3dsbuilder As String
     Private Property Path_makerom As String
+    Private Property Path_ndstool As String
 
     Private Sub ResetToolDirectory()
         ToolDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DotNet3DSToolkit-" & Guid.NewGuid.ToString)
@@ -103,6 +104,18 @@ Public Class Converter
         If Not File.Exists(exePath) Then
             File.WriteAllBytes(exePath, My.Resources.makerom)
             Path_makerom = exePath
+        End If
+    End Sub
+
+    Private Sub CopyNDSTool()
+        If String.IsNullOrEmpty(ToolDirectory) Then
+            ResetToolDirectory()
+        End If
+
+        Dim exePath = Path.Combine(ToolDirectory, "ndstool.exe")
+        If Not File.Exists(exePath) Then
+            File.WriteAllBytes(exePath, My.Resources.ndstool)
+            Path_ndstool = exePath
         End If
     End Sub
 
