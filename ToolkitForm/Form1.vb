@@ -1,6 +1,7 @@
 ﻿Imports System.ComponentModel
 Imports System.IO
 Imports DotNet3dsToolkit
+Imports DotNet3dsToolkit.Misc
 
 Public Class Form1
 
@@ -31,7 +32,7 @@ Public Class Form1
 
     Private Sub btnExtractSourceBrowse_Click(sender As Object, e As EventArgs) Handles btnExtractSourceBrowse.Click
         Dim s As New OpenFileDialog
-        s.Filter = "Supported Files|*.3ds;*.cci;*.cxi|Decrypted 3DS ROMs|*.3ds;*.cci|All Files|*.*"
+        s.Filter = "Supported Files|*.3ds;*.cci;*.cxi;*.nds;*.srl|Decrypted 3DS ROMs|*.3ds;*.cci|Decrypted CXI Partitions|*.cxi|Nintendo DS ROMs|*.nds;*.srl|All Files|*.*"
         If s.ShowDialog = DialogResult.OK Then
             txtExtractSource.Text = s.FileName
         End If
@@ -53,7 +54,7 @@ Public Class Form1
 
     Private Sub btnBuildOutputBrowse_Click(sender As Object, e As EventArgs) Handles btnBuildOutputBrowse.Click
         Dim s As New SaveFileDialog
-        s.Filter = "Decrypted 3DS ROMs|*.3ds;*.cci|CIA files|*.cia|0-Key Encryted 3DS ROMs|*.3dz;*.3ds|All Files|*.*"
+        s.Filter = "Decrypted 3DS ROMs|*.3ds;*.cci|CIA files|*.cia|0-Key Encryted 3DS ROMs|*.3dz;*.3ds|Nintendo DS ROMs|*.nds;*.srl|All Files|*.*"
         If s.ShowDialog = DialogResult.OK Then
             txtBuildDestination.Text = s.FileName
         End If
@@ -78,6 +79,23 @@ Public Class Form1
             CurrentWriter.Write(DateTime.Now.ToString)
             CurrentWriter.Write(": ")
             CurrentWriter.WriteLine(e.Data)
+        End If
+    End Sub
+
+    Private Sub OnUnpackProgressedInternal(sender As Object, e As UnpackProgressEventArgs)
+        If pbProgress.Style = ProgressBarStyle.Marquee Then
+            pbProgress.Style = ProgressBarStyle.Continuous
+        End If
+
+        pbProgress.Value = e.Progress * pbProgress.Maximum
+        lblStatus.Text = String.Format("Extracting... ({0} of {1})", e.FilesExtracted, e.TotalFiles)
+    End Sub
+
+    Private Sub OnUnpackProgressed(sender As Object, e As UnpackProgressEventArgs)
+        If InvokeRequired Then
+            Invoke(Sub() OnUnpackProgressedInternal(sender, e))
+        Else
+            OnUnpackProgressedInternal(sender, e)
         End If
     End Sub
 
@@ -107,6 +125,7 @@ Public Class Form1
             pbProgress.Style = ProgressBarStyle.Marquee
 
             AddHandler c.ConsoleOutputReceived, AddressOf OnConsoleOutputReceived
+            AddHandler c.UnpackProgressed, AddressOf OnUnpackProgressed
 
             If rbExtractAuto.Checked Then
                 lblStatus.Text = "Extracting (type auto-detected)..."
@@ -120,13 +139,17 @@ Public Class Form1
             ElseIf rbExtractCIA.Checked Then
                 lblStatus.Text = "Extracting as decrypted CIA..."
                 Await c.ExtractCIA(txtExtractSource.Text, txtExtractDestination.Text)
+            ElseIf rbExtractNDS.Checked Then
+                lblStatus.Text = "Extracting as NDS ROM..."
+                Await c.ExtractNDS(txtExtractSource.Text, txtExtractDestination.Text)
             Else
                 MessageBox.Show("Invalid radio button choice.")
             End If
 
             RemoveHandler c.ConsoleOutputReceived, AddressOf OnConsoleOutputReceived
+            RemoveHandler c.UnpackProgressed, AddressOf OnUnpackProgressed
 
-            pbProgress.Value = 1
+            pbProgress.Value = pbProgress.Maximum
             pbProgress.Style = ProgressBarStyle.Continuous
             lblStatus.Text = "Ready"
             IsOperating = False
@@ -157,7 +180,7 @@ Public Class Form1
             AddHandler c.ConsoleOutputReceived, AddressOf OnConsoleOutputReceived
 
             If rbBuildAuto.Checked Then
-                lblStatus.Text = "Building as decrypted CCI..."
+                lblStatus.Text = "Building (auto-detect format)..."
                 Await c.BuildAuto(txtBuildSource.Text, txtBuildDestination.Text)
             ElseIf rbBuildCCIDec.Checked Then
                 lblStatus.Text = "Building as decrypted CCI..."
@@ -168,13 +191,16 @@ Public Class Form1
             ElseIf rbBuildCIA.Checked Then
                 lblStatus.Text = "Building as CIA..."
                 Await c.BuildCia(txtBuildSource.Text, txtBuildDestination.Text)
+            ElseIf rbBuildNDS.Checked Then
+                lblStatus.Text = "Building as NDS..."
+                Await c.BuildNDS(txtBuildSource.Text, txtBuildDestination.Text)
             Else
                 MessageBox.Show("Invalid radio button choice.")
             End If
 
             RemoveHandler c.ConsoleOutputReceived, AddressOf OnConsoleOutputReceived
 
-            pbProgress.Value = 1
+            pbProgress.Value = pbProgress.Maximum
             pbProgress.Style = ProgressBarStyle.Continuous
             lblStatus.Text = "Ready"
             IsOperating = False

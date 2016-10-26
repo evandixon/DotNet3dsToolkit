@@ -1,5 +1,6 @@
 ﻿Imports System.IO
 Imports System.Text.RegularExpressions
+Imports DotNet3dsToolkit.Misc
 
 Public Class Converter
     Implements IDisposable
@@ -52,12 +53,15 @@ Public Class Converter
         End If
     End Sub
 
+    Public Event UnpackProgressed(sender As Object, e As UnpackProgressEventArgs)
+
 #Region "Tool Management"
     Private Property ToolDirectory As String
     Private Property Path_3dstool As String
     Private Property Path_3dsbuilder As String
     Private Property Path_makerom As String
     Private Property Path_ctrtool As String
+    Private Property Path_ndstool As String
 
     Private Sub ResetToolDirectory()
         ToolDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DotNet3DSToolkit-" & Guid.NewGuid.ToString)
@@ -122,6 +126,18 @@ Public Class Converter
         If Not File.Exists(exePath) Then
             File.WriteAllBytes(exePath, My.Resources.makerom)
             Path_makerom = exePath
+        End If
+    End Sub
+
+    Private Sub CopyNDSTool()
+        If String.IsNullOrEmpty(ToolDirectory) Then
+            ResetToolDirectory()
+        End If
+
+        Dim exePath = Path.Combine(ToolDirectory, "ndstool.exe")
+        If Not File.Exists(exePath) Then
+            File.WriteAllBytes(exePath, My.Resources.ndstool)
+            Path_ndstool = exePath
         End If
     End Sub
 
@@ -491,19 +507,49 @@ Public Class Converter
     End Function
 
     ''' <summary>
+    ''' Extracts an NDS ROM.
+    ''' </summary>
+    ''' <param name="filename">Full path of the ROM to extract.</param>
+    ''' <param name="outputDirectory">Directory into which to extract the files.</param>
+    Public Async Function ExtractNDS(filename As String, outputDirectory As String) As Task
+        ''Old ndstool usage
+        'CopyNDSTool()
+        'Await RunProgram(Path_ndstool, String.Format("-v -x ""{0}"" -9 ""{1}/arm9.bin"" -7 ""{1}/arm7.bin"" -y9 ""{1}/y9.bin"" -y7 ""{1}/y7.bin"" -d ""{1}/data"" -y ""{1}/overlay"" -t ""{1}/banner.bin"" -h ""{1}/header.bin""", filename, outputDirectory))
+
+        Dim reportProgress = Sub(sender As Object, e As UnpackProgressEventArgs)
+                                 RaiseEvent UnpackProgressed(Me, e)
+                             End Sub
+
+        'New implementation
+        Dim r As New GenericNDSRom
+        Dim p As New WindowsIOProvider
+
+        AddHandler r.UnpackProgress, reportProgress
+
+        Await r.OpenFile(filename, p)
+        Await r.Unpack(outputDirectory, p)
+
+        RemoveHandler r.UnpackProgress, reportProgress
+    End Function
+
+    ''' <summary>
     ''' Extracts a decrypted CCI or CXI ROM.
     ''' </summary>
     ''' <param name="filename">Full path of the ROM to extract.</param>
     ''' <param name="outputDirectory">Directory into which to extract the files.</param>
     ''' <remarks>Extraction type is determined by file extension.  Extensions of ".cxi" are extracted as CXI, all others are extracted as CCI.  To override this behavior, use a more specific extraction function.</remarks>
     Public Async Function ExtractAuto(filename As String, outputDirectory As String) As Task
-        If Path.GetExtension(filename).ToLower = ".cxi" Then
-            Await ExtractCXI(filename, outputDirectory)
-        ElseIf Path.GetExtension(filename).ToLower = ".cia" Then
-            Await ExtractCIA(filename, outputDirectory)
-        Else
-            Await ExtractCCI(filename, outputDirectory)
-        End If
+        Dim ext = Path.GetExtension(filename).ToLower
+        Select Case ext
+            Case ".cxi"
+                Await ExtractCXI(filename, outputDirectory)
+            Case ".cia"
+                Await ExtractCIA(filename, outputDirectory)
+            Case ".nds", ".srl"
+                Await ExtractNDS(filename, outputDirectory)
+            Case Else
+                Await ExtractCCI(filename, outputDirectory)
+        End Select
     End Function
 
     ''' <summary>
@@ -647,6 +693,17 @@ Public Class Converter
     End Function
 
     ''' <summary>
+    ''' Builds an NDS ROM from the given files.
+    ''' </summary>
+    ''' <param name="sourceDirectory">Path of the files to build.  Must have been created with <see cref="ExtractAuto(String, String)"/> or equivalent function using default settings.</param>
+    ''' <param name="outputROM">Destination of the output ROM.</param>
+    Public Async Function BuildNDS(sourceDirectory As String, outputROM As String) As Task
+        CopyNDSTool()
+
+        Await RunProgram(Path_ndstool, String.Format("-c ""{0}"" -9 ""{1}/arm9.bin"" -7 ""{1}/arm7.bin"" -y9 ""{1}/y9.bin"" -y7 ""{1}/y7.bin"" -d ""{1}/data"" -y ""{1}/overlay"" -t ""{1}/banner.bin"" -h ""{1}/header.bin""", outputROM, sourceDirectory))
+    End Function
+
+    ''' <summary>
     ''' Builds files for use with HANS.
     ''' </summary>
     ''' <param name="options">Options to use for the build.  <see cref="BuildOptions.Destination"/> should be the SD card root.</param>
@@ -761,13 +818,17 @@ Public Class Converter
     ''' <param name="outputROM">Destination of the output ROM.</param>
     ''' <remarks>Output format is determined by file extension.  Extensions of ".cia" build a CIA, extensions of ".3dz" build a 0-key encrypted CCI, and all others build a decrypted CCI.  To force a different behavior, use a more specific Build function.</remarks>
     Public Async Function BuildAuto(sourceDirectory As String, outputROM As String) As Task
-        If Path.GetExtension(outputROM).ToLower = ".cia" Then
-            Await BuildCia(sourceDirectory, outputROM)
-        ElseIf Path.GetExtension(outputROM).ToLower = ".3dz" Then
-            Await Build3DS0Key(sourceDirectory, outputROM)
-        Else
-            Await Build3DSDecrypted(sourceDirectory, outputROM)
-        End If
+        Dim ext = Path.GetExtension(outputROM).ToLower
+        Select Case ext
+            Case ".cia"
+                Await BuildCia(sourceDirectory, outputROM)
+            Case ".3dz"
+                Await Build3DS0Key(sourceDirectory, outputROM)
+            Case ".nds", ".srl"
+                Await BuildNDS(sourceDirectory, outputROM)
+            Case Else
+                Await Build3DSDecrypted(sourceDirectory, outputROM)
+        End Select
     End Function
 #End Region
 

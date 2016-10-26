@@ -117,23 +117,16 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <assembly alias="System.Windows.Forms" name="System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" />
-  <data name="ignore_3dstool" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\ignore_3dstool.txt;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;Windows-1252</value>
+  <data name="ErrorAsyncForInfiniteLoop" xml:space="preserve">
+    <value>StepCount cannot be 0.</value>
+    <comment>Message for an exception that's thrown when the Step of a logical For statement is 0.</comment>
   </data>
-  <data name="_3dstool" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\3dstool.exe;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  <data name="ErrorNoSaveFilename" xml:space="preserve">
+    <value>Using GenericFile.Save() requires GenericFile.OriginalFilename to not be null.</value>
+    <comment>Message for an exception that's thrown when using GenericFile.Save() when the file doesn't have an original filename.</comment>
   </data>
-  <data name="makerom" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\makerom.exe;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="_3DS_Builder" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\3DS Builder.exe;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="ctrtool" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\ctrtool.exe;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="ndstool" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\ndstool.exe;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  <data name="ErrorWrittenReadonly" xml:space="preserve">
+    <value>Attempted to write to a read-only file.</value>
+    <comment>Message for an exception that's thrown when attempting to alter a read-only file.</comment>
   </data>
 </root>
