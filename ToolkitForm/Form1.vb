@@ -31,7 +31,7 @@ Public Class Form1
 
     Private Sub btnExtractSourceBrowse_Click(sender As Object, e As EventArgs) Handles btnExtractSourceBrowse.Click
         Dim s As New OpenFileDialog
-        s.Filter = "Supported Files|*.3ds;*.cci;*.cxi|Decrypted 3DS ROMs|*.3ds;*.cci|All Files|*.*"
+        s.Filter = "Supported Files|*.3ds;*.cci;*.cxi;*.nds;*.srl|Decrypted 3DS ROMs|*.3ds;*.cci|Decrypted CXI Partitions|*.cxi|Nintendo DS ROMs|*.nds;*.srl|All Files|*.*"
         If s.ShowDialog = DialogResult.OK Then
             txtExtractSource.Text = s.FileName
         End If
@@ -53,7 +53,7 @@ Public Class Form1
 
     Private Sub btnBuildOutputBrowse_Click(sender As Object, e As EventArgs) Handles btnBuildOutputBrowse.Click
         Dim s As New SaveFileDialog
-        s.Filter = "Decrypted 3DS ROMs|*.3ds;*.cci|CIA files|*.cia|0-Key Encryted 3DS ROMs|*.3dz;*.3ds|All Files|*.*"
+        s.Filter = "Decrypted 3DS ROMs|*.3ds;*.cci|CIA files|*.cia|0-Key Encryted 3DS ROMs|*.3dz;*.3ds|Nintendo DS ROMs|*.nds;*.srl|All Files|*.*"
         If s.ShowDialog = DialogResult.OK Then
             txtBuildDestination.Text = s.FileName
         End If
@@ -160,7 +160,7 @@ Public Class Form1
             AddHandler c.ConsoleOutputReceived, AddressOf OnConsoleOutputReceived
 
             If rbBuildAuto.Checked Then
-                lblStatus.Text = "Building as decrypted CCI..."
+                lblStatus.Text = "Building (auto-detect format)..."
                 Await c.BuildAuto(txtBuildSource.Text, txtBuildDestination.Text)
             ElseIf rbBuildCCIDec.Checked Then
                 lblStatus.Text = "Building as decrypted CCI..."
