@@ -4,11 +4,11 @@ Imports System.Reflection
 Module Module1
 
     Sub PrintUsage()
-        Console.WriteLine("Usage: ToolkitConsole.exe <source> <destination> [hans raw file name] [-source-cxi|-source-cia] [-key0|-hans]")
+        Console.WriteLine("Usage: ToolkitConsole.exe <source> <destination> [hans raw file name] [-source-cxi|-source-cia|-source-nds] [-key0|-hans]")
         Console.WriteLine("<source> can be a decrypted CCI/3DS ROM, a decrypted CIA, a decrypted CXI, or a directory created by ToolkitConsole.exe.")
-        Console.WriteLine("<destination> can be a *.3DS, *.3DZ, *.CCI, or *.CIA file, a directory if the source is a ROM, or the root of your SD card if outputting files for HANS.")
+        Console.WriteLine("<destination> can be a *.3DS, *.3DZ, *.CCI, *.CIA, *.NDS, or *.SRL file, a directory if the source is a ROM, or the root of your SD card if outputting files for HANS.")
         Console.WriteLine("[hans raw file name] is the future name of the raw files for HANS, if the ""-hans"" argument is present.  Shorter strings work better, but the exact requirements are unknown.")
-        Console.WriteLine("Output format is detected by the extension.  *.CIA files are outputted as CIA files, *.3DZ files are outputted as 0-key encrypted CCI ROMs, all others are outputted as decrypted CCI ROMs.  Use the -key0 flag to output as a 0-key encrypted CCI ROM instead.")
+        Console.WriteLine("Output format is detected by the extension.  *.CIA files are outputted as CIA files, *.3DZ files are outputted as 0-key encrypted CCI ROMs, *.NDS and *.SRL are outputted as NDS ROMs, all others are outputted as decrypted CCI ROMs.  Use the -key0 flag to output as a 0-key encrypted CCI ROM instead.")
         Console.WriteLine("")
         Console.WriteLine("Examples:")
         Console.WriteLine("Extract a CCI: ToolkitConsole.exe MyRom.3ds MyFiles")
@@ -40,13 +40,17 @@ Module Module1
 
                     'Extraction mode
                     Using c As New DotNet3dsToolkit.Converter
-                        Console.WriteLine("Extracting to ""{0}""...", destination)
-
                         If Path.GetExtension(source).ToLower = ".cxi" OrElse args.Contains("-source-cxi") Then
+                            Console.WriteLine("Extracting as CXI to ""{0}""...", destination)
                             c.ExtractCXI(source, destination).Wait()
                         ElseIf Path.GetExtension(source).ToLower = ".cia" OrElse args.Contains("-source-cia") Then
+                            Console.WriteLine("Extracting as CIA to ""{0}""...", destination)
                             c.ExtractCIA(source, destination).Wait()
+                        ElseIf Path.GetExtension(source).ToLower = ".nds" OrElse Path.GetExtension(source).ToLower = ".srl" OrElse args.Contains("-source-nds") Then
+                            Console.WriteLine("Extracting as NDS to ""{0}""...", destination)
+                            c.ExtractNDS(source, destination).Wait()
                         Else
+                            Console.WriteLine("Extracting as CCI to ""{0}""...", destination)
                             c.ExtractCCI(source, destination).Wait()
                         End If
 
@@ -74,6 +78,9 @@ Module Module1
                         ElseIf Path.GetExtension(destination).ToLower = ".3dz" Then
                             Console.WriteLine("Building as 0-key encrypted CCI...")
                             c.Build3DS0Key(source, destination).Wait()
+                        ElseIf Path.GetExtension(destination).ToLower = ".nds" OrElse Path.GetExtension(destination).ToLower = ".srl" Then
+                            Console.WriteLine("Building as NDS...")
+                            c.BuildNDS(source, destination).Wait()
                         Else
                             Console.WriteLine("Building as decrypted CCI...")
                             c.Build3DSDecrypted(source, destination).Wait()
