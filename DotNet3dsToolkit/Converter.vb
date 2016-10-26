@@ -53,6 +53,8 @@ Public Class Converter
         End If
     End Sub
 
+    Public Event UnpackProgressed(sender As Object, e As UnpackProgressEventArgs)
+
 #Region "Tool Management"
     Private Property ToolDirectory As String
     Private Property Path_3dstool As String
@@ -514,11 +516,20 @@ Public Class Converter
         'CopyNDSTool()
         'Await RunProgram(Path_ndstool, String.Format("-v -x ""{0}"" -9 ""{1}/arm9.bin"" -7 ""{1}/arm7.bin"" -y9 ""{1}/y9.bin"" -y7 ""{1}/y7.bin"" -d ""{1}/data"" -y ""{1}/overlay"" -t ""{1}/banner.bin"" -h ""{1}/header.bin""", filename, outputDirectory))
 
+        Dim reportProgress = Sub(sender As Object, e As UnpackProgressEventArgs)
+                                 RaiseEvent UnpackProgressed(Me, e)
+                             End Sub
+
         'New implementation
         Dim r As New GenericNDSRom
         Dim p As New WindowsIOProvider
+
+        AddHandler r.UnpackProgress, reportProgress
+
         Await r.OpenFile(filename, p)
         Await r.Unpack(outputDirectory, p)
+
+        RemoveHandler r.UnpackProgress, reportProgress
     End Function
 
     ''' <summary>

@@ -635,7 +635,11 @@ Namespace Misc
         ''' </summary>
         ''' <returns></returns>
         Public Function GetExtractionProgress() As Single
-            Return CurrentExtractProgress / CurrentExtractMax
+            If CurrentExtractMax = 0 Then
+                Return 0
+            Else
+                Return CurrentExtractProgress / CurrentExtractMax
+            End If
         End Function
 #End Region
 

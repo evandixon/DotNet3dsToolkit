@@ -1,6 +1,7 @@
 ﻿Imports System.ComponentModel
 Imports System.IO
 Imports DotNet3dsToolkit
+Imports DotNet3dsToolkit.Misc
 
 Public Class Form1
 
@@ -81,6 +82,23 @@ Public Class Form1
         End If
     End Sub
 
+    Private Sub OnUnpackProgressedInternal(sender As Object, e As UnpackProgressEventArgs)
+        If pbProgress.Style = ProgressBarStyle.Marquee Then
+            pbProgress.Style = ProgressBarStyle.Continuous
+        End If
+
+        pbProgress.Value = e.Progress * pbProgress.Maximum
+        lblStatus.Text = String.Format("Extracting... ({0} of {1})", e.FilesExtracted, e.TotalFiles)
+    End Sub
+
+    Private Sub OnUnpackProgressed(sender As Object, e As UnpackProgressEventArgs)
+        If InvokeRequired Then
+            Invoke(Sub() OnUnpackProgressedInternal(sender, e))
+        Else
+            OnUnpackProgressedInternal(sender, e)
+        End If
+    End Sub
+
     Private Sub ShowOperatingWarning()
         MessageBox.Show("Please wait until the current operation is complete before starting another.")
     End Sub
@@ -107,6 +125,7 @@ Public Class Form1
             pbProgress.Style = ProgressBarStyle.Marquee
 
             AddHandler c.ConsoleOutputReceived, AddressOf OnConsoleOutputReceived
+            AddHandler c.UnpackProgressed, AddressOf OnUnpackProgressed
 
             If rbExtractAuto.Checked Then
                 lblStatus.Text = "Extracting (type auto-detected)..."
@@ -128,8 +147,9 @@ Public Class Form1
             End If
 
             RemoveHandler c.ConsoleOutputReceived, AddressOf OnConsoleOutputReceived
+            RemoveHandler c.UnpackProgressed, AddressOf OnUnpackProgressed
 
-            pbProgress.Value = 1
+            pbProgress.Value = pbProgress.Maximum
             pbProgress.Style = ProgressBarStyle.Continuous
             lblStatus.Text = "Ready"
             IsOperating = False
@@ -180,7 +200,7 @@ Public Class Form1
 
             RemoveHandler c.ConsoleOutputReceived, AddressOf OnConsoleOutputReceived
 
-            pbProgress.Value = 1
+            pbProgress.Value = pbProgress.Maximum
             pbProgress.Style = ProgressBarStyle.Continuous
             lblStatus.Text = "Ready"
             IsOperating = False

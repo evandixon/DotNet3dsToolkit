@@ -26,6 +26,7 @@ Partial Class Form1
         Me.TabPage1 = New System.Windows.Forms.TabPage()
         Me.btnExtract = New System.Windows.Forms.Button()
         Me.GroupBox1 = New System.Windows.Forms.GroupBox()
+        Me.rbExtractNDS = New System.Windows.Forms.RadioButton()
         Me.rbExtractCIA = New System.Windows.Forms.RadioButton()
         Me.rbExtractCXIDec = New System.Windows.Forms.RadioButton()
         Me.rbExtractCCIDec = New System.Windows.Forms.RadioButton()
@@ -40,6 +41,7 @@ Partial Class Form1
         Me.TabPage2 = New System.Windows.Forms.TabPage()
         Me.btnBuild = New System.Windows.Forms.Button()
         Me.GroupBox2 = New System.Windows.Forms.GroupBox()
+        Me.rbBuildNDS = New System.Windows.Forms.RadioButton()
         Me.rbBuildCCI0Key = New System.Windows.Forms.RadioButton()
         Me.rbBuildCIA = New System.Windows.Forms.RadioButton()
         Me.rbBuildCCIDec = New System.Windows.Forms.RadioButton()
@@ -66,8 +68,6 @@ Partial Class Form1
         Me.StatusStrip1 = New System.Windows.Forms.StatusStrip()
         Me.pbProgress = New System.Windows.Forms.ToolStripProgressBar()
         Me.lblStatus = New System.Windows.Forms.ToolStripStatusLabel()
-        Me.rbExtractNDS = New System.Windows.Forms.RadioButton()
-        Me.rbBuildNDS = New System.Windows.Forms.RadioButton()
         Me.TabControl1.SuspendLayout()
         Me.TabPage1.SuspendLayout()
         Me.GroupBox1.SuspendLayout()
@@ -137,6 +137,17 @@ Partial Class Form1
         Me.GroupBox1.TabIndex = 6
         Me.GroupBox1.TabStop = False
         Me.GroupBox1.Text = "Options"
+        '
+        'rbExtractNDS
+        '
+        Me.rbExtractNDS.AutoSize = True
+        Me.rbExtractNDS.Location = New System.Drawing.Point(119, 109)
+        Me.rbExtractNDS.Name = "rbExtractNDS"
+        Me.rbExtractNDS.Size = New System.Drawing.Size(48, 17)
+        Me.rbExtractNDS.TabIndex = 5
+        Me.rbExtractNDS.TabStop = True
+        Me.rbExtractNDS.Text = "NDS"
+        Me.rbExtractNDS.UseVisualStyleBackColor = True
         '
         'rbExtractCIA
         '
@@ -291,6 +302,17 @@ Partial Class Form1
         Me.GroupBox2.TabStop = False
         Me.GroupBox2.Text = "Options"
         '
+        'rbBuildNDS
+        '
+        Me.rbBuildNDS.AutoSize = True
+        Me.rbBuildNDS.Location = New System.Drawing.Point(119, 109)
+        Me.rbBuildNDS.Name = "rbBuildNDS"
+        Me.rbBuildNDS.Size = New System.Drawing.Size(48, 17)
+        Me.rbBuildNDS.TabIndex = 6
+        Me.rbBuildNDS.TabStop = True
+        Me.rbBuildNDS.Text = "NDS"
+        Me.rbBuildNDS.UseVisualStyleBackColor = True
+        '
         'rbBuildCCI0Key
         '
         Me.rbBuildCCI0Key.AutoSize = True
@@ -411,7 +433,7 @@ Partial Class Form1
         Me.TabPage3.Location = New System.Drawing.Point(4, 22)
         Me.TabPage3.Name = "TabPage3"
         Me.TabPage3.Padding = New System.Windows.Forms.Padding(3)
-        Me.TabPage3.Size = New System.Drawing.Size(465, 207)
+        Me.TabPage3.Size = New System.Drawing.Size(465, 236)
         Me.TabPage3.TabIndex = 2
         Me.TabPage3.Text = "HANS"
         Me.TabPage3.UseVisualStyleBackColor = True
@@ -537,7 +559,6 @@ Partial Class Form1
         '
         'pbProgress
         '
-        Me.pbProgress.Maximum = 1
         Me.pbProgress.Name = "pbProgress"
         Me.pbProgress.Size = New System.Drawing.Size(100, 16)
         Me.pbProgress.Style = System.Windows.Forms.ProgressBarStyle.Continuous
@@ -547,28 +568,6 @@ Partial Class Form1
         Me.lblStatus.Name = "lblStatus"
         Me.lblStatus.Size = New System.Drawing.Size(39, 17)
         Me.lblStatus.Text = "Ready"
-        '
-        'rbExtractNDS
-        '
-        Me.rbExtractNDS.AutoSize = True
-        Me.rbExtractNDS.Location = New System.Drawing.Point(119, 109)
-        Me.rbExtractNDS.Name = "rbExtractNDS"
-        Me.rbExtractNDS.Size = New System.Drawing.Size(48, 17)
-        Me.rbExtractNDS.TabIndex = 5
-        Me.rbExtractNDS.TabStop = True
-        Me.rbExtractNDS.Text = "NDS"
-        Me.rbExtractNDS.UseVisualStyleBackColor = True
-        '
-        'rbBuildNDS
-        '
-        Me.rbBuildNDS.AutoSize = True
-        Me.rbBuildNDS.Location = New System.Drawing.Point(119, 109)
-        Me.rbBuildNDS.Name = "rbBuildNDS"
-        Me.rbBuildNDS.Size = New System.Drawing.Size(48, 17)
-        Me.rbBuildNDS.TabIndex = 6
-        Me.rbBuildNDS.TabStop = True
-        Me.rbBuildNDS.Text = "NDS"
-        Me.rbBuildNDS.UseVisualStyleBackColor = True
         '
         'Form1
         '
