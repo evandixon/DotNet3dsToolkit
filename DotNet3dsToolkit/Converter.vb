@@ -1,5 +1,6 @@
 ﻿Imports System.IO
 Imports System.Text.RegularExpressions
+Imports DotNet3dsToolkit.Misc
 
 Public Class Converter
     Implements IDisposable
@@ -509,9 +510,15 @@ Public Class Converter
     ''' <param name="filename">Full path of the ROM to extract.</param>
     ''' <param name="outputDirectory">Directory into which to extract the files.</param>
     Public Async Function ExtractNDS(filename As String, outputDirectory As String) As Task
-        CopyNDSTool()
+        ''Old ndstool usage
+        'CopyNDSTool()
+        'Await RunProgram(Path_ndstool, String.Format("-v -x ""{0}"" -9 ""{1}/arm9.bin"" -7 ""{1}/arm7.bin"" -y9 ""{1}/y9.bin"" -y7 ""{1}/y7.bin"" -d ""{1}/data"" -y ""{1}/overlay"" -t ""{1}/banner.bin"" -h ""{1}/header.bin""", filename, outputDirectory))
 
-        Await RunProgram(Path_ndstool, String.Format("-v -x ""{0}"" -9 ""{1}/arm9.bin"" -7 ""{1}/arm7.bin"" -y9 ""{1}/y9.bin"" -y7 ""{1}/y7.bin"" -d ""{1}/data"" -y ""{1}/overlay"" -t ""{1}/banner.bin"" -h ""{1}/header.bin""", filename, outputDirectory))
+        'New implementation
+        Dim r As New GenericNDSRom
+        Dim p As New WindowsIOProvider
+        Await r.OpenFile(filename, p)
+        Await r.Unpack(outputDirectory, p)
     End Function
 
     ''' <summary>
