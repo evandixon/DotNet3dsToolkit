@@ -129,9 +129,9 @@
     <None Include="Resources\3DS Builder.exe" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Resources\ctrtool.exe" />
-    <Content Include="Resources\makerom.exe" />
-    <Content Include="Resources\ndstool.exe" />
+    <None Include="Resources\ctrtool.exe" />
+    <None Include="Resources\makerom.exe" />
+    <None Include="Resources\ndstool.exe" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
