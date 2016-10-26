@@ -39,7 +39,7 @@ Namespace My.Resources
         Friend ReadOnly Property ResourceManager() As Global.System.Resources.ResourceManager
             Get
                 If Object.ReferenceEquals(resourceMan, Nothing) Then
-                    Dim temp As Global.System.Resources.ResourceManager = New Global.System.Resources.ResourceManager("DotNet3dsToolkit.Resources", GetType(Resources).Assembly)
+                    Dim temp As Global.System.Resources.ResourceManager = New Global.System.Resources.ResourceManager("ToolkitForm.Resources", GetType(Resources).Assembly)
                     resourceMan = temp
                 End If
                 Return resourceMan
@@ -58,66 +58,6 @@ Namespace My.Resources
             Set
                 resourceCulture = value
             End Set
-        End Property
-        
-        '''<summary>
-        '''  Looks up a localized resource of type System.Byte[].
-        '''</summary>
-        Friend ReadOnly Property _3DS_Builder() As Byte()
-            Get
-                Dim obj As Object = ResourceManager.GetObject("_3DS_Builder", resourceCulture)
-                Return CType(obj,Byte())
-            End Get
-        End Property
-        
-        '''<summary>
-        '''  Looks up a localized resource of type System.Byte[].
-        '''</summary>
-        Friend ReadOnly Property _3dstool() As Byte()
-            Get
-                Dim obj As Object = ResourceManager.GetObject("_3dstool", resourceCulture)
-                Return CType(obj,Byte())
-            End Get
-        End Property
-        
-        '''<summary>
-        '''  Looks up a localized resource of type System.Byte[].
-        '''</summary>
-        Friend ReadOnly Property ctrtool() As Byte()
-            Get
-                Dim obj As Object = ResourceManager.GetObject("ctrtool", resourceCulture)
-                Return CType(obj,Byte())
-            End Get
-        End Property
-        
-        '''<summary>
-        '''  Looks up a localized string similar to // regex: ECMAScript grammar and case insensitive
-        '''.
-        '''</summary>
-        Friend ReadOnly Property ignore_3dstool() As String
-            Get
-                Return ResourceManager.GetString("ignore_3dstool", resourceCulture)
-            End Get
-        End Property
-        
-        '''<summary>
-        '''  Looks up a localized resource of type System.Byte[].
-        '''</summary>
-        Friend ReadOnly Property makerom() As Byte()
-            Get
-                Dim obj As Object = ResourceManager.GetObject("makerom", resourceCulture)
-                Return CType(obj,Byte())
-            End Get
-        End Property
-        
-        '''<summary>
-        '''  Looks up a localized resource of type System.Byte[].
-        '''</summary>
-        Friend ReadOnly Property ndstool() As Byte()
-            Get
-                Dim obj As Object = ResourceManager.GetObject("ndstool", resourceCulture)
-                Return CType(obj,Byte())
-            End Get
         End Property
     End Module
 End Namespace

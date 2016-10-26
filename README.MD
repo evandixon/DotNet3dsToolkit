@@ -3,6 +3,7 @@
 
 Supported formats for extraction:
 * Decrypted CCI (aka .3DS)
+* Decrypted CIA
 * Decrypted CXI (like what Braindump would give you)
 
 Supported formats for building:
@@ -13,10 +14,9 @@ Supported formats for building:
   * For use with Gateway
 * CIA
   * For use with CFW
+* HANS RomFS, Code.Bin, and Homebrew Launcher Shortcut
 
 Planned Features
-* Build files for HANS
-* More supported source formats (more might work, but only decrypted CCI's have been tested)
 * Automatically add private header to 0-key encrypted CCI's.
 
 Using the library (VB.Net):
@@ -24,13 +24,17 @@ Using the library (VB.Net):
 ' To Extract
 Using c As New DotNet3dsToolkit.Converter
 	' To use the most appropriate format based on the extension
-	Await c.ExtractCXI("C:/MyROM.cxi", "C:/RawFiles/")
+	Await c.ExtractAuto("C:/MyROM.cxi", "C:/RawFiles/")
 
     ' To extract a decrypted CCI
     Await c.ExtractCCI("C:/MyROM.3ds", "C:/RawFiles/") 'Do not run these functions concurrently.  If you need to do so, create another instance of DotNet3dsToolkit.Converter to build another directory.
 
 	' To extract a decrypted CXI
 	Await c.ExtractCXI("C:/MyROM.cxi", "C:/RawFiles/")
+
+	' To extract a decrypted CIA
+	Await c.ExtractCIA("C:/MyROM.cia", "C:/RawFiles/")
+
 End Using 'It is important to dispose of the converter when finished.  This will delete temporary files created during extraction.
 
 ' To Build
@@ -47,6 +51,9 @@ Using c As New DotNet3dsToolkit.Converter
 
 	' To use the most appropriate format based on the extension
 	Await c.BuildAuto("C:/RawFiles/", "C:/MyRom-Rebuilt.cia")
+
+	' To build files for HANS (not supported by BuildAuto)
+	Await c.BuildHans("C:/RawFiles/", "G:/", "MyHack")
 End Using
 ```
 
@@ -56,13 +63,17 @@ Using the library (C#.Net):
 // To Extract
 using (DotNet3dsToolkit.Converter c = new DotNet3dsToolkit.Converter()) {
 	// To use the most appropriate format based on the extension
-	await c.ExtractCXI("C:/MyROM.cxi", "C:/RawFiles/");
+	await c.ExtractAuto("C:/MyROM.cxi", "C:/RawFiles/");
 
     // To extract a decrypted CCI
     await c.ExtractCCI("C:/MyROM.3ds", "C:/RawFiles/"); 'Do not run these functions concurrently.  If you need to do so, create another instance of DotNet3dsToolkit.Converter to build another directory.
 
 	// To extract a decrypted CXI
 	await c.ExtractCXI("C:/MyROM.cxi", "C:/RawFiles/");
+
+	// To extract a decrypted CIA
+	await c.ExtractCXI("C:/MyROM.cia", "C:/RawFiles/");
+
 } // It is important to dispose of the converter when finished.  This will delete temporary files created during extraction.
 
 // To Build
@@ -79,17 +90,22 @@ using (DotNet3dsToolkit.Converter c = new DotNet3dsToolkit.Converter()) {
 
 	// To use the most appropriate format based on the extension
 	await c.BuildAuto("C:/RawFiles/", "C:/MyRom-Rebuilt.cia");
+
+	// To build files for HANS (not supported by BuildAuto)
+	await c.BuildHans("C:/RawFiles/", "G:/", "MyHack");
 }
 
 ```
 
 Using the ToolkitConsole.exe:
-`ToolkitConsole.exe <source> [source-cxi] <destination> [-key0]`
-* <source> can be a decrypted CCI/3DS ROM or a decrypted CXI, or a directory created by ToolkitConsole.exe.
+`ToolkitConsole.exe <source> <destination> [hans raw file name] [-source-cxi|-source-cia] [-key0]`
+* <source> can be a decrypted CCI/3DS ROM, a decrypted CIA, a decrypted CXI, or a directory created by ToolkitConsole.exe.
 * <destination> can be a *.3DS, *.3DZ, *.CCI, or *.CIA file, or a directory if the source is a ROM.
+* [hans raw file name] is the future name of the raw files for HANS, if the ""-hans"" argument is present.  Shorter strings work better, but the exact requirements are unknown.
 * Input format is detected by the extension.
   * *.CXI files are treated as decrypted CXI files.
-  * All others are treated as decrypted CCI files.  This can be overridden by using the -source-cxi flag to treat input as a CXI.
+  * *.CIA files are treated as decrypted CIA files.
+  * All others are treated as decrypted CCI files.  This can be overridden by using the -source-cxi flag to treat input as a CXI or the -source-cia flag to treat the input as a CIA.
 * Output format is detected by the extension.
   * *.CIA files are outputted as CIA files.
   * *.3DZ files are outputted as 0-key encrypted CCI ROMs.
@@ -97,7 +113,7 @@ Using the ToolkitConsole.exe:
 
 Credits:
 * SciresM for [3DS Builder](https://github.com/SciresM/3DS-Builder) ([modified to use command-line arguments](https://github.com/evandixon/3DS-Builder))
-* profi200 for [Project_CTR](https://github.com/profi200/Project_CTR)'s makerom
+* profi200 for [Project_CTR](https://github.com/profi200/Project_CTR)'s ctrtool and makerom
 * dnasdw for [3dstool](https://github.com/dnasdw/3dstool)
 * DarkFader for ndstool
 * Asia81 for HackingToolkit3DS, which provided the usage for 3dstool.

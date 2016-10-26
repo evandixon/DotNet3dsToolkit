@@ -1,7 +1,10 @@
 ﻿Imports System.IO
+Imports System.Text.RegularExpressions
 
 Public Class Converter
     Implements IDisposable
+
+    Public Event ConsoleOutputReceived(sender As Object, e As DataReceivedEventArgs)
 
     ''' <summary>
     ''' Whether or not to forward console output of child processes to the current process.
@@ -17,6 +20,7 @@ Public Class Converter
         p.StartInfo.WorkingDirectory = Path.GetDirectoryName(program)
         p.StartInfo.Arguments = arguments
         p.StartInfo.WindowStyle = ProcessWindowStyle.Hidden
+        p.StartInfo.CreateNoWindow = True
         p.StartInfo.RedirectStandardOutput = OutputConsoleOutput
         p.StartInfo.RedirectStandardError = p.StartInfo.RedirectStandardOutput
         p.StartInfo.UseShellExecute = False
@@ -29,6 +33,9 @@ Public Class Converter
 
         p.Start()
 
+        p.BeginOutputReadLine()
+        p.BeginErrorReadLine()
+
         Await Task.Run(Sub() p.WaitForExit())
 
         If handlersRegistered Then
@@ -38,11 +45,10 @@ Public Class Converter
     End Function
 
     Private Sub OnInputRecieved(sender As Object, e As DataReceivedEventArgs)
-        If OutputConsoleOutput Then
-            If TypeOf sender Is Process Then
-                Console.Write($"[{Path.GetFileNameWithoutExtension(DirectCast(sender, Process).StartInfo.FileName)}] ")
-                Console.WriteLine(e.Data)
-            End If
+        If TypeOf sender Is Process AndAlso Not String.IsNullOrEmpty(e.Data) Then
+            Console.Write($"[{Path.GetFileNameWithoutExtension(DirectCast(sender, Process).StartInfo.FileName)}] ")
+            Console.WriteLine(e.Data)
+            RaiseEvent ConsoleOutputReceived(Me, e)
         End If
     End Sub
 
@@ -51,6 +57,7 @@ Public Class Converter
     Private Property Path_3dstool As String
     Private Property Path_3dsbuilder As String
     Private Property Path_makerom As String
+    Private Property Path_ctrtool As String
     Private Property Path_ndstool As String
 
     Private Sub ResetToolDirectory()
@@ -95,6 +102,18 @@ Public Class Converter
         End If
     End Sub
 
+    Private Sub CopyCtrTool()
+        If String.IsNullOrEmpty(ToolDirectory) Then
+            ResetToolDirectory()
+        End If
+
+        Dim exePath = Path.Combine(ToolDirectory, "ctrtool.exe")
+        If Not File.Exists(exePath) Then
+            File.WriteAllBytes(exePath, My.Resources.ctrtool)
+            Path_ctrtool = exePath
+        End If
+    End Sub
+
     Private Sub CopyMakeRom()
         If String.IsNullOrEmpty(ToolDirectory) Then
             ResetToolDirectory()
@@ -127,12 +146,34 @@ Public Class Converter
 #End Region
 
 #Region "Extraction"
-    Private Async Function ExtractPartitions(options As ExtractionOptions) As Task
+    Public Sub ExtractPrivateHeader(sourceCCI As String, outputFile As String)
+        Dim onlineHeaderBinPath = outputFile
+        Using f As New FileStream(sourceCCI, FileMode.Open, FileAccess.Read)
+            Dim buffer(&H2E00 + 1) As Byte
+            f.Seek(&H1200, SeekOrigin.Begin)
+            f.Read(buffer, 0, &H2E00)
+            File.WriteAllBytes(onlineHeaderBinPath, buffer)
+        End Using
+    End Sub
+    Private Async Function ExtractCCIPartitions(options As ExtractionOptions) As Task
         Dim headerNcchPath As String = Path.Combine(options.DestinationDirectory, options.RootHeaderName)
         Await RunProgram(Path_3dstool, $"-xtf 3ds ""{options.SourceRom}"" --header ""{headerNcchPath}"" -0 DecryptedPartition0.bin -1 DecryptedPartition1.bin -2 DecryptedPartition2.bin -6 DecryptedPartition6.bin -7 DecryptedPartition7.bin")
     End Function
 
-    Private Async Function ExtractPartition0(options As ExtractionOptions, partitionFilename As String) As Task
+    Private Async Function ExtractCIAPartitions(options As ExtractionOptions) As Task
+        Dim headerNcchPath As String = Path.Combine(options.DestinationDirectory, options.RootHeaderName)
+        Await RunProgram(Path_ctrtool, $"--content=Partition ""{options.SourceRom}""")
+
+        Dim partitionRegex As New Regex("Partition\.000([0-9])\.[0-9]{8}")
+        Dim replace As String = "DecryptedPartition$1.bin"
+        For Each item In Directory.GetFiles(ToolDirectory)
+            If partitionRegex.IsMatch(item) Then
+                File.Move(item, partitionRegex.Replace(item, replace))
+            End If
+        Next
+    End Function
+
+    Private Async Function ExtractPartition0(options As ExtractionOptions, partitionFilename As String, ctrTool As Boolean) As Task
         'Extract partitions
         Dim exheaderPath As String = Path.Combine(options.DestinationDirectory, options.ExheaderName)
         Dim headerPath As String = Path.Combine(options.DestinationDirectory, options.Partition0HeaderName)
@@ -147,7 +188,11 @@ Public Class Converter
         Dim tasks As New List(Of Task)
 
         '- romfs
-        tasks.Add(RunProgram(Path_3dstool, $"-xtf romfs DecryptedRomFS.bin --romfs-dir ""{romfsDir}"""))
+        If ctrTool Then
+            Await RunProgram(Path_ctrtool, $"-t romfs --romfsdir ""{romfsDir}"" DecryptedRomFS.bin")
+        Else
+            tasks.Add(RunProgram(Path_3dstool, $"-xtf romfs DecryptedRomFS.bin --romfs-dir ""{romfsDir}"""))
+        End If
 
         '- exefs
         Dim exefsExtractionOptions As String
@@ -157,18 +202,22 @@ Public Class Converter
         '    exefsExtractionOptions = "-xtf"
         'End If
 
-        tasks.Add(Task.Run(Async Function() As Task
-                               '- exefs
-                               Await RunProgram(Path_3dstool, $"{exefsExtractionOptions} exefs DecryptedExeFS.bin --exefs-dir ""{exefsDir}"" --header ""{exefsHeaderPath}""")
+        If ctrTool Then
+            Await RunProgram(Path_ctrtool, $"-t exefs --exefsdir=""{exefsDir}"" DecryptedExeFS.bin --decompresscode")
+        Else
+            tasks.Add(Task.Run(Async Function() As Task
+                                   '- exefs
+                                   Await RunProgram(Path_3dstool, $"{exefsExtractionOptions} exefs DecryptedExeFS.bin --exefs-dir ""{exefsDir}"" --header ""{exefsHeaderPath}""")
 
-                               File.Move(Path.Combine(options.DestinationDirectory, options.ExeFSDirName, "banner.bnr"), Path.Combine(options.DestinationDirectory, options.ExeFSDirName, "banner.bin"))
-                               File.Move(Path.Combine(options.DestinationDirectory, options.ExeFSDirName, "icon.icn"), Path.Combine(options.DestinationDirectory, options.ExeFSDirName, "icon.bin"))
+                                   File.Move(Path.Combine(options.DestinationDirectory, options.ExeFSDirName, "banner.bnr"), Path.Combine(options.DestinationDirectory, options.ExeFSDirName, "banner.bin"))
+                                   File.Move(Path.Combine(options.DestinationDirectory, options.ExeFSDirName, "icon.icn"), Path.Combine(options.DestinationDirectory, options.ExeFSDirName, "icon.bin"))
 
-                               '- banner
-                               Await RunProgram(Path_3dstool, $"-x -t banner -f ""{Path.Combine(options.DestinationDirectory, options.ExeFSDirName, "banner.bin")}"" --banner-dir ""{Path.Combine(options.DestinationDirectory, "ExtractedBanner")}""")
+                                   '- banner
+                                   Await RunProgram(Path_3dstool, $"-x -t banner -f ""{Path.Combine(options.DestinationDirectory, options.ExeFSDirName, "banner.bin")}"" --banner-dir ""{Path.Combine(options.DestinationDirectory, "ExtractedBanner")}""")
 
-                               File.Move(Path.Combine(options.DestinationDirectory, "ExtractedBanner", "banner0.bcmdl"), Path.Combine(options.DestinationDirectory, "ExtractedBanner", "banner.cgfx"))
-                           End Function))
+                                   File.Move(Path.Combine(options.DestinationDirectory, "ExtractedBanner", "banner0.bcmdl"), Path.Combine(options.DestinationDirectory, "ExtractedBanner", "banner.cgfx"))
+                               End Function))
+        End If
 
         'Cleanup while we're waiting
         File.Delete(Path.Combine(ToolDirectory, "DecryptedPartition0.bin"))
@@ -238,7 +287,7 @@ Public Class Converter
     End Function
 #End Region
 
-#Region "Building"
+#Region "Building Parts"
     Private Sub UpdateExheader(options As BuildOptions, isCia As Boolean)
         Using f As New FileStream(Path.Combine(options.SourceDirectory, options.ExheaderName), FileMode.Open, FileAccess.ReadWrite)
             f.Seek(&HD, SeekOrigin.Begin)
@@ -265,7 +314,11 @@ Public Class Converter
 
     Private Async Function BuildRomFS(options As BuildOptions) As Task
         Dim romfsDir = Path.Combine(options.SourceDirectory, options.RomFSDirName)
-        Await RunProgram(Path_3dstool, $" -ctf romfs CustomRomFS.bin --romfs-dir ""{romfsDir}""")
+        Await BuildRomFS(romfsDir, "CustomRomFS.bin")
+    End Function
+
+    Public Async Function BuildRomFS(sourceDirectory As String, outputFile As String) As Task
+        Await RunProgram(Path_3dstool, $"-ctf romfs ""{outputFile}"" --romfs-dir ""{sourceDirectory}""")
     End Function
 
     Private Async Function BuildExeFS(options As BuildOptions) As Task
@@ -352,6 +405,7 @@ Public Class Converter
 
 #End Region
 
+#Region "Top Level Public Methods"
     ''' <summary>
     ''' Extracts a decrypted CCI ROM.
     ''' </summary>
@@ -375,10 +429,10 @@ Public Class Converter
         End If
         Directory.CreateDirectory(options.DestinationDirectory)
 
-        Await ExtractPartitions(options)
+        Await ExtractCCIPartitions(options)
 
         Dim partitionExtractions As New List(Of Task)
-        partitionExtractions.Add(ExtractPartition0(options, "DecryptedPartition0.bin"))
+        partitionExtractions.Add(ExtractPartition0(options, "DecryptedPartition0.bin", False))
         partitionExtractions.Add(ExtractPartition1(options))
         partitionExtractions.Add(ExtractPartition2(options))
         partitionExtractions.Add(ExtractPartition6(options))
@@ -403,6 +457,7 @@ Public Class Converter
     ''' </summary>
     Public Async Function ExtractCXI(options As ExtractionOptions) As Task
         Copy3DSTool()
+        CopyCtrTool()
 
         If Directory.Exists(options.DestinationDirectory) Then
             Directory.Delete(options.DestinationDirectory, True)
@@ -410,7 +465,42 @@ Public Class Converter
         Directory.CreateDirectory(options.DestinationDirectory)
 
         'Extract partition 0, which is the only partition we have
-        Await ExtractPartition0(options, options.SourceRom)
+        Await ExtractPartition0(options, options.SourceRom, True)
+    End Function
+
+    ''' <summary>
+    ''' Extracts a decrypted CIA.
+    ''' </summary>
+    ''' <param name="filename">Full path of the ROM to extract.</param>
+    ''' <param name="outputDirectory">Directory into which to extract the files.</param>
+    Public Async Function ExtractCIA(filename As String, outputDirectory As String) As Task
+        Dim options As New ExtractionOptions
+        options.SourceRom = filename
+        options.DestinationDirectory = outputDirectory
+        Await ExtractCIA(options)
+    End Function
+
+    ''' <summary>
+    ''' Extracts a CIA.
+    ''' </summary>
+    Public Async Function ExtractCIA(options As ExtractionOptions) As Task
+        Copy3DSTool()
+        CopyCtrTool()
+
+        If Directory.Exists(options.DestinationDirectory) Then
+            Directory.Delete(options.DestinationDirectory, True)
+        End If
+        Directory.CreateDirectory(options.DestinationDirectory)
+
+        Await ExtractCIAPartitions(options)
+
+        Dim partitionExtractions As New List(Of Task)
+        partitionExtractions.Add(ExtractPartition0(options, "DecryptedPartition0.bin", False))
+        partitionExtractions.Add(ExtractPartition1(options))
+        partitionExtractions.Add(ExtractPartition2(options))
+        partitionExtractions.Add(ExtractPartition6(options))
+        partitionExtractions.Add(ExtractPartition7(options))
+        Await Task.WhenAll(partitionExtractions)
     End Function
 
     ''' <summary>
@@ -422,6 +512,8 @@ Public Class Converter
     Public Async Function ExtractAuto(filename As String, outputDirectory As String) As Task
         If Path.GetExtension(filename).ToLower = ".cxi" Then
             Await ExtractCXI(filename, outputDirectory)
+        ElseIf Path.GetExtension(filename).ToLower = ".cia" Then
+            Await ExtractCIA(filename, outputDirectory)
         Else
             Await ExtractCCI(filename, outputDirectory)
         End If
@@ -435,7 +527,7 @@ Public Class Converter
         UpdateExheader(options, False)
 
         Dim headerPath As String = Path.Combine(options.SourceDirectory, options.RootHeaderName)
-        Dim outputPath As String = Path.Combine(options.SourceDirectory, options.DestinationROM)
+        Dim outputPath As String = Path.Combine(options.SourceDirectory, options.Destination)
         Dim partitionArgs As String = ""
 
         If Not File.Exists(headerPath) Then
@@ -474,7 +566,7 @@ Public Class Converter
     Public Async Function Build3DSDecrypted(sourceDirectory As String, outputROM As String) As Task
         Dim options As New BuildOptions
         options.SourceDirectory = sourceDirectory
-        options.DestinationROM = outputROM
+        options.Destination = outputROM
 
         Await Build3DSDecrypted(options)
     End Function
@@ -493,10 +585,10 @@ Public Class Converter
         Dim romFS As String = Path.Combine(options.SourceDirectory, options.RomFSDirName)
 
         If options.CompressCodeBin Then
-            Await RunProgram(Path_3dsbuilder, $"""{exeFS}"" ""{romFS}"" ""{exHeader}"" ""{options.DestinationROM}""-compressCode")
+            Await RunProgram(Path_3dsbuilder, $"""{exeFS}"" ""{romFS}"" ""{exHeader}"" ""{options.Destination}""-compressCode")
             Console.WriteLine("WARNING: .code.bin is still compressed, and other operations may be affected.")
         Else
-            Await RunProgram(Path_3dsbuilder, $"""{exeFS}"" ""{romFS}"" ""{exHeader}"" ""{options.DestinationROM}""")
+            Await RunProgram(Path_3dsbuilder, $"""{exeFS}"" ""{romFS}"" ""{exHeader}"" ""{options.Destination}""")
             Dim dotCodeBin = Path.Combine(options.SourceDirectory, options.ExeFSDirName, ".code.bin")
             Dim codeBin = Path.Combine(options.SourceDirectory, options.ExeFSDirName, "code.bin")
             If File.Exists(dotCodeBin) Then
@@ -513,7 +605,7 @@ Public Class Converter
     Public Async Function Build3DS0Key(sourceDirectory As String, outputROM As String) As Task
         Dim options As New BuildOptions
         options.SourceDirectory = sourceDirectory
-        options.DestinationROM = outputROM
+        options.Destination = outputROM
 
         Await Build3DS0Key(options)
     End Function
@@ -541,7 +633,7 @@ Public Class Converter
         Next
 
         Dim headerPath As String = Path.Combine(options.SourceDirectory, options.RootHeaderName)
-        Dim outputPath As String = Path.Combine(options.SourceDirectory, options.DestinationROM)
+        Dim outputPath As String = Path.Combine(options.SourceDirectory, options.Destination)
 
         Await RunProgram(Path_makerom, $"-f cia -o ""{outputPath}""{partitionArgs}")
 
@@ -562,9 +654,117 @@ Public Class Converter
     Public Async Function BuildCia(sourceDirectory As String, outputROM As String) As Task
         Dim options As New BuildOptions
         options.SourceDirectory = sourceDirectory
-        options.DestinationROM = outputROM
+        options.Destination = outputROM
 
         Await BuildCia(options)
+    End Function
+
+    ''' <summary>
+    ''' Builds files for use with HANS.
+    ''' </summary>
+    ''' <param name="options">Options to use for the build.  <see cref="BuildOptions.Destination"/> should be the SD card root.</param>
+    ''' <param name="shortcutName">Name of the shortcut.  Should not contain spaces nor special characters.</param>
+    ''' <param name="rawName">Raw name for the destination RomFS and Code files.  Should be short, but the exact requirements are unknown.</param>
+    Public Async Function BuildHans(options As BuildOptions, shortcutName As String, rawName As String) As Task
+
+        'Validate input.  Never trust the user.
+        shortcutName = shortcutName.Replace(" ", "").Replace("é", "e")
+
+        Copy3DSTool()
+
+        'Create variables
+        Dim romfsDir = Path.Combine(options.SourceDirectory, options.RomFSDirName)
+        Dim romfsFile = Path.Combine(ToolDirectory, "romfsRepacked.bin")
+        Dim codeFile = Path.Combine(options.SourceDirectory, options.ExeFSDirName, "code.bin")
+        Dim smdhSourceFile = Path.Combine(options.SourceDirectory, options.ExeFSDirName, "icon.bin")
+        Dim exheaderFile = Path.Combine(options.SourceDirectory, options.ExheaderName)
+        Dim titleID As String
+
+        If File.Exists(exheaderFile) Then
+            Dim exheader = File.ReadAllBytes(exheaderFile)
+            titleID = BitConverter.ToUInt64(exheader, &H200).ToString("X").PadLeft(16, "0"c)
+        Else
+            Throw New IOException($"Could not find exheader at the path ""{exheaderFile}"".")
+        End If
+
+        'Repack romfs
+        Await BuildRomFS(romfsDir, romfsFile)
+
+        'Copy the files
+        '- Create non-existant directories
+        If Not Directory.Exists(options.Destination) Then
+            Directory.CreateDirectory(options.Destination)
+        End If
+        If Not Directory.Exists(Path.Combine(options.Destination, "hans")) Then
+            Directory.CreateDirectory(Path.Combine(options.Destination, "hans"))
+        End If
+
+        '- Copy files if they exist
+        If File.Exists(romfsFile) Then
+            File.Copy(romfsFile, IO.Path.Combine(options.Destination, "hans", rawName & ".romfs"), True)
+        End If
+        If File.Exists(codeFile) Then
+            File.Copy(codeFile, IO.Path.Combine(options.Destination, "hans", rawName & ".code"), True)
+        End If
+
+        'Create the homebrew launcher shortcut
+        If Not Directory.Exists(IO.Path.Combine(options.Destination, "3ds")) Then
+            Directory.CreateDirectory(IO.Path.Combine(options.Destination, "3ds"))
+        End If
+
+        '- Copy smdh
+        Dim iconExists As Boolean = False
+        If File.Exists(smdhSourceFile) Then
+            iconExists = True
+            File.Copy(smdhSourceFile, IO.Path.Combine(options.Destination, "3ds", shortcutName & ".smdh"), True)
+        End If
+
+        '- Write hans shortcut
+        Dim shortcut As New Text.StringBuilder
+        shortcut.AppendLine("<shortcut>")
+        shortcut.AppendLine("	<executable>/3ds/hans/hans.3dsx</executable>")
+        If iconExists Then
+            shortcut.AppendLine($"	<icon>/3ds/{shortcutName}.smdh</icon>")
+        End If
+        shortcut.AppendLine($"	<arg>-f/3ds/hans/titles/{rawName}.txt</arg>")
+        shortcut.AppendLine("</shortcut>")
+        shortcut.AppendLine("<targets selectable=""false"">")
+        shortcut.AppendLine($"	<title mediatype=""2"">{titleID}</title>")
+        shortcut.AppendLine($"	<title mediatype=""1"">{titleID}</title>")
+        shortcut.AppendLine("</targets>")
+        File.WriteAllText(Path.Combine(options.Destination, "3ds", shortcutName & ".xml"), shortcut.ToString)
+
+        '- Write hans title settings
+        Dim preset As New Text.StringBuilder
+        preset.Append("region : -1")
+        preset.Append(vbLf)
+        preset.Append("language : -1")
+        preset.Append(vbLf)
+        preset.Append("clock : 0")
+        preset.Append(vbLf)
+        preset.Append("romfs : 0")
+        preset.Append(vbLf)
+        preset.Append("code : 0")
+        preset.Append(vbLf)
+        preset.Append("nim_checkupdate : 1")
+        preset.Append(vbLf)
+        If Not Directory.Exists(Path.Combine(options.Destination, "3ds", "hans", "titles")) Then
+            Directory.CreateDirectory(Path.Combine(options.Destination, "3ds", "hans", "titles"))
+        End If
+        File.WriteAllText(Path.Combine(options.Destination, "3ds", "hans", "titles", rawName & ".txt"), preset.ToString)
+    End Function
+
+    ''' <summary>
+    ''' Builds files for use with HANS.
+    ''' </summary>
+    ''' <param name="sourceDirectory">Path of the files to build.  Must have been created with <see cref="ExtractAuto(String, String)"/> or equivalent function using default settings.</param>
+    ''' <param name="sdRoot">Root of the SD card</param>
+    ''' <param name="rawName">Raw name for the destination RomFS, Code, and shortcut files.  Should be short, but the exact requirements are unknown.  To use a different name for shortcut files, use <see cref="BuildHans(BuildOptions, String, String)"/>.</param>
+    Public Async Function BuildHans(sourceDirectory As String, sdRoot As String, rawName As String) As Task
+        Dim options As New BuildOptions
+        options.SourceDirectory = sourceDirectory
+        options.Destination = sdRoot
+        Await BuildHans(options, rawName, rawName)
     End Function
 
     ''' <summary>
@@ -582,7 +782,7 @@ Public Class Converter
             Await Build3DSDecrypted(sourceDirectory, outputROM)
         End If
     End Function
-
+#End Region
 
 #Region "IDisposable Support"
     Private disposedValue As Boolean ' To detect redundant calls
@@ -617,4 +817,5 @@ Public Class Converter
         ' GC.SuppressFinalize(Me)
     End Sub
 #End Region
+
 End Class
