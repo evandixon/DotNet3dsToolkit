@@ -120,6 +120,9 @@ Public Class Form1
             ElseIf rbExtractCIA.Checked Then
                 lblStatus.Text = "Extracting as decrypted CIA..."
                 Await c.ExtractCIA(txtExtractSource.Text, txtExtractDestination.Text)
+            ElseIf rbExtractNDS.Checked Then
+                lblStatus.Text = "Extracting as NDS ROM..."
+                Await c.ExtractNDS(txtExtractSource.Text, txtExtractDestination.Text)
             Else
                 MessageBox.Show("Invalid radio button choice.")
             End If
@@ -168,6 +171,9 @@ Public Class Form1
             ElseIf rbBuildCIA.Checked Then
                 lblStatus.Text = "Building as CIA..."
                 Await c.BuildCia(txtBuildSource.Text, txtBuildDestination.Text)
+            ElseIf rbBuildNDS.Checked Then
+                lblStatus.Text = "Building as NDS..."
+                Await c.BuildNDS(txtBuildSource.Text, txtBuildDestination.Text)
             Else
                 MessageBox.Show("Invalid radio button choice.")
             End If

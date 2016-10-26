@@ -26,6 +26,7 @@ Partial Class Form1
         Me.TabPage1 = New System.Windows.Forms.TabPage()
         Me.btnExtract = New System.Windows.Forms.Button()
         Me.GroupBox1 = New System.Windows.Forms.GroupBox()
+        Me.rbExtractCIA = New System.Windows.Forms.RadioButton()
         Me.rbExtractCXIDec = New System.Windows.Forms.RadioButton()
         Me.rbExtractCCIDec = New System.Windows.Forms.RadioButton()
         Me.Label3 = New System.Windows.Forms.Label()
@@ -65,7 +66,8 @@ Partial Class Form1
         Me.StatusStrip1 = New System.Windows.Forms.StatusStrip()
         Me.pbProgress = New System.Windows.Forms.ToolStripProgressBar()
         Me.lblStatus = New System.Windows.Forms.ToolStripStatusLabel()
-        Me.rbExtractCIA = New System.Windows.Forms.RadioButton()
+        Me.rbExtractNDS = New System.Windows.Forms.RadioButton()
+        Me.rbBuildNDS = New System.Windows.Forms.RadioButton()
         Me.TabControl1.SuspendLayout()
         Me.TabPage1.SuspendLayout()
         Me.GroupBox1.SuspendLayout()
@@ -87,7 +89,7 @@ Partial Class Form1
         Me.TabControl1.Location = New System.Drawing.Point(0, 0)
         Me.TabControl1.Name = "TabControl1"
         Me.TabControl1.SelectedIndex = 0
-        Me.TabControl1.Size = New System.Drawing.Size(473, 233)
+        Me.TabControl1.Size = New System.Drawing.Size(473, 262)
         Me.TabControl1.TabIndex = 0
         '
         'TabPage1
@@ -103,7 +105,7 @@ Partial Class Form1
         Me.TabPage1.Location = New System.Drawing.Point(4, 22)
         Me.TabPage1.Name = "TabPage1"
         Me.TabPage1.Padding = New System.Windows.Forms.Padding(3)
-        Me.TabPage1.Size = New System.Drawing.Size(465, 207)
+        Me.TabPage1.Size = New System.Drawing.Size(465, 236)
         Me.TabPage1.TabIndex = 0
         Me.TabPage1.Text = "Extract"
         Me.TabPage1.UseVisualStyleBackColor = True
@@ -111,7 +113,7 @@ Partial Class Form1
         'btnExtract
         '
         Me.btnExtract.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left), System.Windows.Forms.AnchorStyles)
-        Me.btnExtract.Location = New System.Drawing.Point(6, 176)
+        Me.btnExtract.Location = New System.Drawing.Point(6, 205)
         Me.btnExtract.Name = "btnExtract"
         Me.btnExtract.Size = New System.Drawing.Size(75, 23)
         Me.btnExtract.TabIndex = 7
@@ -123,6 +125,7 @@ Partial Class Form1
         Me.GroupBox1.Anchor = CType((((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Bottom) _
             Or System.Windows.Forms.AnchorStyles.Left) _
             Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
+        Me.GroupBox1.Controls.Add(Me.rbExtractNDS)
         Me.GroupBox1.Controls.Add(Me.rbExtractCIA)
         Me.GroupBox1.Controls.Add(Me.rbExtractCXIDec)
         Me.GroupBox1.Controls.Add(Me.rbExtractCCIDec)
@@ -130,10 +133,20 @@ Partial Class Form1
         Me.GroupBox1.Controls.Add(Me.rbExtractAuto)
         Me.GroupBox1.Location = New System.Drawing.Point(11, 60)
         Me.GroupBox1.Name = "GroupBox1"
-        Me.GroupBox1.Size = New System.Drawing.Size(446, 110)
+        Me.GroupBox1.Size = New System.Drawing.Size(446, 139)
         Me.GroupBox1.TabIndex = 6
         Me.GroupBox1.TabStop = False
         Me.GroupBox1.Text = "Options"
+        '
+        'rbExtractCIA
+        '
+        Me.rbExtractCIA.AutoSize = True
+        Me.rbExtractCIA.Location = New System.Drawing.Point(119, 63)
+        Me.rbExtractCIA.Name = "rbExtractCIA"
+        Me.rbExtractCIA.Size = New System.Drawing.Size(94, 17)
+        Me.rbExtractCIA.TabIndex = 3
+        Me.rbExtractCIA.Text = "Decrypted CIA"
+        Me.rbExtractCIA.UseVisualStyleBackColor = True
         '
         'rbExtractCXIDec
         '
@@ -245,7 +258,7 @@ Partial Class Form1
         Me.TabPage2.Location = New System.Drawing.Point(4, 22)
         Me.TabPage2.Name = "TabPage2"
         Me.TabPage2.Padding = New System.Windows.Forms.Padding(3)
-        Me.TabPage2.Size = New System.Drawing.Size(465, 207)
+        Me.TabPage2.Size = New System.Drawing.Size(465, 236)
         Me.TabPage2.TabIndex = 1
         Me.TabPage2.Text = "Build"
         Me.TabPage2.UseVisualStyleBackColor = True
@@ -253,7 +266,7 @@ Partial Class Form1
         'btnBuild
         '
         Me.btnBuild.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left), System.Windows.Forms.AnchorStyles)
-        Me.btnBuild.Location = New System.Drawing.Point(6, 176)
+        Me.btnBuild.Location = New System.Drawing.Point(6, 205)
         Me.btnBuild.Name = "btnBuild"
         Me.btnBuild.Size = New System.Drawing.Size(75, 23)
         Me.btnBuild.TabIndex = 15
@@ -265,6 +278,7 @@ Partial Class Form1
         Me.GroupBox2.Anchor = CType((((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Bottom) _
             Or System.Windows.Forms.AnchorStyles.Left) _
             Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
+        Me.GroupBox2.Controls.Add(Me.rbBuildNDS)
         Me.GroupBox2.Controls.Add(Me.rbBuildCCI0Key)
         Me.GroupBox2.Controls.Add(Me.rbBuildCIA)
         Me.GroupBox2.Controls.Add(Me.rbBuildCCIDec)
@@ -272,7 +286,7 @@ Partial Class Form1
         Me.GroupBox2.Controls.Add(Me.rbBuildAuto)
         Me.GroupBox2.Location = New System.Drawing.Point(11, 60)
         Me.GroupBox2.Name = "GroupBox2"
-        Me.GroupBox2.Size = New System.Drawing.Size(446, 110)
+        Me.GroupBox2.Size = New System.Drawing.Size(446, 139)
         Me.GroupBox2.TabIndex = 14
         Me.GroupBox2.TabStop = False
         Me.GroupBox2.Text = "Options"
@@ -514,7 +528,7 @@ Partial Class Form1
         'StatusStrip1
         '
         Me.StatusStrip1.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.pbProgress, Me.lblStatus})
-        Me.StatusStrip1.Location = New System.Drawing.Point(0, 236)
+        Me.StatusStrip1.Location = New System.Drawing.Point(0, 265)
         Me.StatusStrip1.Name = "StatusStrip1"
         Me.StatusStrip1.Size = New System.Drawing.Size(473, 22)
         Me.StatusStrip1.SizingGrip = False
@@ -534,21 +548,33 @@ Partial Class Form1
         Me.lblStatus.Size = New System.Drawing.Size(39, 17)
         Me.lblStatus.Text = "Ready"
         '
-        'rbExtractCIA
+        'rbExtractNDS
         '
-        Me.rbExtractCIA.AutoSize = True
-        Me.rbExtractCIA.Location = New System.Drawing.Point(119, 63)
-        Me.rbExtractCIA.Name = "rbExtractCIA"
-        Me.rbExtractCIA.Size = New System.Drawing.Size(94, 17)
-        Me.rbExtractCIA.TabIndex = 3
-        Me.rbExtractCIA.Text = "Decrypted CIA"
-        Me.rbExtractCIA.UseVisualStyleBackColor = True
+        Me.rbExtractNDS.AutoSize = True
+        Me.rbExtractNDS.Location = New System.Drawing.Point(119, 109)
+        Me.rbExtractNDS.Name = "rbExtractNDS"
+        Me.rbExtractNDS.Size = New System.Drawing.Size(48, 17)
+        Me.rbExtractNDS.TabIndex = 5
+        Me.rbExtractNDS.TabStop = True
+        Me.rbExtractNDS.Text = "NDS"
+        Me.rbExtractNDS.UseVisualStyleBackColor = True
+        '
+        'rbBuildNDS
+        '
+        Me.rbBuildNDS.AutoSize = True
+        Me.rbBuildNDS.Location = New System.Drawing.Point(119, 109)
+        Me.rbBuildNDS.Name = "rbBuildNDS"
+        Me.rbBuildNDS.Size = New System.Drawing.Size(48, 17)
+        Me.rbBuildNDS.TabIndex = 6
+        Me.rbBuildNDS.TabStop = True
+        Me.rbBuildNDS.Text = "NDS"
+        Me.rbBuildNDS.UseVisualStyleBackColor = True
         '
         'Form1
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
-        Me.ClientSize = New System.Drawing.Size(473, 258)
+        Me.ClientSize = New System.Drawing.Size(473, 287)
         Me.Controls.Add(Me.StatusStrip1)
         Me.Controls.Add(Me.TabControl1)
         Me.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle
@@ -619,4 +645,6 @@ Partial Class Form1
     Friend WithEvents pbProgress As ToolStripProgressBar
     Friend WithEvents lblStatus As ToolStripStatusLabel
     Friend WithEvents rbExtractCIA As RadioButton
+    Friend WithEvents rbExtractNDS As RadioButton
+    Friend WithEvents rbBuildNDS As RadioButton
 End Class
