@@ -427,11 +427,6 @@ Public Class Converter
     Public Async Function ExtractCCI(options As ExtractionOptions) As Task
         Copy3DSTool()
 
-        If Directory.Exists(options.DestinationDirectory) Then
-            Directory.Delete(options.DestinationDirectory, True)
-        End If
-        Directory.CreateDirectory(options.DestinationDirectory)
-
         Await ExtractCCIPartitions(options)
 
         Dim partitionExtractions As New List(Of Task)
@@ -462,11 +457,6 @@ Public Class Converter
         Copy3DSTool()
         CopyCtrTool()
 
-        If Directory.Exists(options.DestinationDirectory) Then
-            Directory.Delete(options.DestinationDirectory, True)
-        End If
-        Directory.CreateDirectory(options.DestinationDirectory)
-
         'Extract partition 0, which is the only partition we have
         Await ExtractPartition0(options, options.SourceRom, True)
     End Function
@@ -489,11 +479,6 @@ Public Class Converter
     Public Async Function ExtractCIA(options As ExtractionOptions) As Task
         Copy3DSTool()
         CopyCtrTool()
-
-        If Directory.Exists(options.DestinationDirectory) Then
-            Directory.Delete(options.DestinationDirectory, True)
-        End If
-        Directory.CreateDirectory(options.DestinationDirectory)
 
         Await ExtractCIAPartitions(options)
 
