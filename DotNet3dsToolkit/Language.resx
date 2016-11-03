@@ -129,6 +129,10 @@
     <value>Using GenericFile.Save() requires GenericFile.OriginalFilename to not be null.</value>
     <comment>Message for an exception that's thrown when using GenericFile.Save() when the file doesn't have an original filename.</comment>
   </data>
+  <data name="ErrorSystemNotSupported" xml:space="preserve">
+    <value>Unsupported system format {0}</value>
+    <comment>Message for an exception that's thrown when the SystemType {0} is not supported by a function.</comment>
+  </data>
   <data name="ErrorWrittenReadonly" xml:space="preserve">
     <value>Attempted to write to a read-only file.</value>
     <comment>Message for an exception that's thrown when attempting to alter a read-only file.</comment>

@@ -1,13 +1,24 @@
 ﻿Imports System.IO
+Imports DotNet3dsToolkit.Misc
 
+''' <summary>
+''' Reads metadata from packed or unpacked ROMs.
+''' </summary>
 Public Class MetadataReader
+
     ''' <summary>
     ''' Gets the system corresponding to the given directory.
     ''' </summary>
     ''' <param name="path">The directory containing the unpacked ROM to check.</param>
     ''' <returns>A <see cref="SystemType"/> corresponding to the extracted files located in the directory <paramref name="path"/>.</returns>
     Public Shared Function GetDirectorySystem(path As String) As SystemType
-        Throw New NotImplementedException
+        If File.Exists(IO.Path.Combine(path, "arm9.bin")) AndAlso File.Exists(IO.Path.Combine(path, "arm7.bin")) AndAlso File.Exists(IO.Path.Combine(path, "header.bin")) AndAlso Directory.Exists(IO.Path.Combine(path, "data")) Then
+            Return SystemType.NDS
+        ElseIf File.Exists(IO.Path.Combine(path, "exheader.bin")) AndAlso Directory.Exists(IO.Path.Combine(path, "exefs")) AndAlso Directory.Exists(IO.Path.Combine(path, "romfs")) Then
+            Return SystemType.ThreeDS
+        Else
+            Return SystemType.Unknown
+        End If
     End Function
 
     ''' <summary>
@@ -17,7 +28,17 @@ Public Class MetadataReader
     ''' <param name="system">The type of system the unpacked ROM is for.</param>
     ''' <returns>The unpacked ROM's game code.</returns>
     Public Shared Function GetDirectoryGameID(path As String, system As SystemType) As String
-        Throw New NotImplementedException
+        Select Case system
+            Case SystemType.NDS
+                Dim header = File.ReadAllBytes(IO.Path.Combine(path, "header.bin"))
+                Dim e As New Text.ASCIIEncoding
+                Return e.GetString(header, &HC, 4)
+            Case SystemType.ThreeDS
+                Dim exheader = File.ReadAllBytes(IO.Path.Combine(path, "exheader.bin"))
+                Return BitConverter.ToUInt64(exheader, &H200).ToString("X").PadLeft(16, "0"c)
+            Case Else
+                Throw New NotSupportedException(String.Format(My.Resources.Language.ErrorSystemNotSupported, system.ToString))
+        End Select
     End Function
 
     ''' <summary>
@@ -34,8 +55,18 @@ Public Class MetadataReader
     ''' </summary>
     ''' <param name="path">The filename of the ROM to check.</param>
     ''' <returns>A <see cref="SystemType"/> corresponding to ROM located at <paramref name="path"/>.</returns>
-    Public Shared Function GetROMSystem(path As String) As SystemType
-        Throw New NotImplementedException
+    Public Shared Async Function GetROMSystem(path As String) As Task(Of SystemType)
+        Dim file As New GenericFile
+        file.EnableInMemoryLoad = False
+        Await file.OpenFile(path, New WindowsIOProvider)
+
+        Dim n As New GenericNDSRom
+        'Todo: add CCI, CIA, and CXI support.
+        If Await n.IsFileOfType(file) Then
+            Return SystemType.NDS
+        Else
+            Return SystemType.Unknown
+        End If
     End Function
 
     ''' <summary>
@@ -44,8 +75,23 @@ Public Class MetadataReader
     ''' <param name="path">The filename of the ROM to check.</param>
     ''' <param name="system">The type of system the unpacked ROM is for.</param>
     ''' <returns>The ROM's game code.</returns>
-    Public Shared Function GetROMGameID(path As String, system As SystemType) As String
-        Throw New NotImplementedException
+    Public Shared Async Function GetROMGameID(path As String, system As SystemType) As Task(Of String)
+        Select Case system
+            Case SystemType.NDS
+                Dim code As String
+
+                Using n As New GenericNDSRom
+                    n.EnableInMemoryLoad = False 'In-memory load would be overkill for simply reading the game code
+                    Await n.OpenFile(path, New WindowsIOProvider)
+                    code = n.GameCode
+                End Using
+
+                Return code
+            Case SystemType.ThreeDS
+                Throw New NotImplementedException
+            Case Else
+                Throw New NotSupportedException(String.Format(My.Resources.Language.ErrorSystemNotSupported, system.ToString))
+        End Select
     End Function
 
     ''' <summary>
@@ -53,8 +99,8 @@ Public Class MetadataReader
     ''' </summary>
     ''' <param name="path">The filename of the ROM ROM to check.</param>
     ''' <returns>The ROM's game code.</returns>
-    Public Shared Function GetROMGameID(path As String) As String
-        Return GetROMGameID(path, GetDirectorySystem(path))
+    Public Shared Async Function GetROMGameID(path As String) As Task(Of String)
+        Return Await GetROMGameID(path, GetDirectorySystem(path))
     End Function
 
     ''' <summary>
@@ -63,11 +109,11 @@ Public Class MetadataReader
     ''' <param name="path">The filename of the ROM to check.</param>
     ''' <returns>A <see cref="SystemType"/> corresponding to ROM located at <paramref name="path"/>.</returns>
     ''' <exception cref="IOException">Thrown when <paramref name="path"/> is neither a file nor a directory.</exception>
-    Public Shared Function GetSystem(path As String) As SystemType
+    Public Shared Async Function GetSystem(path As String) As Task(Of SystemType)
         If Directory.Exists(path) Then
             Return GetDirectorySystem(path)
         ElseIf File.Exists(path) Then
-            Return GetROMSystem(path)
+            Return Await GetROMSystem(path)
         Else
             Throw New IOException(String.Format(My.Resources.Language.ErrorFileDirNotFound, path))
         End If
@@ -80,11 +126,11 @@ Public Class MetadataReader
     ''' <param name="system">The type of system the unpacked ROM is for.</param>
     ''' <returns>The ROM's game code.</returns>
     ''' <exception cref="IOException">Thrown when <paramref name="path"/> is neither a file nor a directory.</exception>
-    Public Shared Function GetGameID(path As String, system As SystemType) As String
+    Public Shared Async Function GetGameID(path As String, system As SystemType) As Task(Of String)
         If Directory.Exists(path) Then
             Return GetDirectoryGameID(path, system)
         ElseIf File.Exists(path) Then
-            Return GetROMGameID(path, system)
+            Return Await GetROMGameID(path, system)
         Else
             Throw New IOException(String.Format(My.Resources.Language.ErrorFileDirNotFound, path))
         End If
@@ -96,11 +142,11 @@ Public Class MetadataReader
     ''' <param name="path">The filename of the ROM ROM to check.</param>
     ''' <returns>The ROM's game code.</returns>
     ''' <exception cref="IOException">Thrown when <paramref name="path"/> is neither a file nor a directory.</exception>
-    Public Shared Function GetGameID(path As String) As String
+    Public Shared Async Function GetGameID(path As String) As Task(Of String)
         If Directory.Exists(path) Then
             Return GetDirectoryGameID(path, GetDirectorySystem(path))
         ElseIf File.Exists(path) Then
-            Return GetROMGameID(path, GetDirectorySystem(path))
+            Return Await GetROMGameID(path, GetDirectorySystem(path))
         Else
             Throw New IOException(String.Format(My.Resources.Language.ErrorFileDirNotFound, path))
         End If

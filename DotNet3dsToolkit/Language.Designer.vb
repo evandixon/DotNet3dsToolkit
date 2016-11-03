@@ -92,6 +92,15 @@ Namespace My.Resources
         End Property
         
         '''<summary>
+        '''  Looks up a localized string similar to Unsupported system format {0}.
+        '''</summary>
+        Friend Shared ReadOnly Property ErrorSystemNotSupported() As String
+            Get
+                Return ResourceManager.GetString("ErrorSystemNotSupported", resourceCulture)
+            End Get
+        End Property
+        
+        '''<summary>
         '''  Looks up a localized string similar to Attempted to write to a read-only file..
         '''</summary>
         Friend Shared ReadOnly Property ErrorWrittenReadonly() As String
