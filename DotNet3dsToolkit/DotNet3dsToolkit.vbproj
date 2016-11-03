@@ -71,6 +71,7 @@
       <DesignTime>True</DesignTime>
       <DependentUpon>Language.resx</DependentUpon>
     </Compile>
+    <Compile Include="MetadataReader.vb" />
     <Compile Include="Misc\AsyncFor.vb" />
     <Compile Include="Misc\GenericFile.vb" />
     <Compile Include="Misc\GenericNDSRom.vb" />
@@ -93,6 +94,7 @@
       <DependentUpon>Settings.settings</DependentUpon>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
+    <Compile Include="SystemType.vb" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Language.resx">
