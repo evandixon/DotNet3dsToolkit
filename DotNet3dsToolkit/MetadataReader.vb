@@ -149,7 +149,7 @@ Public Class MetadataReader
     ''' <param name="path">The filename of the ROM ROM to check.</param>
     ''' <returns>The ROM's game code.</returns>
     Public Shared Async Function GetROMGameID(path As String) As Task(Of String)
-        Return Await GetROMGameID(path, GetDirectorySystem(path))
+        Return Await GetROMGameID(path, Await GetROMSystem(path))
     End Function
 
     ''' <summary>

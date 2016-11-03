@@ -117,6 +117,7 @@
     </None>
     <None Include="Resources\FBI.3ds" />
     <None Include="Resources\FBI.cia" />
+    <None Include="Resources\FBI.cxi" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\DotNet3dsToolkit\DotNet3dsToolkit.vbproj">
