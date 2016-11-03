@@ -74,6 +74,15 @@ Namespace My.Resources
         End Property
         
         '''<summary>
+        '''  Looks up a localized string similar to Neither file nor directory not found at &quot;{0}&quot;..
+        '''</summary>
+        Friend Shared ReadOnly Property ErrorFileDirNotFound() As String
+            Get
+                Return ResourceManager.GetString("ErrorFileDirNotFound", resourceCulture)
+            End Get
+        End Property
+        
+        '''<summary>
         '''  Looks up a localized string similar to Using GenericFile.Save() requires GenericFile.OriginalFilename to not be null..
         '''</summary>
         Friend Shared ReadOnly Property ErrorNoSaveFilename() As String

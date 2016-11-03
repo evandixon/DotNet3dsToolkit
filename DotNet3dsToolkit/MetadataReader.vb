@@ -1,4 +1,6 @@
-﻿Public Class MetadataReader
+﻿Imports System.IO
+
+Public Class MetadataReader
     ''' <summary>
     ''' Gets the system corresponding to the given directory.
     ''' </summary>
@@ -28,7 +30,7 @@
     End Function
 
     ''' <summary>
-    ''' Gets the system corresponding to the given directory.
+    ''' Gets the system corresponding to the given ROM.
     ''' </summary>
     ''' <param name="path">The filename of the ROM to check.</param>
     ''' <returns>A <see cref="SystemType"/> corresponding to ROM located at <paramref name="path"/>.</returns>
@@ -37,7 +39,7 @@
     End Function
 
     ''' <summary>
-    ''' Gets the game ID from the unpacked ROM in the given directory.
+    ''' Gets the game ID from a ROM.
     ''' </summary>
     ''' <param name="path">The filename of the ROM to check.</param>
     ''' <param name="system">The type of system the unpacked ROM is for.</param>
@@ -47,11 +49,60 @@
     End Function
 
     ''' <summary>
-    ''' Gets the game ID from the unpacked ROM in the given directory.
+    ''' Gets the game ID from a ROM.
     ''' </summary>
     ''' <param name="path">The filename of the ROM ROM to check.</param>
     ''' <returns>The ROM's game code.</returns>
     Public Shared Function GetROMGameID(path As String) As String
         Return GetROMGameID(path, GetDirectorySystem(path))
-        End
+    End Function
+
+    ''' <summary>
+    ''' Gets the system corresponding from a packed or unpacked ROM.
+    ''' </summary>
+    ''' <param name="path">The filename of the ROM to check.</param>
+    ''' <returns>A <see cref="SystemType"/> corresponding to ROM located at <paramref name="path"/>.</returns>
+    ''' <exception cref="IOException">Thrown when <paramref name="path"/> is neither a file nor a directory.</exception>
+    Public Shared Function GetSystem(path As String) As SystemType
+        If Directory.Exists(path) Then
+            Return GetDirectorySystem(path)
+        ElseIf File.Exists(path) Then
+            Return GetROMSystem(path)
+        Else
+            Throw New IOException(String.Format(My.Resources.Language.ErrorFileDirNotFound, path))
+        End If
+    End Function
+
+    ''' <summary>
+    ''' Gets the game ID from a packed or unpacked ROM.
+    ''' </summary>
+    ''' <param name="path">The filename of the ROM to check.</param>
+    ''' <param name="system">The type of system the unpacked ROM is for.</param>
+    ''' <returns>The ROM's game code.</returns>
+    ''' <exception cref="IOException">Thrown when <paramref name="path"/> is neither a file nor a directory.</exception>
+    Public Shared Function GetGameID(path As String, system As SystemType) As String
+        If Directory.Exists(path) Then
+            Return GetDirectoryGameID(path, system)
+        ElseIf File.Exists(path) Then
+            Return GetROMGameID(path, system)
+        Else
+            Throw New IOException(String.Format(My.Resources.Language.ErrorFileDirNotFound, path))
+        End If
+    End Function
+
+    ''' <summary>
+    ''' Gets the game ID from from a packed or unpacked ROM.
+    ''' </summary>
+    ''' <param name="path">The filename of the ROM ROM to check.</param>
+    ''' <returns>The ROM's game code.</returns>
+    ''' <exception cref="IOException">Thrown when <paramref name="path"/> is neither a file nor a directory.</exception>
+    Public Shared Function GetGameID(path As String) As String
+        If Directory.Exists(path) Then
+            Return GetDirectoryGameID(path, GetDirectorySystem(path))
+        ElseIf File.Exists(path) Then
+            Return GetROMGameID(path, GetDirectorySystem(path))
+        Else
+            Throw New IOException(String.Format(My.Resources.Language.ErrorFileDirNotFound, path))
+        End If
+    End Function
 End Class
