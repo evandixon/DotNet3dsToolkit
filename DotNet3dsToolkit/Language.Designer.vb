@@ -83,6 +83,15 @@ Namespace My.Resources
         End Property
         
         '''<summary>
+        '''  Looks up a localized string similar to The file format is invalid or unsupported..
+        '''</summary>
+        Friend Shared ReadOnly Property ErrorInvalidFileFormat() As String
+            Get
+                Return ResourceManager.GetString("ErrorInvalidFileFormat", resourceCulture)
+            End Get
+        End Property
+        
+        '''<summary>
         '''  Looks up a localized string similar to Using GenericFile.Save() requires GenericFile.OriginalFilename to not be null..
         '''</summary>
         Friend Shared ReadOnly Property ErrorNoSaveFilename() As String

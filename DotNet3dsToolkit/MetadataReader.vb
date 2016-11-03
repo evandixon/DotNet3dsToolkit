@@ -1,10 +1,31 @@
 ﻿Imports System.IO
+Imports System.Text
 Imports DotNet3dsToolkit.Misc
 
 ''' <summary>
 ''' Reads metadata from packed or unpacked ROMs.
 ''' </summary>
 Public Class MetadataReader
+
+#Region "CIA"
+    ''' <remarks>From CTRTool
+    ''' https://github.com/profi200/Project_CTR/blob/d32f096e3ea8d6cacc2f8e8f43d4eec51394eca2/ctrtool/utils.c </remarks>
+    Private Shared Function Align(offset As Integer, alignment As Integer)
+        Dim mask As Integer = Not (alignment - 1)
+        Return offset + (alignment - 1) And mask
+    End Function
+
+    ''' <summary>
+    ''' Gets the offset of the content section of the given CIA file.
+    ''' </summary>
+    Private Shared Function GetCIAContentOffset(cia As GenericFile) As Integer
+        Dim offsetCerts = Align(cia.Int32(0), 64)
+        Dim offsetTik = Align(cia.Int32(&H8) + offsetCerts, 64)
+        Dim offsetTmd = Align(cia.Int32(&HC) + offsetTik, 64)
+        Dim offsetContent = Align(cia.Int32(&H10) + offsetTmd, 64)
+        Return offsetContent
+    End Function
+#End Region
 
     ''' <summary>
     ''' Gets the system corresponding to the given directory.
@@ -31,7 +52,7 @@ Public Class MetadataReader
         Select Case system
             Case SystemType.NDS
                 Dim header = File.ReadAllBytes(IO.Path.Combine(path, "header.bin"))
-                Dim e As New Text.ASCIIEncoding
+                Dim e As New ASCIIEncoding
                 Return e.GetString(header, &HC, 4)
             Case SystemType.ThreeDS
                 Dim exheader = File.ReadAllBytes(IO.Path.Combine(path, "exheader.bin"))
@@ -56,17 +77,28 @@ Public Class MetadataReader
     ''' <param name="path">The filename of the ROM to check.</param>
     ''' <returns>A <see cref="SystemType"/> corresponding to ROM located at <paramref name="path"/>.</returns>
     Public Shared Async Function GetROMSystem(path As String) As Task(Of SystemType)
-        Dim file As New GenericFile
-        file.EnableInMemoryLoad = False
-        Await file.OpenFile(path, New WindowsIOProvider)
+        Dim e As New ASCIIEncoding
+        Using file As New GenericFile
+            file.EnableInMemoryLoad = False
+            Await file.OpenFile(path, New WindowsIOProvider)
 
-        Dim n As New GenericNDSRom
-        'Todo: add CCI, CIA, and CXI support.
-        If Await n.IsFileOfType(file) Then
-            Return SystemType.NDS
-        Else
-            Return SystemType.Unknown
-        End If
+            Dim n As New GenericNDSRom
+
+            If Await n.IsFileOfType(file) Then
+                Return SystemType.NDS
+            ElseIf file.Length > 104 AndAlso e.GetString(file.RawData(&H100, 4)) = "NCSD" Then
+                'CCI
+                Return SystemType.ThreeDS
+            ElseIf file.Length > 104 AndAlso e.GetString(file.RawData(&H100, 4)) = "NCCH" Then
+                'CXI
+                Return SystemType.ThreeDS
+            ElseIf file.Length > file.Int32(0) AndAlso e.GetString(file.RawData(&H100 + GetCIAContentOffset(file), 4)) = "NCCH" Then
+                'CIA
+                Return SystemType.ThreeDS
+            Else
+                Return SystemType.Unknown
+            End If
+        End Using
     End Function
 
     ''' <summary>
@@ -88,7 +120,24 @@ Public Class MetadataReader
 
                 Return code
             Case SystemType.ThreeDS
-                Throw New NotImplementedException
+                Dim e As New ASCIIEncoding
+                Using file As New GenericFile
+                    file.EnableInMemoryLoad = False
+                    Await file.OpenFile(path, New WindowsIOProvider)
+
+                    If file.Length > 104 AndAlso e.GetString(file.RawData(&H100, 4)) = "NCSD" Then
+                        'CCI
+                        Return e.GetString(file.RawData(&H1156, 4), 0, 4).Trim
+                    ElseIf file.Length > 104 AndAlso e.GetString(file.RawData(&H100, 4)) = "NCCH" Then
+                        'CXI
+                        Return BitConverter.ToUInt64(file.RawData(&H108, 8), 0).ToString("X").PadLeft(16, "0"c)
+                    ElseIf file.Length > file.Int32(0) AndAlso e.GetString(file.RawData(&H100 + GetCIAContentOffset(file), 4)) = "NCCH" Then
+                        'CIA
+                        Return BitConverter.ToUInt64(file.RawData(&H108 + GetCIAContentOffset(file), 8), 0).ToString("X").PadLeft(16, "0"c)
+                    Else
+                        Throw New NotSupportedException(My.Resources.Language.ErrorInvalidFileFormat)
+                    End If
+                End Using
             Case Else
                 Throw New NotSupportedException(String.Format(My.Resources.Language.ErrorSystemNotSupported, system.ToString))
         End Select

@@ -125,6 +125,9 @@
     <value>Neither file nor directory not found at "{0}".</value>
     <comment>Message for an exception that's thrown when neither a file nor a directory can be found at the path {0}.</comment>
   </data>
+  <data name="ErrorInvalidFileFormat" xml:space="preserve">
+    <value>The file format is invalid or unsupported.</value>
+  </data>
   <data name="ErrorNoSaveFilename" xml:space="preserve">
     <value>Using GenericFile.Save() requires GenericFile.OriginalFilename to not be null.</value>
     <comment>Message for an exception that's thrown when using GenericFile.Save() when the file doesn't have an original filename.</comment>
