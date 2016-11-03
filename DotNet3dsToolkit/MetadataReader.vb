@@ -127,7 +127,7 @@ Public Class MetadataReader
 
                     If file.Length > 104 AndAlso e.GetString(file.RawData(&H100, 4)) = "NCSD" Then
                         'CCI
-                        Return e.GetString(file.RawData(&H1156, 4), 0, 4).Trim
+                        Return BitConverter.ToUInt64(file.RawData(&H108, 8), 0).ToString("X").PadLeft(16, "0"c)
                     ElseIf file.Length > 104 AndAlso e.GetString(file.RawData(&H100, 4)) = "NCCH" Then
                         'CXI
                         Return BitConverter.ToUInt64(file.RawData(&H108, 8), 0).ToString("X").PadLeft(16, "0"c)
@@ -195,7 +195,7 @@ Public Class MetadataReader
         If Directory.Exists(path) Then
             Return GetDirectoryGameID(path, GetDirectorySystem(path))
         ElseIf File.Exists(path) Then
-            Return Await GetROMGameID(path, GetDirectorySystem(path))
+            Return Await GetROMGameID(path, Await GetROMSystem(path))
         Else
             Throw New IOException(String.Format(My.Resources.Language.ErrorFileDirNotFound, path))
         End If
