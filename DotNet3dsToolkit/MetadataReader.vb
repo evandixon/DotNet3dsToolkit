@@ -80,6 +80,7 @@ Public Class MetadataReader
         Dim e As New ASCIIEncoding
         Using file As New GenericFile
             file.EnableInMemoryLoad = False
+            file.IsReadOnly = True
             Await file.OpenFile(path, New WindowsIOProvider)
 
             Dim n As New GenericNDSRom
@@ -114,6 +115,7 @@ Public Class MetadataReader
 
                 Using n As New GenericNDSRom
                     n.EnableInMemoryLoad = False 'In-memory load would be overkill for simply reading the game code
+                    n.IsReadOnly = True
                     Await n.OpenFile(path, New WindowsIOProvider)
                     code = n.GameCode
                 End Using
@@ -123,6 +125,7 @@ Public Class MetadataReader
                 Dim e As New ASCIIEncoding
                 Using file As New GenericFile
                     file.EnableInMemoryLoad = False
+                    file.IsReadOnly = True
                     Await file.OpenFile(path, New WindowsIOProvider)
 
                     If file.Length > 104 AndAlso e.GetString(file.RawData(&H100, 4)) = "NCSD" Then
