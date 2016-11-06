@@ -74,11 +74,38 @@ Namespace My.Resources
         End Property
         
         '''<summary>
+        '''  Looks up a localized string similar to Neither file nor directory not found at &quot;{0}&quot;..
+        '''</summary>
+        Friend Shared ReadOnly Property ErrorFileDirNotFound() As String
+            Get
+                Return ResourceManager.GetString("ErrorFileDirNotFound", resourceCulture)
+            End Get
+        End Property
+        
+        '''<summary>
+        '''  Looks up a localized string similar to The file format is invalid or unsupported..
+        '''</summary>
+        Friend Shared ReadOnly Property ErrorInvalidFileFormat() As String
+            Get
+                Return ResourceManager.GetString("ErrorInvalidFileFormat", resourceCulture)
+            End Get
+        End Property
+        
+        '''<summary>
         '''  Looks up a localized string similar to Using GenericFile.Save() requires GenericFile.OriginalFilename to not be null..
         '''</summary>
         Friend Shared ReadOnly Property ErrorNoSaveFilename() As String
             Get
                 Return ResourceManager.GetString("ErrorNoSaveFilename", resourceCulture)
+            End Get
+        End Property
+        
+        '''<summary>
+        '''  Looks up a localized string similar to Unsupported system format {0}.
+        '''</summary>
+        Friend Shared ReadOnly Property ErrorSystemNotSupported() As String
+            Get
+                Return ResourceManager.GetString("ErrorSystemNotSupported", resourceCulture)
             End Get
         End Property
         

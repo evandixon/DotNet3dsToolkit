@@ -136,3 +136,4 @@ Credits:
 * dnasdw for [3dstool](https://github.com/dnasdw/3dstool)
 * DarkFader for ndstool
 * Asia81 for HackingToolkit3DS, which provided the usage for 3dstool.
+* Steveice10 for FBI, which I'm using in my unit tests to read title IDs.
