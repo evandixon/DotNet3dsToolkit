@@ -1,3 +1,5 @@
+![Build Status](http://teamcity.skyeditor.org:90/app/rest/builds/buildType:(id:DotNet3dsToolkit_DotNet3dsToolkit)/statusIcon)
+
 # .Net 3DS Toolkit
 .Net 3DS Toolkit is a code library intended to simplify extracting and rebuilding 3DS ROMs.  Requires the .Net Framework 4.6.
 
