@@ -1,5 +1,6 @@
 ﻿Imports System.IO
 Imports Microsoft.VisualBasic.Devices
+Imports SkyEditor.Core.IO
 
 Namespace Misc
     Public Class WindowsIOProvider

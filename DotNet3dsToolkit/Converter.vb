@@ -1,9 +1,11 @@
 ﻿Imports System.IO
 Imports System.Text.RegularExpressions
 Imports DotNet3dsToolkit.Misc
+Imports SkyEditor.Core.Utilities
 
 Public Class Converter
     Implements IDisposable
+    Implements IReportProgress
 
     Public Event ConsoleOutputReceived(sender As Object, e As DataReceivedEventArgs)
 
@@ -53,7 +55,8 @@ Public Class Converter
         End If
     End Sub
 
-    Public Event UnpackProgressed(sender As Object, e As UnpackProgressEventArgs)
+    Public Event UnpackProgressed(sender As Object, e As ProgressReportedEventArgs) Implements IReportProgress.ProgressChanged
+    Public Event Completed As IReportProgress.CompletedEventHandler Implements IReportProgress.Completed
 
 #Region "Tool Management"
     Private Property ToolDirectory As String
@@ -62,6 +65,30 @@ Public Class Converter
     Private Property Path_makerom As String
     Private Property Path_ctrtool As String
     Private Property Path_ndstool As String
+
+    Public ReadOnly Property Progress As Single Implements IReportProgress.Progress
+        Get
+            Throw New NotImplementedException()
+        End Get
+    End Property
+
+    Public ReadOnly Property Message As String Implements IReportProgress.Message
+        Get
+            Throw New NotImplementedException()
+        End Get
+    End Property
+
+    Public ReadOnly Property IsIndeterminate As Boolean Implements IReportProgress.IsIndeterminate
+        Get
+            Throw New NotImplementedException()
+        End Get
+    End Property
+
+    Public ReadOnly Property IsCompleted As Boolean Implements IReportProgress.IsCompleted
+        Get
+            Throw New NotImplementedException()
+        End Get
+    End Property
 
     Private Sub ResetToolDirectory()
         ToolDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DotNet3DSToolkit-" & Guid.NewGuid.ToString)
@@ -501,7 +528,7 @@ Public Class Converter
         'CopyNDSTool()
         'Await RunProgram(Path_ndstool, String.Format("-v -x ""{0}"" -9 ""{1}/arm9.bin"" -7 ""{1}/arm7.bin"" -y9 ""{1}/y9.bin"" -y7 ""{1}/y7.bin"" -d ""{1}/data"" -y ""{1}/overlay"" -t ""{1}/banner.bin"" -h ""{1}/header.bin""", filename, outputDirectory))
 
-        Dim reportProgress = Sub(sender As Object, e As UnpackProgressEventArgs)
+        Dim reportProgress = Sub(sender As Object, e As ProgressReportedEventArgs)
                                  RaiseEvent UnpackProgressed(Me, e)
                              End Sub
 

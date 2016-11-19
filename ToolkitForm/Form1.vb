@@ -2,6 +2,7 @@
 Imports System.IO
 Imports DotNet3dsToolkit
 Imports DotNet3dsToolkit.Misc
+Imports SkyEditor.Core.Utilities
 
 Public Class Form1
 
@@ -82,16 +83,16 @@ Public Class Form1
         End If
     End Sub
 
-    Private Sub OnUnpackProgressedInternal(sender As Object, e As UnpackProgressEventArgs)
+    Private Sub OnUnpackProgressedInternal(sender As Object, e As ProgressReportedEventArgs)
         If pbProgress.Style = ProgressBarStyle.Marquee Then
             pbProgress.Style = ProgressBarStyle.Continuous
         End If
 
         pbProgress.Value = e.Progress * pbProgress.Maximum
-        lblStatus.Text = String.Format("Extracting... ({0} of {1})", e.FilesExtracted, e.TotalFiles)
+        lblStatus.Text = String.Format("Extracting...")
     End Sub
 
-    Private Sub OnUnpackProgressed(sender As Object, e As UnpackProgressEventArgs)
+    Private Sub OnUnpackProgressed(sender As Object, e As ProgressReportedEventArgs)
         If InvokeRequired Then
             Invoke(Sub() OnUnpackProgressedInternal(sender, e))
         Else
