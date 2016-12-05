@@ -454,6 +454,10 @@ Public Class Converter
     Public Async Function ExtractCCI(options As ExtractionOptions) As Task
         Copy3DSTool()
 
+        If Not Directory.Exists(options.DestinationDirectory)
+            Directory.CreateDirectory(options.DestinationDirectory)
+        End If
+
         Await ExtractCCIPartitions(options)
 
         Dim partitionExtractions As New List(Of Task)
@@ -484,6 +488,10 @@ Public Class Converter
         Copy3DSTool()
         CopyCtrTool()
 
+        If Not Directory.Exists(options.DestinationDirectory)
+            Directory.CreateDirectory(options.DestinationDirectory)
+        End If
+
         'Extract partition 0, which is the only partition we have
         Await ExtractPartition0(options, options.SourceRom, True)
     End Function
@@ -507,6 +515,10 @@ Public Class Converter
         Copy3DSTool()
         CopyCtrTool()
 
+        If Not Directory.Exists(options.DestinationDirectory)
+            Directory.CreateDirectory(options.DestinationDirectory)
+        End If
+
         Await ExtractCIAPartitions(options)
 
         Dim partitionExtractions As New List(Of Task)
@@ -524,15 +536,14 @@ Public Class Converter
     ''' <param name="filename">Full path of the ROM to extract.</param>
     ''' <param name="outputDirectory">Directory into which to extract the files.</param>
     Public Async Function ExtractNDS(filename As String, outputDirectory As String) As Task
-        ''Old ndstool usage
-        'CopyNDSTool()
-        'Await RunProgram(Path_ndstool, String.Format("-v -x ""{0}"" -9 ""{1}/arm9.bin"" -7 ""{1}/arm7.bin"" -y9 ""{1}/y9.bin"" -y7 ""{1}/y7.bin"" -d ""{1}/data"" -y ""{1}/overlay"" -t ""{1}/banner.bin"" -h ""{1}/header.bin""", filename, outputDirectory))
-
         Dim reportProgress = Sub(sender As Object, e As ProgressReportedEventArgs)
                                  RaiseEvent UnpackProgressed(Me, e)
                              End Sub
 
-        'New implementation
+        If Not Directory.Exists(outputDirectory)
+            Directory.CreateDirectory(outputDirectory)
+        End If
+        
         Dim r As New GenericNDSRom
         Dim p As New WindowsIOProvider
 
