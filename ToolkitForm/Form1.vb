@@ -33,7 +33,7 @@ Public Class Form1
 
     Private Sub btnExtractSourceBrowse_Click(sender As Object, e As EventArgs) Handles btnExtractSourceBrowse.Click
         Dim s As New OpenFileDialog
-        s.Filter = "Supported Files|*.3ds;*.cci;*.cxi;*.nds;*.srl|Decrypted 3DS ROMs|*.3ds;*.cci|Decrypted CXI Partitions|*.cxi|Nintendo DS ROMs|*.nds;*.srl|All Files|*.*"
+        s.Filter = "Supported Files|*.3ds;*.cci;*.cxi;*.cia;*.nds;*.srl|Decrypted 3DS ROMs|*.3ds;*.cci|Decrypted CXI Partitions|*.cxi|CIA files|*.cia|Nintendo DS ROMs|*.nds;*.srl|All Files|*.*"
         If s.ShowDialog = DialogResult.OK Then
             txtExtractSource.Text = s.FileName
         End If
