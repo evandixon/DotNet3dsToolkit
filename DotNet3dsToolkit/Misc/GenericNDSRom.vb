@@ -640,7 +640,11 @@ Public Class GenericNDSRom
     ''' <returns></returns>
     Public ReadOnly Property ExtractionProgress As Single Implements IReportProgress.Progress
         Get
-            Return CurrentExtractProgress / CurrentExtractMax
+            If CurrentExtractMax = 0 Then
+                Return 0
+            Else
+                Return CurrentExtractProgress / CurrentExtractMax
+            End If
         End Get
     End Property
 

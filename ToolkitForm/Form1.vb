@@ -84,11 +84,16 @@ Public Class Form1
     End Sub
 
     Private Sub OnUnpackProgressedInternal(sender As Object, e As ProgressReportedEventArgs)
-        If pbProgress.Style = ProgressBarStyle.Marquee Then
+        If e.IsIndeterminate OrElse e.Progress = Single.NaN Then
+            pbProgress.Style = ProgressBarStyle.Marquee
+        Else
             pbProgress.Style = ProgressBarStyle.Continuous
         End If
 
-        pbProgress.Value = e.Progress * pbProgress.Maximum
+        If Not SIngle.IsNaN(e.Progress) Then
+            pbProgress.Value = e.Progress * pbProgress.Maximum
+        End If
+
         lblStatus.Text = String.Format("Extracting...")
     End Sub
 
