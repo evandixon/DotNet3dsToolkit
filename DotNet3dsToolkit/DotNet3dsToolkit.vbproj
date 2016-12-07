@@ -144,7 +144,7 @@
     <None Include="Resources\ndstool.exe" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Resources\ext_key.txt" />
+    <None Include="Resources\ext_key.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
