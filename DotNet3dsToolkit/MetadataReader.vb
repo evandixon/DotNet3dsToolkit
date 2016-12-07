@@ -19,7 +19,7 @@ Public Class MetadataReader
     ''' <summary>
     ''' Gets the offset of the content section of the given CIA file.
     ''' </summary>
-    Private Shared Function GetCIAContentOffset(cia As GenericFile) As Integer
+    Friend Shared Function GetCIAContentOffset(cia As GenericFile) As Integer
         Dim offsetCerts = Align(cia.Int32(0), 64)
         Dim offsetTik = Align(cia.Int32(&H8) + offsetCerts, 64)
         Dim offsetTmd = Align(cia.Int32(&HC) + offsetTik, 64)
