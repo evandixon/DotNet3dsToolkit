@@ -2,6 +2,7 @@
 Imports System.Text.RegularExpressions
 Imports DotNet3dsToolkit.Misc
 Imports SkyEditor.Core.Utilities
+Imports SkyEditor.ROMEditor
 
 Public Class Converter
     Implements IDisposable

@@ -2,6 +2,7 @@
 Imports System.Text
 Imports DotNet3dsToolkit.Misc
 Imports SkyEditor.Core.IO
+Imports SkyEditor.ROMEditor
 
 ''' <summary>
 ''' Reads metadata from packed or unpacked ROMs.
