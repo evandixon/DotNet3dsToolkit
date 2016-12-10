@@ -33,7 +33,7 @@ Public Class Form1
 
     Private Sub btnExtractSourceBrowse_Click(sender As Object, e As EventArgs) Handles btnExtractSourceBrowse.Click
         Dim s As New OpenFileDialog
-        s.Filter = "Supported Files|*.3ds;*.cci;*.cxi;*.nds;*.srl|Decrypted 3DS ROMs|*.3ds;*.cci|Decrypted CXI Partitions|*.cxi|Nintendo DS ROMs|*.nds;*.srl|All Files|*.*"
+        s.Filter = "Supported Files|*.3ds;*.cci;*.cxi;*.cia;*.nds;*.srl|Decrypted 3DS ROMs|*.3ds;*.cci|Decrypted CXI Partitions|*.cxi|CIA files|*.cia|Nintendo DS ROMs|*.nds;*.srl|All Files|*.*"
         If s.ShowDialog = DialogResult.OK Then
             txtExtractSource.Text = s.FileName
         End If
@@ -84,11 +84,16 @@ Public Class Form1
     End Sub
 
     Private Sub OnUnpackProgressedInternal(sender As Object, e As ProgressReportedEventArgs)
-        If pbProgress.Style = ProgressBarStyle.Marquee Then
+        If e.IsIndeterminate OrElse e.Progress = Single.NaN Then
+            pbProgress.Style = ProgressBarStyle.Marquee
+        Else
             pbProgress.Style = ProgressBarStyle.Continuous
         End If
 
-        pbProgress.Value = e.Progress * pbProgress.Maximum
+        If Not SIngle.IsNaN(e.Progress) Then
+            pbProgress.Value = e.Progress * pbProgress.Maximum
+        End If
+
         lblStatus.Text = String.Format("Extracting...")
     End Sub
 

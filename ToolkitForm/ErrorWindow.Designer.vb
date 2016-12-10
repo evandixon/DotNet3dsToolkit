@@ -28,41 +28,41 @@ Partial Class ErrorWindow
         Me.L_ProvideInfo = New System.Windows.Forms.Label()
         Me.L_Message = New System.Windows.Forms.Label()
         Me.T_ExceptionDetails = New System.Windows.Forms.TextBox()
-        Me.SuspendLayout()
+        Me.SuspendLayout
         '
         'B_Continue
         '
-        Me.B_Continue.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
+        Me.B_Continue.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Right),System.Windows.Forms.AnchorStyles)
         Me.B_Continue.Location = New System.Drawing.Point(332, 203)
         Me.B_Continue.Name = "B_Continue"
         Me.B_Continue.Size = New System.Drawing.Size(75, 23)
         Me.B_Continue.TabIndex = 11
         Me.B_Continue.Text = "Continue"
-        Me.B_Continue.UseVisualStyleBackColor = True
+        Me.B_Continue.UseVisualStyleBackColor = true
         '
         'B_Abort
         '
-        Me.B_Abort.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
+        Me.B_Abort.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Right),System.Windows.Forms.AnchorStyles)
         Me.B_Abort.Location = New System.Drawing.Point(413, 203)
         Me.B_Abort.Name = "B_Abort"
         Me.B_Abort.Size = New System.Drawing.Size(75, 23)
         Me.B_Abort.TabIndex = 10
         Me.B_Abort.Text = "Abort"
-        Me.B_Abort.UseVisualStyleBackColor = True
+        Me.B_Abort.UseVisualStyleBackColor = true
         '
         'B_CopyToClipboard
         '
-        Me.B_CopyToClipboard.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left), System.Windows.Forms.AnchorStyles)
+        Me.B_CopyToClipboard.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left),System.Windows.Forms.AnchorStyles)
         Me.B_CopyToClipboard.Location = New System.Drawing.Point(13, 203)
         Me.B_CopyToClipboard.Name = "B_CopyToClipboard"
         Me.B_CopyToClipboard.Size = New System.Drawing.Size(164, 23)
         Me.B_CopyToClipboard.TabIndex = 9
         Me.B_CopyToClipboard.Text = "Copy to Clipboard"
-        Me.B_CopyToClipboard.UseVisualStyleBackColor = True
+        Me.B_CopyToClipboard.UseVisualStyleBackColor = true
         '
         'L_ProvideInfo
         '
-        Me.L_ProvideInfo.AutoSize = True
+        Me.L_ProvideInfo.AutoSize = true
         Me.L_ProvideInfo.Location = New System.Drawing.Point(10, 38)
         Me.L_ProvideInfo.Name = "L_ProvideInfo"
         Me.L_ProvideInfo.Size = New System.Drawing.Size(269, 13)
@@ -71,8 +71,8 @@ Partial Class ErrorWindow
         '
         'L_Message
         '
-        Me.L_Message.Anchor = CType(((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Left) _
-            Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
+        Me.L_Message.Anchor = CType(((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Left)  _
+            Or System.Windows.Forms.AnchorStyles.Right),System.Windows.Forms.AnchorStyles)
         Me.L_Message.Location = New System.Drawing.Point(10, 11)
         Me.L_Message.Name = "L_Message"
         Me.L_Message.Size = New System.Drawing.Size(478, 27)
@@ -81,20 +81,20 @@ Partial Class ErrorWindow
         '
         'T_ExceptionDetails
         '
-        Me.T_ExceptionDetails.Anchor = CType((((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Bottom) _
-            Or System.Windows.Forms.AnchorStyles.Left) _
-            Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
+        Me.T_ExceptionDetails.Anchor = CType((((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Bottom)  _
+            Or System.Windows.Forms.AnchorStyles.Left)  _
+            Or System.Windows.Forms.AnchorStyles.Right),System.Windows.Forms.AnchorStyles)
         Me.T_ExceptionDetails.Location = New System.Drawing.Point(13, 54)
-        Me.T_ExceptionDetails.Multiline = True
+        Me.T_ExceptionDetails.Multiline = true
         Me.T_ExceptionDetails.Name = "T_ExceptionDetails"
-        Me.T_ExceptionDetails.ReadOnly = True
+        Me.T_ExceptionDetails.ReadOnly = true
         Me.T_ExceptionDetails.ScrollBars = System.Windows.Forms.ScrollBars.Vertical
         Me.T_ExceptionDetails.Size = New System.Drawing.Size(475, 143)
         Me.T_ExceptionDetails.TabIndex = 6
         '
         'ErrorWindow
         '
-        Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
+        Me.AutoScaleDimensions = New System.Drawing.SizeF(6!, 13!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         Me.ClientSize = New System.Drawing.Size(499, 236)
         Me.Controls.Add(Me.B_Continue)
@@ -105,10 +105,10 @@ Partial Class ErrorWindow
         Me.Controls.Add(Me.T_ExceptionDetails)
         Me.Name = "ErrorWindow"
         Me.Text = "Error"
-        Me.ResumeLayout(False)
-        Me.PerformLayout()
+        Me.ResumeLayout(false)
+        Me.PerformLayout
 
-    End Sub
+End Sub
 
     Private WithEvents B_Continue As Button
     Private WithEvents B_Abort As Button

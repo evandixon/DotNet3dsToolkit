@@ -85,18 +85,18 @@ Partial Public Class ErrorWindow
         T_ExceptionDetails.Text = details.ToString()
     End Sub
 
-    Private Sub btnCopyToClipboard_Click(sender As Object, e As EventArgs)
+    Private Sub btnCopyToClipboard_Click(sender As Object, e As EventArgs) Handles B_CopyToClipboard.Click
         Clipboard.SetText(T_ExceptionDetails.Text)
     End Sub
 
-    Private Sub B_Continue_Click(sender As Object, e As EventArgs)
+    Private Sub B_Continue_Click(sender As Object, e As EventArgs) Handles B_Continue.Click
         DialogResult = DialogResult.OK
         Close()
     End Sub
 
-    Private Sub B_Abort_Click(sender As Object, e As EventArgs)
+    Private Sub B_Abort_Click(sender As Object, e As EventArgs) Handles B_Abort.Click
         DialogResult = DialogResult.Abort
         Close()
     End Sub
-
+    
 End Class

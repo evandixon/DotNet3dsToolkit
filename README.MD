@@ -27,6 +27,12 @@ Planned Features
 
 Known Limitations
 * DSi ROMs are not supported.
+* Pokémon Sun/Moon cannot be build using the "0-Key Encrypted CCI" option.  The work-around for Gateway is to either use a CIA, or build as "Decrypted CCI (aka .3DS)", then using Decrypt-9 to re-encrypt.  It may need to be converted to use Card-2 saves, which this program currently cannot do.
+* When extracting Pokémon Sun/Moon, the following error message may display; however, the resulting files appear to be fully functional:
+```
+[3dstool] ERROR: uncompress error
+[3dstool] ERROR: extract file failed
+```
 
 Using the library (VB.Net):
 ```

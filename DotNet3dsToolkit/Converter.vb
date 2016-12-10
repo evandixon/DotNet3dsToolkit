@@ -1,6 +1,8 @@
 ﻿Imports System.IO
+Imports System.Text
 Imports System.Text.RegularExpressions
 Imports DotNet3dsToolkit.Misc
+Imports SkyEditor.Core.IO
 Imports SkyEditor.Core.Utilities
 Imports SkyEditor.ROMEditor
 
@@ -455,6 +457,10 @@ Public Class Converter
     Public Async Function ExtractCCI(options As ExtractionOptions) As Task
         Copy3DSTool()
 
+        If Not Directory.Exists(options.DestinationDirectory) Then
+            Directory.CreateDirectory(options.DestinationDirectory)
+        End If
+
         Await ExtractCCIPartitions(options)
 
         Dim partitionExtractions As New List(Of Task)
@@ -485,6 +491,10 @@ Public Class Converter
         Copy3DSTool()
         CopyCtrTool()
 
+        If Not Directory.Exists(options.DestinationDirectory) Then
+            Directory.CreateDirectory(options.DestinationDirectory)
+        End If
+
         'Extract partition 0, which is the only partition we have
         Await ExtractPartition0(options, options.SourceRom, True)
     End Function
@@ -508,6 +518,10 @@ Public Class Converter
         Copy3DSTool()
         CopyCtrTool()
 
+        If Not Directory.Exists(options.DestinationDirectory) Then
+            Directory.CreateDirectory(options.DestinationDirectory)
+        End If
+
         Await ExtractCIAPartitions(options)
 
         Dim partitionExtractions As New List(Of Task)
@@ -525,15 +539,14 @@ Public Class Converter
     ''' <param name="filename">Full path of the ROM to extract.</param>
     ''' <param name="outputDirectory">Directory into which to extract the files.</param>
     Public Async Function ExtractNDS(filename As String, outputDirectory As String) As Task
-        ''Old ndstool usage
-        'CopyNDSTool()
-        'Await RunProgram(Path_ndstool, String.Format("-v -x ""{0}"" -9 ""{1}/arm9.bin"" -7 ""{1}/arm7.bin"" -y9 ""{1}/y9.bin"" -y7 ""{1}/y7.bin"" -d ""{1}/data"" -y ""{1}/overlay"" -t ""{1}/banner.bin"" -h ""{1}/header.bin""", filename, outputDirectory))
-
         Dim reportProgress = Sub(sender As Object, e As ProgressReportedEventArgs)
                                  RaiseEvent UnpackProgressed(Me, e)
                              End Sub
 
-        'New implementation
+        If Not Directory.Exists(outputDirectory) Then
+            Directory.CreateDirectory(outputDirectory)
+        End If
+
         Dim r As New GenericNDSRom
         Dim p As New WindowsIOProvider
 
@@ -551,17 +564,33 @@ Public Class Converter
     ''' <param name="filename">Full path of the ROM to extract.</param>
     ''' <param name="outputDirectory">Directory into which to extract the files.</param>
     ''' <remarks>Extraction type is determined by file extension.  Extensions of ".cxi" are extracted as CXI, all others are extracted as CCI.  To override this behavior, use a more specific extraction function.</remarks>
+    ''' <exception cref="NotSupportedException">Thrown when the input file is not a supported file.</exception>
     Public Async Function ExtractAuto(filename As String, outputDirectory As String) As Task
         Dim ext = Path.GetExtension(filename).ToLower
-        Select Case ext
-            Case ".cxi"
-                Await ExtractCXI(filename, outputDirectory)
-            Case ".cia"
-                Await ExtractCIA(filename, outputDirectory)
-            Case ".nds", ".srl"
+        Select Case Await MetadataReader.GetROMSystem(filename)
+            Case SystemType.NDS
                 Await ExtractNDS(filename, outputDirectory)
-            Case Else
-                Await ExtractCCI(filename, outputDirectory)
+            Case SystemType.ThreeDS
+                Dim e As New ASCIIEncoding
+                Using file As New GenericFile
+                    file.EnableInMemoryLoad = False
+                    file.IsReadOnly = True
+                    Await file.OpenFile(filename, New WindowsIOProvider)
+                    If file.Length > 104 AndAlso e.GetString(file.RawData(&H100, 4)) = "NCSD" Then
+                        'CCI
+                        Await ExtractCCI(filename, outputDirectory)
+                    ElseIf file.Length > 104 AndAlso e.GetString(file.RawData(&H100, 4)) = "NCCH" Then
+                        'CXI
+                        Await ExtractCXI(filename, outputDirectory)
+                    ElseIf file.Length > file.Int32(0) AndAlso e.GetString(file.RawData(&H100 + MetadataReader.GetCIAContentOffset(file), 4)) = "NCCH" Then
+                        'CIA
+                        Await ExtractCIA(filename, outputDirectory)
+                    Else
+                        Throw New NotSupportedException(My.Resources.Language.ErrorInvalidFileFormat)
+                    End If
+                End Using
+            Case SystemType.Unknown
+                Throw New NotSupportedException(My.Resources.Language.ErrorInvalidFileFormat)
         End Select
     End Function
 
