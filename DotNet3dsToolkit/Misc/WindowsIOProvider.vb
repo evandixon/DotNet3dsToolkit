@@ -4,48 +4,48 @@ Imports SkyEditor.Core.IO
 
 Namespace Misc
     Public Class WindowsIOProvider
-        Inherits IOProvider
+        Implements IIOProvider
 
         Public Sub New()
         End Sub
 
-        Public Overrides Sub CopyFile(sourceFilename As String, destinationFilename As String)
+        Public Overridable Sub CopyFile(sourceFilename As String, destinationFilename As String) Implements IIOProvider.CopyFile
             File.Copy(sourceFilename, destinationFilename, True)
         End Sub
 
-        Public Overrides Sub CreateDirectory(path As String)
+        Public Overridable Sub CreateDirectory(path As String) Implements IIOProvider.CreateDirectory
             Directory.CreateDirectory(path)
         End Sub
 
-        Public Overrides Sub DeleteDirectory(path As String)
+        Public Overridable Sub DeleteDirectory(path As String) Implements IIOProvider.DeleteDirectory
             Directory.Delete(path, True)
         End Sub
 
-        Public Overrides Sub DeleteFile(filename As String)
+        Public Overridable Sub DeleteFile(filename As String) Implements IIOProvider.DeleteFile
             File.Delete(filename)
         End Sub
 
-        Public Overrides Sub WriteAllBytes(filename As String, data() As Byte)
+        Public Overridable Sub WriteAllBytes(filename As String, data() As Byte) Implements IIOProvider.WriteAllBytes
             File.WriteAllBytes(filename, data)
         End Sub
 
-        Public Overrides Sub WriteAllText(filename As String, data As String)
+        Public Overridable Sub WriteAllText(filename As String, data As String) Implements IIOProvider.WriteAllText
             File.WriteAllText(filename, data)
         End Sub
 
-        Public Overrides Function CanLoadFileInMemory(fileSize As Long) As Boolean
+        Public Overridable Function CanLoadFileInMemory(fileSize As Long) As Boolean Implements IIOProvider.CanLoadFileInMemory
             Return (New ComputerInfo).AvailablePhysicalMemory > (fileSize + 500 * 1024 * 1024)
         End Function
 
-        Public Overrides Function DirectoryExists(directoryPath As String) As Boolean
+        Public Overridable Function DirectoryExists(directoryPath As String) As Boolean Implements IIOProvider.DirectoryExists
             Return Directory.Exists(directoryPath)
         End Function
 
-        Public Overrides Function fileExists(Filename As String) As Boolean
+        Public Overridable Function FileExists(Filename As String) As Boolean Implements IIOProvider.FileExists
             Return File.Exists(Filename)
         End Function
 
-        Public Overrides Function GetDirectories(path As String, topDirectoryOnly As Boolean) As String()
+        Public Overridable Function GetDirectories(path As String, topDirectoryOnly As Boolean) As String() Implements IIOProvider.GetDirectories
             If topDirectoryOnly Then
                 Return Directory.GetDirectories(path, "*", SearchOption.TopDirectoryOnly)
             Else
@@ -53,11 +53,11 @@ Namespace Misc
             End If
         End Function
 
-        Public Overrides Function GetFileLength(filename As String) As Long
+        Public Overridable Function GetFileLength(filename As String) As Long Implements IIOProvider.GetFileLength
             Return (New FileInfo(filename)).Length
         End Function
 
-        Public Overrides Function GetFiles(path As String, searchPattern As String, topDirectoryOnly As Boolean) As String()
+        Public Overridable Function GetFiles(path As String, searchPattern As String, topDirectoryOnly As Boolean) As String() Implements IIOProvider.GetFiles
             If topDirectoryOnly Then
                 Return Directory.GetFiles(path, searchPattern, SearchOption.TopDirectoryOnly)
             Else
@@ -65,7 +65,7 @@ Namespace Misc
             End If
         End Function
 
-        Public Overrides Function GetTempDirectory() As String
+        Public Overridable Function GetTempDirectory() As String Implements IIOProvider.GetTempDirectory
             Dim tempDir = Path.Combine(Path.GetTempPath, "SkyEditor", Guid.NewGuid.ToString)
             If Not DirectoryExists(tempDir) Then
                 CreateDirectory(tempDir)
@@ -73,27 +73,27 @@ Namespace Misc
             Return tempDir
         End Function
 
-        Public Overrides Function GetTempFilename() As String
+        Public Overridable Function GetTempFilename() As String Implements IIOProvider.GetTempFilename
             Return Path.GetTempFileName
         End Function
 
-        Public Overrides Function OpenFile(filename As String) As Stream
+        Public Overridable Function OpenFile(filename As String) As Stream Implements IIOProvider.OpenFile
             Return File.Open(filename, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read)
         End Function
 
-        Public Overrides Function OpenFileReadOnly(filename As String) As Stream
+        Public Overridable Function OpenFileReadOnly(filename As String) As Stream Implements IIOProvider.OpenFileReadOnly
             Return File.Open(filename, FileMode.OpenOrCreate, FileAccess.Read, FileShare.ReadWrite)
         End Function
 
-        Public Overrides Function OpenFileWriteOnly(filename As String) As Stream
+        Public Overridable Function OpenFileWriteOnly(filename As String) As Stream Implements IIOProvider.OpenFileWriteOnly
             Return File.Open(filename, FileMode.OpenOrCreate, FileAccess.Write)
         End Function
 
-        Public Overrides Function ReadAllBytes(filename As String) As Byte()
+        Public Overridable Function ReadAllBytes(filename As String) As Byte() Implements IIOProvider.ReadAllBytes
             Return File.ReadAllBytes(filename)
         End Function
 
-        Public Overrides Function ReadAllText(filename As String) As String
+        Public Overridable Function ReadAllText(filename As String) As String Implements IIOProvider.ReadAllText
             Return File.ReadAllText(filename)
         End Function
     End Class
