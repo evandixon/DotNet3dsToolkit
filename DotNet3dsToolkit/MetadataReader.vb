@@ -21,10 +21,10 @@ Public Class MetadataReader
     ''' Gets the offset of the content section of the given CIA file.
     ''' </summary>
     Friend Shared Function GetCIAContentOffset(cia As GenericFile) As Integer
-        Dim offsetCerts = Align(cia.Int32(0), 64)
-        Dim offsetTik = Align(cia.Int32(&H8) + offsetCerts, 64)
-        Dim offsetTmd = Align(cia.Int32(&HC) + offsetTik, 64)
-        Dim offsetContent = Align(cia.Int32(&H10) + offsetTmd, 64)
+        Dim offsetCerts = Align(cia.ReadInt32(0), 64)
+        Dim offsetTik = Align(cia.ReadInt32(&H8) + offsetCerts, 64)
+        Dim offsetTmd = Align(cia.ReadInt32(&HC) + offsetTik, 64)
+        Dim offsetContent = Align(cia.ReadInt32(&H10) + offsetTmd, 64)
         Return offsetContent
     End Function
 #End Region
@@ -83,19 +83,19 @@ Public Class MetadataReader
         Using file As New GenericFile
             file.EnableInMemoryLoad = False
             file.IsReadOnly = True
-            Await file.OpenFile(path, New WindowsIOProvider)
+            Await file.OpenFile(path, New PhysicalIOProvider)
 
             Dim n As New GenericNDSRom
 
             If Await n.IsFileOfType(file) Then
                 Return SystemType.NDS
-            ElseIf file.Length > 104 AndAlso e.GetString(file.RawData(&H100, 4)) = "NCSD" Then
+            ElseIf file.Length > 104 AndAlso e.GetString(Await file.ReadAsync(&H100, 4)) = "NCSD" Then
                 'CCI
                 Return SystemType.ThreeDS
-            ElseIf file.Length > 104 AndAlso e.GetString(file.RawData(&H100, 4)) = "NCCH" Then
+            ElseIf file.Length > 104 AndAlso e.GetString(Await file.ReadAsync(&H100, 4)) = "NCCH" Then
                 'CXI
                 Return SystemType.ThreeDS
-            ElseIf file.Length > file.Int32(0) AndAlso e.GetString(file.RawData(&H100 + GetCIAContentOffset(file), 4)) = "NCCH" Then
+            ElseIf file.Length > Await file.ReadInt32Async(0) AndAlso e.GetString(Await file.ReadAsync(&H100 + GetCIAContentOffset(file), 4)) = "NCCH" Then
                 'CIA
                 Return SystemType.ThreeDS
             Else
@@ -118,7 +118,7 @@ Public Class MetadataReader
                 Using n As New GenericNDSRom
                     n.EnableInMemoryLoad = False 'In-memory load would be overkill for simply reading the game code
                     n.IsReadOnly = True
-                    Await n.OpenFile(path, New WindowsIOProvider)
+                    Await n.OpenFile(path, New PhysicalIOProvider)
                     code = n.GameCode
                 End Using
 
@@ -128,17 +128,17 @@ Public Class MetadataReader
                 Using file As New GenericFile
                     file.EnableInMemoryLoad = False
                     file.IsReadOnly = True
-                    Await file.OpenFile(path, New WindowsIOProvider)
+                    Await file.OpenFile(path, New PhysicalIOProvider)
 
-                    If file.Length > 104 AndAlso e.GetString(file.RawData(&H100, 4)) = "NCSD" Then
+                    If file.Length > 104 AndAlso e.GetString(Await file.ReadAsync(&H100, 4)) = "NCSD" Then
                         'CCI
-                        Return BitConverter.ToUInt64(file.RawData(&H108, 8), 0).ToString("X").PadLeft(16, "0"c)
-                    ElseIf file.Length > 104 AndAlso e.GetString(file.RawData(&H100, 4)) = "NCCH" Then
+                        Return BitConverter.ToUInt64(Await file.ReadAsync(&H108, 8), 0).ToString("X").PadLeft(16, "0"c)
+                    ElseIf file.Length > 104 AndAlso e.GetString(Await file.ReadAsync(&H100, 4)) = "NCCH" Then
                         'CXI
-                        Return BitConverter.ToUInt64(file.RawData(&H108, 8), 0).ToString("X").PadLeft(16, "0"c)
-                    ElseIf file.Length > file.Int32(0) AndAlso e.GetString(file.RawData(&H100 + GetCIAContentOffset(file), 4)) = "NCCH" Then
+                        Return BitConverter.ToUInt64(Await file.ReadAsync(&H108, 8), 0).ToString("X").PadLeft(16, "0"c)
+                    ElseIf file.Length > Await file.ReadInt32Async(0) AndAlso e.GetString(Await file.ReadAsync(&H100 + GetCIAContentOffset(file), 4)) = "NCCH" Then
                         'CIA
-                        Return BitConverter.ToUInt64(file.RawData(&H108 + GetCIAContentOffset(file), 8), 0).ToString("X").PadLeft(16, "0"c)
+                        Return BitConverter.ToUInt64(Await file.ReadAsync(&H108 + GetCIAContentOffset(file), 8), 0).ToString("X").PadLeft(16, "0"c)
                     Else
                         Throw New NotSupportedException(My.Resources.Language.ErrorInvalidFileFormat)
                     End If

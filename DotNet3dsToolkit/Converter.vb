@@ -58,8 +58,8 @@ Public Class Converter
         End If
     End Sub
 
-    Public Event UnpackProgressed(sender As Object, e As ProgressReportedEventArgs) Implements IReportProgress.ProgressChanged
-    Public Event Completed As IReportProgress.CompletedEventHandler Implements IReportProgress.Completed
+    Public Event UnpackProgressed As EventHandler(Of ProgressReportedEventArgs) Implements IReportProgress.ProgressChanged
+    Public Event Completed As EventHandler Implements IReportProgress.Completed
 
 #Region "Tool Management"
     Private Property ToolDirectory As String
@@ -548,7 +548,7 @@ Public Class Converter
         End If
 
         Dim r As New GenericNDSRom
-        Dim p As New WindowsIOProvider
+        Dim p As New PhysicalIOProvider
 
         AddHandler r.UnpackProgress, reportProgress
 
@@ -575,14 +575,14 @@ Public Class Converter
                 Using file As New GenericFile
                     file.EnableInMemoryLoad = False
                     file.IsReadOnly = True
-                    Await file.OpenFile(filename, New WindowsIOProvider)
-                    If file.Length > 104 AndAlso e.GetString(file.RawData(&H100, 4)) = "NCSD" Then
+                    Await file.OpenFile(filename, New PhysicalIOProvider)
+                    If file.Length > 104 AndAlso e.GetString(Await file.ReadAsync(&H100, 4)) = "NCSD" Then
                         'CCI
                         Await ExtractCCI(filename, outputDirectory)
-                    ElseIf file.Length > 104 AndAlso e.GetString(file.RawData(&H100, 4)) = "NCCH" Then
+                    ElseIf file.Length > 104 AndAlso e.GetString(Await file.ReadAsync(&H100, 4)) = "NCCH" Then
                         'CXI
                         Await ExtractCXI(filename, outputDirectory)
-                    ElseIf file.Length > file.Int32(0) AndAlso e.GetString(file.RawData(&H100 + MetadataReader.GetCIAContentOffset(file), 4)) = "NCCH" Then
+                    ElseIf file.Length > Await file.ReadInt32Async(0) AndAlso e.GetString(Await file.ReadAsync(&H100 + MetadataReader.GetCIAContentOffset(file), 4)) = "NCCH" Then
                         'CIA
                         Await ExtractCIA(filename, outputDirectory)
                     Else
