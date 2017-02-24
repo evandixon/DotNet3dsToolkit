@@ -135,19 +135,29 @@ Public Class Form1
 
             If rbExtractAuto.Checked Then
                 lblStatus.Text = "Extracting (type auto-detected)..."
-                Await c.ExtractAuto(txtExtractSource.Text, txtExtractDestination.Text)
+                Await Task.Run(Async Function() As Task 'Start as a new task to allow running on a new thread right now
+                                   Await c.ExtractAuto(txtExtractSource.Text, txtExtractDestination.Text)
+                               End Function)
             ElseIf rbExtractCCIDec.Checked Then
                 lblStatus.Text = "Extracting as decrypted CCI..."
-                Await c.ExtractCCI(txtExtractSource.Text, txtExtractDestination.Text)
+                Await Task.Run(Async Function() As Task
+                                   Await c.ExtractCCI(txtExtractSource.Text, txtExtractDestination.Text)
+                               End Function)
             ElseIf rbExtractCXIDec.Checked Then
                 lblStatus.Text = "Extracting as decrypted CXI..."
-                Await c.ExtractCXI(txtExtractSource.Text, txtExtractDestination.Text)
+                Await Task.Run(Async Function() As Task
+                                   Await c.ExtractCXI(txtExtractSource.Text, txtExtractDestination.Text)
+                               End Function)
             ElseIf rbExtractCIA.Checked Then
                 lblStatus.Text = "Extracting as decrypted CIA..."
-                Await c.ExtractCIA(txtExtractSource.Text, txtExtractDestination.Text)
+                Await Task.Run(Async Function() As Task
+                                   Await c.ExtractCIA(txtExtractSource.Text, txtExtractDestination.Text)
+                               End Function)
             ElseIf rbExtractNDS.Checked Then
                 lblStatus.Text = "Extracting as NDS ROM..."
-                Await c.ExtractNDS(txtExtractSource.Text, txtExtractDestination.Text)
+                Await Task.Run(Async Function() As Task
+                                   Await c.ExtractNDS(txtExtractSource.Text, txtExtractDestination.Text)
+                               End Function)
             Else
                 MessageBox.Show("Invalid radio button choice.")
             End If
@@ -187,19 +197,29 @@ Public Class Form1
 
             If rbBuildAuto.Checked Then
                 lblStatus.Text = "Building (auto-detect format)..."
-                Await c.BuildAuto(txtBuildSource.Text, txtBuildDestination.Text)
+                Await Task.Run(Async Function() As Task 'Start as a new task to allow running on a new thread right now
+                                   Await c.BuildAuto(txtBuildSource.Text, txtBuildDestination.Text)
+                               End Function)
             ElseIf rbBuildCCIDec.Checked Then
                 lblStatus.Text = "Building as decrypted CCI..."
-                Await c.Build3DSDecrypted(txtBuildSource.Text, txtBuildDestination.Text)
+                Await Task.Run(Async Function() As Task
+                                   Await c.Build3DSDecrypted(txtBuildSource.Text, txtBuildDestination.Text)
+                               End Function)
             ElseIf rbBuildCCI0Key.Checked Then
                 lblStatus.Text = "Building as 0-key encrypted CCI..."
-                Await c.Build3DS0Key(txtBuildSource.Text, txtBuildDestination.Text)
+                Await Task.Run(Async Function() As Task
+                                   Await c.Build3DS0Key(txtBuildSource.Text, txtBuildDestination.Text)
+                               End Function)
             ElseIf rbBuildCIA.Checked Then
                 lblStatus.Text = "Building as CIA..."
-                Await c.BuildCia(txtBuildSource.Text, txtBuildDestination.Text)
+                Await Task.Run(Async Function() As Task
+                                   Await c.BuildCia(txtBuildSource.Text, txtBuildDestination.Text)
+                               End Function)
             ElseIf rbBuildNDS.Checked Then
                 lblStatus.Text = "Building as NDS..."
-                Await c.BuildNDS(txtBuildSource.Text, txtBuildDestination.Text)
+                Await Task.Run(Async Function() As Task
+                                   Await c.BuildNDS(txtBuildSource.Text, txtBuildDestination.Text)
+                               End Function)
             Else
                 MessageBox.Show("Invalid radio button choice.")
             End If
@@ -242,7 +262,10 @@ Public Class Form1
             AddHandler c.ConsoleOutputReceived, AddressOf OnConsoleOutputReceived
 
             lblStatus.Text = "Building for HANS..."
-            Await c.BuildHans(txtHansSource.Text, txtHansSD.Text, txtHansShortName.Text)
+            Await Task.Run(Async Function() As Task 'Start as a new task to allow running on a new thread right now
+                               Await c.BuildHans(txtHansSource.Text, txtHansSD.Text, txtHansShortName.Text)
+                           End Function)
+
 
             RemoveHandler c.ConsoleOutputReceived, AddressOf OnConsoleOutputReceived
 
