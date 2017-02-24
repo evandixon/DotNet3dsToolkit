@@ -5,7 +5,7 @@ Imports SkyEditor.Core.Utilities
 
 Public Class GenericNDSRom
     Inherits GenericFile
-    Implements IDetectableFileType
+    'Implements IDetectableFileType
     Implements IReportProgress
 
     Public Overrides Function GetDefaultExtension() As String
@@ -376,15 +376,26 @@ Public Class GenericNDSRom
         Return out
     End Function
 
-    Private Function GetFAT() As List(Of FileAllocationEntry)
-        Dim out As New List(Of FileAllocationEntry)
-        For count = FileAllocationTableOffset To FileAllocationTableOffset + FileAllocationTableSize - 1 Step 8
-            Dim entry As New FileAllocationEntry(BitConverter.ToUInt32(Read(count, 4), 0), BitConverter.ToUInt32(Read(count + 4, 4), 0))
-            If Not entry.Offset = 0 Then
-                out.Add(entry)
-            End If
-        Next
-        Return out
+    Private Async Function GetFAT() As Task(Of List(Of FileAllocationEntry))
+        Dim out As New ConcurrentDictionary(Of Integer, FileAllocationEntry)
+        Dim f As New AsyncFor
+        Await f.RunFor(Async Function(count As Integer) As Task
+                           Dim offset = FileAllocationTableOffset + count * 8
+                           Dim entry As New FileAllocationEntry(BitConverter.ToUInt32(Await ReadAsync(offset, 4), 0), BitConverter.ToUInt32(Await ReadAsync(offset + 4, 4), 0))
+                           If Not entry.Offset = 0 Then
+                               out(count) = entry
+                           End If
+                       End Function, 0, FileAllocationTableSize / 8 - 1)
+        Return out.Keys.OrderBy(Function(x) x).Select(Function(x) out(x)).ToList()
+
+        'Dim out As New List(Of FileAllocationEntry)
+        'For count = FileAllocationTableOffset To FileAllocationTableOffset + FileAllocationTableSize - 1 Step 8
+        '    Dim entry As New FileAllocationEntry(BitConverter.ToUInt32(Read(count, 4), 0), BitConverter.ToUInt32(Read(count + 4, 4), 0))
+        '    If Not entry.Offset = 0 Then
+        '        out.Add(entry)
+        '    End If
+        'Next
+        'Return out
     End Function
 
     Private Function GetFNT() As FilenameTable
@@ -453,7 +464,7 @@ Public Class GenericNDSRom
     ''' <param name="TargetDir">Directory to store the extracted files.</param>
     ''' <returns></returns>
     Public Async Function Unpack(TargetDir As String, Provider As IIOProvider) As Task
-        Dim fat = GetFAT()
+        Dim fat = Await GetFAT()
 
         'Set up extraction dependencies
         CurrentExtractProgress = 0
@@ -589,7 +600,7 @@ Public Class GenericNDSRom
                                    If Not provider.DirectoryExists(parentDir) Then
                                        provider.CreateDirectory(parentDir)
                                    End If
-                                   provider.WriteAllBytes(IO.Path.Combine(dest, item.Name), Read(entry.Offset, entry.EndAddress - entry.Offset))
+                                   provider.WriteAllBytes(IO.Path.Combine(dest, item.Name), Await ReadAsync(entry.Offset, entry.EndAddress - entry.Offset))
                                    Threading.Interlocked.Increment(CurrentExtractProgress)
                                End If
                            End Function))
@@ -670,7 +681,7 @@ Public Class GenericNDSRom
     End Property
 #End Region
 
-    Public Overridable Async Function IsFileOfType(file As GenericFile) As Task(Of Boolean) Implements IDetectableFileType.IsOfType
+    Public Overridable Async Function IsFileOfType(file As GenericFile) As Task(Of Boolean) ' Implements IDetectableFileType.IsOfType
         Return file.Length > &H15D AndAlso Await file.ReadAsync(&H15C) = &H56 AndAlso Await file.ReadAsync(&H15D) = &HCF
     End Function
 
