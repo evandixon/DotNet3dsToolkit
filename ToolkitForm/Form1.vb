@@ -1,7 +1,6 @@
 ﻿Imports System.ComponentModel
 Imports System.IO
 Imports DotNet3dsToolkit
-Imports DotNet3dsToolkit.Misc
 Imports SkyEditor.Core.Utilities
 
 Public Class Form1
