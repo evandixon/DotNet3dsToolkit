@@ -131,6 +131,10 @@
   <data name="ErrorInvalidFileFormat" xml:space="preserve">
     <value>The file format is invalid or unsupported.</value>
   </data>
+  <data name="ErrorMissingFile" xml:space="preserve">
+    <value>A file required for building is missing: "{0}"</value>
+    <comment>Message for an exeption that's thrown when a file needed for building is missing.</comment>
+  </data>
   <data name="ErrorNoSaveFilename" xml:space="preserve">
     <value>Using GenericFile.Save() requires GenericFile.OriginalFilename to not be null.</value>
     <comment>Message for an exception that's thrown when using GenericFile.Save() when the file doesn't have an original filename.</comment>

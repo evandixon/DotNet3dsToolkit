@@ -138,6 +138,7 @@
       <DependentUpon>Language.resx</DependentUpon>
     </Compile>
     <Compile Include="MetadataReader.vb" />
+    <Compile Include="MissingFileException.vb" />
     <Compile Include="My Project\AssemblyInfo.vb" />
     <Compile Include="My Project\Application.Designer.vb">
       <AutoGen>True</AutoGen>

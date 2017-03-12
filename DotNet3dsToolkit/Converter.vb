@@ -353,9 +353,32 @@ Public Class Converter
     End Function
 
     Private Async Function BuildExeFS(options As BuildOptions) As Task
-        File.Move(Path.Combine(options.SourceDirectory, options.ExeFSDirName, "banner.bin"), Path.Combine(options.SourceDirectory, options.ExeFSDirName, "banner.bnr"))
-        File.Move(Path.Combine(options.SourceDirectory, options.ExeFSDirName, "icon.bin"), Path.Combine(options.SourceDirectory, options.ExeFSDirName, "icon.icn"))
+        Dim bannerBin = Path.Combine(options.SourceDirectory, options.ExeFSDirName, "banner.bin")
+        Dim bannerBnr = Path.Combine(options.SourceDirectory, options.ExeFSDirName, "banner.bnr")
+        Dim iconBin = Path.Combine(options.SourceDirectory, options.ExeFSDirName, "icon.bin")
+        Dim iconIco = Path.Combine(options.SourceDirectory, options.ExeFSDirName, "icon.icn")
 
+        'Rename banner
+        If File.Exists(bannerBin) AndAlso Not File.Exists(bannerBnr) Then
+            File.Move(bannerBin, bannerBnr)
+        ElseIf File.Exists(bannerBin AndAlso File.Exists(bannerBnr)) Then
+            File.Delete(bannerBnr)
+            File.Move(bannerBin, bannerBnr)
+        Else 'Both files don't exist
+            Throw New MissingFileException(bannerBin)
+        End If
+
+        'Rename icon
+        If File.Exists(iconBin) AndAlso Not File.Exists(iconIco) Then
+            File.Move(iconBin, iconIco)
+        ElseIf File.Exists(iconBin AndAlso File.Exists(iconIco)) Then
+            File.Delete(iconIco)
+            File.Move(iconBin, iconIco)
+        Else 'Both files don't exist
+            Throw New MissingFileException(iconBin)
+        End If
+
+        'Compress code.bin if applicable
         If options.CompressCodeBin Then
             Throw New NotImplementedException
             '"3dstool -zvf code-patched.bin --compress-type blz --compress-out exefs/code.bin"
@@ -365,8 +388,9 @@ Public Class Converter
         Dim exefsPath As String = Path.Combine(options.SourceDirectory, options.ExeFSDirName)
         Await RunProgram(Path_3dstool, $"-ctf exefs CustomExeFS.bin --exefs-dir ""{exefsPath}"" --header ""{headerPath}""")
 
-        File.Move(Path.Combine(options.SourceDirectory, options.ExeFSDirName, "banner.bnr"), Path.Combine(options.SourceDirectory, options.ExeFSDirName, "banner.bin"))
-        File.Move(Path.Combine(options.SourceDirectory, options.ExeFSDirName, "icon.icn"), Path.Combine(options.SourceDirectory, options.ExeFSDirName, "icon.bin"))
+        'Rename files back
+        File.Move(bannerBnr, bannerBin)
+        File.Move(iconIco, bannerBin)
     End Function
 
     Private Async Function BuildPartition0(options As BuildOptions) As Task
