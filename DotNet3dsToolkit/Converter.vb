@@ -67,29 +67,62 @@ Public Class Converter
     Private Property Path_ctrtool As String
     Private Property Path_ndstool As String
 
-    Public ReadOnly Property Progress As Single Implements IReportProgress.Progress
+    Public Property Progress As Single Implements IReportProgress.Progress
         Get
-            Throw New NotImplementedException()
+            Return _progress
         End Get
+        Private Set(value As Single)
+            If value <> _progress Then
+                _progress = value
+                RaiseEvent UnpackProgressed(Me, New ProgressReportedEventArgs With {.Progress = Progress, .IsIndeterminate = IsIndeterminate, .Message = Message})
+            End If
+        End Set
     End Property
+    Dim _progress As Single
 
-    Public ReadOnly Property Message As String Implements IReportProgress.Message
+    Public Property Message As String Implements IReportProgress.Message
         Get
-            Throw New NotImplementedException()
+            Return _message
         End Get
+        Protected Set(value As String)
+            If value <> _message Then
+                _message = value
+                RaiseEvent UnpackProgressed(Me, New ProgressReportedEventArgs With {.Progress = Progress, .IsIndeterminate = IsIndeterminate, .Message = Message})
+            End If
+        End Set
     End Property
+    Dim _message As String
 
-    Public ReadOnly Property IsIndeterminate As Boolean Implements IReportProgress.IsIndeterminate
+    Public Property IsIndeterminate As Boolean Implements IReportProgress.IsIndeterminate
         Get
-            Throw New NotImplementedException()
+            Return _isIndeterminate
         End Get
+        Protected Set(value As Boolean)
+            If value <> _isIndeterminate Then
+                _isIndeterminate = value
+                RaiseEvent UnpackProgressed(Me, New ProgressReportedEventArgs With {.Progress = Progress, .IsIndeterminate = IsIndeterminate, .Message = Message})
+            End If
+        End Set
     End Property
+    Dim _isIndeterminate As Boolean
 
-    Public ReadOnly Property IsCompleted As Boolean Implements IReportProgress.IsCompleted
+    Public Property IsCompleted As Boolean Implements IReportProgress.IsCompleted
         Get
-            Throw New NotImplementedException()
+            Return _isCompleted
         End Get
+        Protected Set(value As Boolean)
+            If value <> _isCompleted Then
+                _isCompleted = value
+
+                If value Then
+                    Progress = 1
+                    IsIndeterminate = False
+                    RaiseEvent Completed(Me, New EventArgs)
+                End If
+            End If
+        End Set
     End Property
+    Dim _isCompleted As Boolean
 
     Private Sub ResetToolDirectory()
         ToolDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DotNet3DSToolkit-" & Guid.NewGuid.ToString)
@@ -477,6 +510,9 @@ Public Class Converter
     ''' Extracts a CCI ROM.
     ''' </summary>
     Public Async Function ExtractCCI(options As ExtractionOptions) As Task
+        IsIndeterminate = True
+        IsCompleted = False
+
         Copy3DSTool()
 
         If Not Directory.Exists(options.DestinationDirectory) Then
@@ -492,6 +528,8 @@ Public Class Converter
         partitionExtractions.Add(ExtractPartition6(options))
         partitionExtractions.Add(ExtractPartition7(options))
         Await Task.WhenAll(partitionExtractions)
+
+        IsCompleted = True
     End Function
 
     ''' <summary>
@@ -510,6 +548,9 @@ Public Class Converter
     ''' Extracts a CXI partition.
     ''' </summary>
     Public Async Function ExtractCXI(options As ExtractionOptions) As Task
+        IsIndeterminate = True
+        IsCompleted = False
+
         Copy3DSTool()
         CopyCtrTool()
 
@@ -519,6 +560,8 @@ Public Class Converter
 
         'Extract partition 0, which is the only partition we have
         Await ExtractPartition0(options, options.SourceRom, True)
+
+        IsCompleted = True
     End Function
 
     ''' <summary>
@@ -537,6 +580,9 @@ Public Class Converter
     ''' Extracts a CIA.
     ''' </summary>
     Public Async Function ExtractCIA(options As ExtractionOptions) As Task
+        IsIndeterminate = True
+        IsCompleted = False
+
         Copy3DSTool()
         CopyCtrTool()
 
@@ -553,6 +599,8 @@ Public Class Converter
         partitionExtractions.Add(ExtractPartition6(options))
         partitionExtractions.Add(ExtractPartition7(options))
         Await Task.WhenAll(partitionExtractions)
+
+        IsCompleted = True
     End Function
 
     ''' <summary>
@@ -561,6 +609,9 @@ Public Class Converter
     ''' <param name="filename">Full path of the ROM to extract.</param>
     ''' <param name="outputDirectory">Directory into which to extract the files.</param>
     Public Async Function ExtractNDS(filename As String, outputDirectory As String) As Task
+        Progress = 0
+        IsIndeterminate = False
+        IsCompleted = False
         Dim reportProgress = Sub(sender As Object, e As ProgressReportedEventArgs)
                                  RaiseEvent UnpackProgressed(Me, e)
                              End Sub
@@ -578,6 +629,7 @@ Public Class Converter
         Await r.Unpack(outputDirectory, p)
 
         RemoveHandler r.UnpackProgress, reportProgress
+        IsCompleted = True
     End Function
 
     ''' <summary>
@@ -621,6 +673,9 @@ Public Class Converter
     ''' </summary>
     ''' <param name="options"></param>
     Public Async Function Build3DSDecrypted(options As BuildOptions) As Task
+        IsIndeterminate = True
+        IsCompleted = False
+
         UpdateExheader(options, False)
 
         Dim headerPath As String = Path.Combine(options.SourceDirectory, options.RootHeaderName)
@@ -653,6 +708,8 @@ Public Class Converter
                 File.Delete(partition)
             End If
         Next
+
+        IsCompleted = True
     End Function
 
     ''' <summary>
@@ -673,6 +730,9 @@ Public Class Converter
     ''' </summary>
     ''' <param name="options"></param>
     Public Async Function Build3DS0Key(options As BuildOptions) As Task
+        IsIndeterminate = True
+        IsCompleted = False
+
         Copy3DSBuilder()
 
         UpdateExheader(options, False)
@@ -692,6 +752,8 @@ Public Class Converter
                 File.Move(dotCodeBin, codeBin)
             End If
         End If
+
+        IsCompleted = True
     End Function
 
     ''' <summary>
@@ -712,6 +774,9 @@ Public Class Converter
     ''' </summary>
     ''' <param name="options"></param>
     Public Async Function BuildCia(options As BuildOptions) As Task
+        IsIndeterminate = True
+        IsCompleted = False
+
         UpdateExheader(options, True)
         CopyMakeRom()
         Await BuildPartitions(options)
@@ -741,6 +806,8 @@ Public Class Converter
                 File.Delete(partition)
             End If
         Next
+
+        IsCompleted = True
     End Function
 
     ''' <summary>
@@ -762,9 +829,14 @@ Public Class Converter
     ''' <param name="sourceDirectory">Path of the files to build.  Must have been created with <see cref="ExtractAuto(String, String)"/> or equivalent function using default settings.</param>
     ''' <param name="outputROM">Destination of the output ROM.</param>
     Public Async Function BuildNDS(sourceDirectory As String, outputROM As String) As Task
+        IsIndeterminate = True
+        IsCompleted = False
+
         CopyNDSTool()
 
         Await RunProgram(Path_ndstool, String.Format("-c ""{0}"" -9 ""{1}/arm9.bin"" -7 ""{1}/arm7.bin"" -y9 ""{1}/y9.bin"" -y7 ""{1}/y7.bin"" -d ""{1}/data"" -y ""{1}/overlay"" -t ""{1}/banner.bin"" -h ""{1}/header.bin""", outputROM, sourceDirectory))
+
+        IsCompleted = True
     End Function
 
     ''' <summary>
@@ -774,6 +846,8 @@ Public Class Converter
     ''' <param name="shortcutName">Name of the shortcut.  Should not contain spaces nor special characters.</param>
     ''' <param name="rawName">Raw name for the destination RomFS and Code files.  Should be short, but the exact requirements are unknown.</param>
     Public Async Function BuildHans(options As BuildOptions, shortcutName As String, rawName As String) As Task
+        IsIndeterminate = True
+        IsCompleted = False
 
         'Validate input.  Never trust the user.
         shortcutName = shortcutName.Replace(" ", "").Replace("é", "e")
@@ -860,6 +934,8 @@ Public Class Converter
             Directory.CreateDirectory(Path.Combine(options.Destination, "3ds", "hans", "titles"))
         End If
         File.WriteAllText(Path.Combine(options.Destination, "3ds", "hans", "titles", rawName & ".txt"), preset.ToString)
+
+        IsCompleted = True
     End Function
 
     ''' <summary>
