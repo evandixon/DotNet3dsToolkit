@@ -26,6 +26,8 @@ Public Class GenericNDSRom
         Await Task.Run(Async Function() As Task
                            CurrentFileAllocationTable = Await GetFAT()
                        End Function)
+        CurrentArm9OverlayTable = ParseArm9OverlayTable()
+        CurrentArm9OverlayTable = ParseArm7OverlayTable()
     End Function
 
 #Region "Events"
@@ -295,6 +297,10 @@ Public Class GenericNDSRom
     Private Property CurrentFilenameTable As FilenameTable
 
     Private Property CurrentFileAllocationTable As List(Of FileAllocationEntry)
+
+    Private Property CurrentArm9OverlayTable As List(Of OverlayTableEntry)
+
+    Private Property CurrentArm7OverlayTable As List(Of OverlayTableEntry)
 #End Region
 
 #Region "NitroRom Stuff"
@@ -716,19 +722,85 @@ Public Class GenericNDSRom
     End Sub
 
     Protected Function FixPath(pathToFix As String) As String
+        Dim fixed = pathToFix.Replace("\", "/")
+
+        'Apply working directory
         If Path.IsPathRooted(pathToFix) Then
-            Return pathToFix
+            Return fixed
         Else
-            Return Path.Combine(WorkingDirectory, pathToFix)
+            Return Path.Combine(WorkingDirectory, fixed)
+        End If
+    End Function
+
+    Private Function GetFATEntry(path As String, Optional throwIfNotFound As Boolean = True) As FileAllocationEntry
+        Dim fixedPath = FixPath(path)
+        Dim parts = fixedPath.Split("/")
+        Dim currentEntry As FilenameTable = Nothing
+
+        If parts.Length < 2 Then
+            Throw New ArgumentException(String.Format(My.Resources.Language.ErrorInvalidPathFormat, path), NameOf(path))
+        End If
+
+        Select Case parts(1).ToLower
+            Case "data"
+                currentEntry = CurrentFilenameTable
+            Case "overlay"
+                Dim index As Integer
+                If Integer.TryParse(parts(2).ToLower.Substring(8, 4), index) Then
+                    Return CurrentFileAllocationTable(CurrentArm9OverlayTable(index).FileID)
+                End If
+            Case "overlay7"
+                Dim index As Integer
+                If Integer.TryParse(parts(2).ToLower.Substring(8, 4), index) Then
+                    Return CurrentFileAllocationTable(CurrentArm7OverlayTable(index).FileID)
+                End If
+            Case "arm7.bin"
+                Return New FileAllocationEntry(Arm7RomOffset, Arm7RomOffset + Arm7Size)
+            Case "arm9.bin"
+                'Write an additional 0xC bytes if the next 4 equal: 21 06 C0 DE
+                Dim footer As Int32 = ReadInt32(Me.Arm9RomOffset + Me.Arm9Size)
+                If footer = &HDEC00621 Then
+                    Return New FileAllocationEntry(Arm9RomOffset, Arm9RomOffset + Arm9Size + &HC)
+                Else
+                    Return New FileAllocationEntry(Arm9RomOffset, Arm9RomOffset + Arm9Size)
+                End If
+            Case "header.bin"
+                Return New FileAllocationEntry(0, &H200)
+            Case "icon.bin"
+                Return New FileAllocationEntry(IconTitleOffset, IconTitleOffset + IconTitleLength)
+            Case "y7.bin"
+                Return New FileAllocationEntry(FileArm7OverlayOffset, FileArm7OverlayOffset + FileArm7OverlaySize)
+            Case "y9.bin"
+                Return New FileAllocationEntry(FileArm9OverlayOffset, FileArm9OverlayOffset + FileArm9OverlaySize)
+            Case Else
+                currentEntry = Nothing 'Throw FileNotFound
+        End Select
+
+        If currentEntry IsNot Nothing Then
+            For count = 2 To parts.Length - 1
+                Dim currentCount = count
+                currentEntry = currentEntry?.Children.Where(Function(x) x.Name.ToLower = parts(currentCount)).FirstOrDefault
+            Next
+        End If
+
+        If currentEntry Is Nothing Then
+            If throwIfNotFound Then
+                Throw New FileNotFoundException(My.Resources.Language.ErrorROMFileNotFound, path)
+            Else
+                Return Nothing
+            End If
+        Else
+            Return CurrentFileAllocationTable(currentEntry.FileIndex)
         End If
     End Function
 
     Public Function GetFileLength(filename As String) As Long Implements IIOProvider.GetFileLength
-        Throw New NotImplementedException()
+        Dim entry = GetFATEntry(filename)
+        Return entry.EndAddress - entry.Offset
     End Function
 
     Public Function FileExists(filename As String) As Boolean Implements IIOProvider.FileExists
-        Throw New NotImplementedException()
+        Return GetFATEntry(filename) IsNot Nothing
     End Function
 
     Public Function DirectoryExists(path As String) As Boolean Implements IIOProvider.DirectoryExists
@@ -748,7 +820,8 @@ Public Class GenericNDSRom
     End Function
 
     Public Function ReadAllBytes(filename As String) As Byte() Implements IIOProvider.ReadAllBytes
-        Throw New NotImplementedException()
+        Dim entry = GetFATEntry(filename)
+        Return Read(entry.Offset, entry.EndAddress - entry.Offset)
     End Function
 
     Public Function ReadAllText(filename As String) As String Implements IIOProvider.ReadAllText

@@ -131,6 +131,9 @@
   <data name="ErrorInvalidFileFormat" xml:space="preserve">
     <value>The file format is invalid or unsupported.</value>
   </data>
+  <data name="ErrorInvalidPathFormat" xml:space="preserve">
+    <value>The given path is in an incorrect format: "{0}"</value>
+  </data>
   <data name="ErrorMissingFile" xml:space="preserve">
     <value>A file required for building is missing: "{0}"</value>
     <comment>Message for an exeption that's thrown when a file needed for building is missing.</comment>
@@ -138,6 +141,9 @@
   <data name="ErrorNoSaveFilename" xml:space="preserve">
     <value>Using GenericFile.Save() requires GenericFile.OriginalFilename to not be null.</value>
     <comment>Message for an exception that's thrown when using GenericFile.Save() when the file doesn't have an original filename.</comment>
+  </data>
+  <data name="ErrorROMFileNotFound" xml:space="preserve">
+    <value>File at the given path in the ROM could not be found.</value>
   </data>
   <data name="ErrorSystemNotSupported" xml:space="preserve">
     <value>Unsupported system format {0}</value>
