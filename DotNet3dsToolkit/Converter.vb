@@ -427,6 +427,10 @@ Public Class Converter
     End Function
 
     Private Async Function BuildPartition0(options As BuildOptions) As Task
+        If Not File.Exists(Path.Combine(ToolDirectory, "CustomPartition0.bin")) Then
+            Throw New MissingFileException(Path.Combine(ToolDirectory, "CustomPartition0.bin"))
+        End If
+
         'Build romfs and exefs
         Dim romfsTask = BuildRomFS(options)
         Dim exefsTask = BuildExeFS(options)
@@ -694,8 +698,10 @@ Public Class Converter
             If info.Length <= 20000 Then
                 File.Delete(info.FullName)
             Else
-                Dim num = item.ToString
-                partitionArgs &= $" -{num} CustomPartition{num}.bin"
+                If info.Exists Then
+                    Dim num = item.ToString
+                    partitionArgs &= $" -{num} CustomPartition{num}.bin"
+                End If
             End If
         Next
 
