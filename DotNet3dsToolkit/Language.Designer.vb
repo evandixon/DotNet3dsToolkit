@@ -101,11 +101,38 @@ Namespace My.Resources
         End Property
         
         '''<summary>
+        '''  Looks up a localized string similar to The given path is in an incorrect format: &quot;{0}&quot;.
+        '''</summary>
+        Friend Shared ReadOnly Property ErrorInvalidPathFormat() As String
+            Get
+                Return ResourceManager.GetString("ErrorInvalidPathFormat", resourceCulture)
+            End Get
+        End Property
+        
+        '''<summary>
+        '''  Looks up a localized string similar to A file required for building is missing: &quot;{0}&quot;.
+        '''</summary>
+        Friend Shared ReadOnly Property ErrorMissingFile() As String
+            Get
+                Return ResourceManager.GetString("ErrorMissingFile", resourceCulture)
+            End Get
+        End Property
+        
+        '''<summary>
         '''  Looks up a localized string similar to Using GenericFile.Save() requires GenericFile.OriginalFilename to not be null..
         '''</summary>
         Friend Shared ReadOnly Property ErrorNoSaveFilename() As String
             Get
                 Return ResourceManager.GetString("ErrorNoSaveFilename", resourceCulture)
+            End Get
+        End Property
+        
+        '''<summary>
+        '''  Looks up a localized string similar to File at the given path in the ROM could not be found..
+        '''</summary>
+        Friend Shared ReadOnly Property ErrorROMFileNotFound() As String
+            Get
+                Return ResourceManager.GetString("ErrorROMFileNotFound", resourceCulture)
             End Get
         End Property
         

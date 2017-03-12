@@ -1,4 +1,5 @@
 ﻿Imports System.Collections.Concurrent
+Imports System.IO
 Imports Portable.Text
 Imports SkyEditor.Core.IO
 Imports SkyEditor.Core.Utilities
@@ -7,25 +8,27 @@ Public Class GenericNDSRom
     Inherits GenericFile
     'Implements IDetectableFileType
     Implements IReportProgress
+    Implements IIOProvider
 
     Public Overrides Function GetDefaultExtension() As String
         Return "*.nds"
     End Function
 
-#Region "Constructors"
-
     Public Sub New()
         MyBase.New()
         Me.EnableInMemoryLoad = True
+        ResetWorkingDirectory()
     End Sub
 
-    Public Sub New(filename As String, isReadOnly As Boolean, enableInMemoryLoad As Boolean, provider As IIOProvider)
-        MyBase.New(filename, provider)
-        Me.IsReadOnly = isReadOnly
-        Me.EnableInMemoryLoad = enableInMemoryLoad
-    End Sub
-
-#End Region
+    Public Overrides Async Function OpenFile(filename As String, provider As IIOProvider) As Task
+        Await MyBase.OpenFile(filename, provider)
+        Await Task.Run(Sub() CurrentFilenameTable = GetFNT())
+        Await Task.Run(Async Function() As Task
+                           CurrentFileAllocationTable = Await GetFAT()
+                       End Function)
+        CurrentArm9OverlayTable = ParseArm9OverlayTable()
+        CurrentArm9OverlayTable = ParseArm7OverlayTable()
+    End Function
 
 #Region "Events"
     Public Event UnpackProgress As EventHandler(Of ProgressReportedEventArgs) Implements IReportProgress.ProgressChanged
@@ -102,12 +105,10 @@ Public Class GenericNDSRom
             Write(&H13, value)
         End Set
     End Property
+
     ''' <summary>
     ''' Gets or sets the capacity of the cartridge.  Cartridge size = 128KB * 2 ^ (DeviceCapacity)
     ''' </summary>
-    ''' <value></value>
-    ''' <returns></returns>
-    ''' <remarks></remarks>
     Public Property DeviceCapacity As Byte
         Get
             Return Read(&H13)
@@ -116,7 +117,9 @@ Public Class GenericNDSRom
             Write(&H13, value)
         End Set
     End Property
+
     'Reserved: 9 bytes of 0
+
     Public Property RomVersion As Byte
         Get
             Return Read(&H1E)
@@ -125,7 +128,9 @@ Public Class GenericNDSRom
             Write(&H1E, value)
         End Set
     End Property
+
     'Autostart: bit 2 skips menu
+
     Private Property Arm9RomOffset As Integer
         Get
             Return BitConverter.ToInt32(Read(&H20, 4), 0)
@@ -285,6 +290,17 @@ Public Class GenericNDSRom
     '168h    4     Debug ram_address  (0=none) (2400000h..27BFE00h) ;SIO and 8MB
     '16Ch    4     Reserved (zero filled) (transferred, and stored, but not used)
     '170h    90h   Reserved (zero filled) (transferred, but not stored in RAM)
+
+    ''' <summary>
+    ''' The ROM's filename table
+    ''' </summary>
+    Private Property CurrentFilenameTable As FilenameTable
+
+    Private Property CurrentFileAllocationTable As List(Of FileAllocationEntry)
+
+    Private Property CurrentArm9OverlayTable As List(Of OverlayTableEntry)
+
+    Private Property CurrentArm7OverlayTable As List(Of OverlayTableEntry)
 #End Region
 
 #Region "NitroRom Stuff"
@@ -387,15 +403,6 @@ Public Class GenericNDSRom
                            End If
                        End Function, 0, FileAllocationTableSize / 8 - 1)
         Return out.Keys.OrderBy(Function(x) x).Select(Function(x) out(x)).ToList()
-
-        'Dim out As New List(Of FileAllocationEntry)
-        'For count = FileAllocationTableOffset To FileAllocationTableOffset + FileAllocationTableSize - 1 Step 8
-        '    Dim entry As New FileAllocationEntry(BitConverter.ToUInt32(Read(count, 4), 0), BitConverter.ToUInt32(Read(count + 4, 4), 0))
-        '    If Not entry.Offset = 0 Then
-        '        out.Add(entry)
-        '    End If
-        'Next
-        'Return out
     End Function
 
     Private Function GetFNT() As FilenameTable
@@ -457,14 +464,14 @@ Public Class GenericNDSRom
         End While
         Return subTables
     End Function
+
     ''' <summary>
     ''' Extracts the files contained within the ROMs.
     ''' Extractions either run synchronously or asynchrounously, depending on the value of IsThreadSafe.
     ''' </summary>
     ''' <param name="TargetDir">Directory to store the extracted files.</param>
-    ''' <returns></returns>
     Public Async Function Unpack(TargetDir As String, Provider As IIOProvider) As Task
-        Dim fat = Await GetFAT()
+        Dim fat = CurrentFileAllocationTable
 
         'Set up extraction dependencies
         CurrentExtractProgress = 0
@@ -479,7 +486,7 @@ Public Class GenericNDSRom
         'Start extracting
         '-Header
         Dim headerTask = Task.Run(New Action(Sub()
-                                                 Provider.WriteAllBytes(IO.Path.Combine(TargetDir, "header.bin"), Read(0, &H200))
+                                                 Provider.WriteAllBytes(Path.Combine(TargetDir, "header.bin"), Read(0, &H200))
                                              End Sub))
         If Me.IsThreadSafe Then
             ExtractionTasks.Add(headerTask)
@@ -498,7 +505,7 @@ Public Class GenericNDSRom
                                                    arm9buffer.AddRange(Read(Me.Arm9RomOffset + Me.Arm9Size, &HC))
                                                End If
 
-                                               Provider.WriteAllBytes(IO.Path.Combine(TargetDir, "arm9.bin"), arm9buffer.ToArray)
+                                               Provider.WriteAllBytes(Path.Combine(TargetDir, "arm9.bin"), arm9buffer.ToArray)
                                            End Sub))
         If Me.IsThreadSafe Then
             ExtractionTasks.Add(arm9Task)
@@ -508,7 +515,7 @@ Public Class GenericNDSRom
 
         '-Arm7
         Dim arm7Task = Task.Run(New Action(Sub()
-                                               Provider.WriteAllBytes(IO.Path.Combine(TargetDir, "arm7.bin"), Read(Me.Arm7RomOffset, Me.Arm7Size))
+                                               Provider.WriteAllBytes(Path.Combine(TargetDir, "arm7.bin"), Read(Me.Arm7RomOffset, Me.Arm7Size))
                                            End Sub))
         If Me.IsThreadSafe Then
             ExtractionTasks.Add(arm7Task)
@@ -518,7 +525,7 @@ Public Class GenericNDSRom
 
         '-Arm9 overlay table (y9.bin)
         Dim y9Task = Task.Run(New Action(Sub()
-                                             Provider.WriteAllBytes(IO.Path.Combine(TargetDir, "y9.bin"), Read(Me.FileArm9OverlayOffset, Me.FileArm9OverlaySize))
+                                             Provider.WriteAllBytes(Path.Combine(TargetDir, "y9.bin"), Read(Me.FileArm9OverlayOffset, Me.FileArm9OverlaySize))
                                          End Sub))
 
         If Me.IsThreadSafe Then
@@ -529,7 +536,7 @@ Public Class GenericNDSRom
 
         '-Extract arm7 overlay table (y7.bin)
         Dim y7Task = Task.Run(New Action(Sub()
-                                             Provider.WriteAllBytes(IO.Path.Combine(TargetDir, "y7.bin"), Read(Me.FileArm7OverlayOffset, Me.FileArm7OverlaySize))
+                                             Provider.WriteAllBytes(Path.Combine(TargetDir, "y7.bin"), Read(Me.FileArm7OverlayOffset, Me.FileArm7OverlaySize))
                                          End Sub))
 
         If Me.IsThreadSafe Then
@@ -538,7 +545,7 @@ Public Class GenericNDSRom
             Await y7Task
         End If
         '-Extract overlays
-        Dim overlay9 = ExtractOverlay(fat, ParseArm9OverlayTable, IO.Path.Combine(TargetDir, "overlay"), Provider)
+        Dim overlay9 = ExtractOverlay(fat, ParseArm9OverlayTable, Path.Combine(TargetDir, "overlay"), Provider)
 
         If Me.IsThreadSafe Then
             ExtractionTasks.Add(overlay9)
@@ -546,7 +553,7 @@ Public Class GenericNDSRom
             Await overlay9
         End If
 
-        Dim overlay7 = ExtractOverlay(fat, ParseArm7OverlayTable, IO.Path.Combine(TargetDir, "overlay7"), Provider)
+        Dim overlay7 = ExtractOverlay(fat, ParseArm7OverlayTable, Path.Combine(TargetDir, "overlay7"), Provider)
 
         If Me.IsThreadSafe Then
             ExtractionTasks.Add(overlay7)
@@ -556,7 +563,7 @@ Public Class GenericNDSRom
         '-Extract icon (banner.bin)
         Dim iconTask = Task.Run(Sub()
                                     If IconTitleOffset > 0 Then '0 means none
-                                        Provider.WriteAllBytes(IO.Path.Combine(TargetDir, "banner.bin"), Read(IconTitleOffset, IconTitleLength))
+                                        Provider.WriteAllBytes(Path.Combine(TargetDir, "banner.bin"), Read(IconTitleOffset, IconTitleLength))
                                     End If
                                 End Sub)
 
@@ -567,7 +574,7 @@ Public Class GenericNDSRom
         End If
 
         '- Extract files
-        Dim filesExtraction = ExtractFiles(fat, GetFNT, TargetDir, Provider)
+        Dim filesExtraction = ExtractFiles(fat, CurrentFilenameTable, TargetDir, Provider)
         If Me.IsThreadSafe Then
             ExtractionTasks.Add(filesExtraction)
         Else
@@ -679,10 +686,187 @@ Public Class GenericNDSRom
             End If
         End Get
     End Property
+
 #End Region
 
     Public Overridable Async Function IsFileOfType(file As GenericFile) As Task(Of Boolean) ' Implements IDetectableFileType.IsOfType
         Return file.Length > &H15D AndAlso Await file.ReadAsync(&H15C) = &H56 AndAlso Await file.ReadAsync(&H15D) = &HCF
     End Function
 
+#Region "IO Provider Implementation"
+
+    Public Property WorkingDirectory() As String Implements IIOProvider.WorkingDirectory
+        Get
+            Return _workingDirectory
+        End Get
+        Set
+            If Path.IsPathRooted(Value) Then
+                _workingDirectory = Value
+            Else
+                For Each part In Value.Replace("\"c, "/"c).Split("/"c)
+                    If part = "." Then
+                        ' Do nothing
+                    ElseIf part = ".." Then
+                        _workingDirectory = Path.GetDirectoryName(_workingDirectory)
+                    Else
+                        _workingDirectory = Path.Combine(_workingDirectory, part)
+                    End If
+                Next
+            End If
+        End Set
+    End Property
+    Private _workingDirectory As String
+
+    Public Sub ResetWorkingDirectory() Implements IIOProvider.ResetWorkingDirectory
+        WorkingDirectory = "/"
+    End Sub
+
+    Protected Function FixPath(pathToFix As String) As String
+        Dim fixed = pathToFix.Replace("\", "/")
+
+        'Apply working directory
+        If Path.IsPathRooted(pathToFix) Then
+            Return fixed
+        Else
+            Return Path.Combine(WorkingDirectory, fixed)
+        End If
+    End Function
+
+    Private Function GetFATEntry(path As String, Optional throwIfNotFound As Boolean = True) As FileAllocationEntry
+        Dim fixedPath = FixPath(path)
+        Dim parts = fixedPath.Split("/")
+        Dim currentEntry As FilenameTable = Nothing
+
+        If parts.Length < 2 Then
+            Throw New ArgumentException(String.Format(My.Resources.Language.ErrorInvalidPathFormat, path), NameOf(path))
+        End If
+
+        Select Case parts(1).ToLower
+            Case "data"
+                currentEntry = CurrentFilenameTable
+            Case "overlay"
+                Dim index As Integer
+                If Integer.TryParse(parts(2).ToLower.Substring(8, 4), index) Then
+                    Return CurrentFileAllocationTable(CurrentArm9OverlayTable(index).FileID)
+                End If
+            Case "overlay7"
+                Dim index As Integer
+                If Integer.TryParse(parts(2).ToLower.Substring(8, 4), index) Then
+                    Return CurrentFileAllocationTable(CurrentArm7OverlayTable(index).FileID)
+                End If
+            Case "arm7.bin"
+                Return New FileAllocationEntry(Arm7RomOffset, Arm7RomOffset + Arm7Size)
+            Case "arm9.bin"
+                'Write an additional 0xC bytes if the next 4 equal: 21 06 C0 DE
+                Dim footer As Int32 = ReadInt32(Me.Arm9RomOffset + Me.Arm9Size)
+                If footer = &HDEC00621 Then
+                    Return New FileAllocationEntry(Arm9RomOffset, Arm9RomOffset + Arm9Size + &HC)
+                Else
+                    Return New FileAllocationEntry(Arm9RomOffset, Arm9RomOffset + Arm9Size)
+                End If
+            Case "header.bin"
+                Return New FileAllocationEntry(0, &H200)
+            Case "icon.bin"
+                Return New FileAllocationEntry(IconTitleOffset, IconTitleOffset + IconTitleLength)
+            Case "y7.bin"
+                Return New FileAllocationEntry(FileArm7OverlayOffset, FileArm7OverlayOffset + FileArm7OverlaySize)
+            Case "y9.bin"
+                Return New FileAllocationEntry(FileArm9OverlayOffset, FileArm9OverlayOffset + FileArm9OverlaySize)
+            Case Else
+                currentEntry = Nothing 'Throw FileNotFound
+        End Select
+
+        If currentEntry IsNot Nothing Then
+            For count = 2 To parts.Length - 1
+                Dim currentCount = count
+                currentEntry = currentEntry?.Children.Where(Function(x) x.Name.ToLower = parts(currentCount)).FirstOrDefault
+            Next
+        End If
+
+        If currentEntry Is Nothing Then
+            If throwIfNotFound Then
+                Throw New FileNotFoundException(My.Resources.Language.ErrorROMFileNotFound, path)
+            Else
+                Return Nothing
+            End If
+        Else
+            Return CurrentFileAllocationTable(currentEntry.FileIndex)
+        End If
+    End Function
+
+    Public Function GetFileLength(filename As String) As Long Implements IIOProvider.GetFileLength
+        Dim entry = GetFATEntry(filename)
+        Return entry.EndAddress - entry.Offset
+    End Function
+
+    Public Function FileExists(filename As String) As Boolean Implements IIOProvider.FileExists
+        Return GetFATEntry(filename) IsNot Nothing
+    End Function
+
+    Public Function DirectoryExists(path As String) As Boolean Implements IIOProvider.DirectoryExists
+        Throw New NotImplementedException()
+    End Function
+
+    Public Sub CreateDirectory(path As String) Implements IIOProvider.CreateDirectory
+        Throw New NotImplementedException()
+    End Sub
+
+    Public Function GetFiles(path As String, searchPattern As String, topDirectoryOnly As Boolean) As String() Implements IIOProvider.GetFiles
+        Throw New NotImplementedException()
+    End Function
+
+    Public Function GetDirectories(path As String, topDirectoryOnly As Boolean) As String() Implements IIOProvider.GetDirectories
+        Throw New NotImplementedException()
+    End Function
+
+    Public Function ReadAllBytes(filename As String) As Byte() Implements IIOProvider.ReadAllBytes
+        Dim entry = GetFATEntry(filename)
+        Return Read(entry.Offset, entry.EndAddress - entry.Offset)
+    End Function
+
+    Public Function ReadAllText(filename As String) As String Implements IIOProvider.ReadAllText
+        Throw New NotImplementedException()
+    End Function
+
+    Public Sub WriteAllBytes(filename As String, data() As Byte) Implements IIOProvider.WriteAllBytes
+        Throw New NotImplementedException()
+    End Sub
+
+    Public Sub WriteAllText(filename As String, data As String) Implements IIOProvider.WriteAllText
+        Throw New NotImplementedException()
+    End Sub
+
+    Public Sub CopyFile(sourceFilename As String, destinationFilename As String) Implements IIOProvider.CopyFile
+        Throw New NotImplementedException()
+    End Sub
+
+    Public Sub DeleteFile(filename As String) Implements IIOProvider.DeleteFile
+        Throw New NotImplementedException()
+    End Sub
+
+    Public Sub DeleteDirectory(path As String) Implements IIOProvider.DeleteDirectory
+        Throw New NotImplementedException()
+    End Sub
+
+    Public Function GetTempFilename() As String Implements IIOProvider.GetTempFilename
+        Throw New NotImplementedException()
+    End Function
+
+    Public Function GetTempDirectory() As String Implements IIOProvider.GetTempDirectory
+        Throw New NotImplementedException()
+    End Function
+
+    Public Function OpenFileReadWrite(filename As String) As Stream Implements IIOProvider.OpenFile
+        Throw New NotImplementedException()
+    End Function
+
+    Public Function OpenFileReadOnly(filename As String) As Stream Implements IIOProvider.OpenFileReadOnly
+        Throw New NotImplementedException()
+    End Function
+
+    Public Function OpenFileWriteOnly(filename As String) As Stream Implements IIOProvider.OpenFileWriteOnly
+        Throw New NotImplementedException()
+    End Function
+
+#End Region
 End Class
