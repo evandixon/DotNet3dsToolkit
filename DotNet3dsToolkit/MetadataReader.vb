@@ -203,4 +203,36 @@ Public Class MetadataReader
             Throw New IOException(String.Format(My.Resources.Language.ErrorFileDirNotFound, path))
         End If
     End Function
+
+    ''' <summary>
+    ''' Determines whether or not the given ROM is decrypted
+    ''' </summary>
+    ''' <param name="path">Path of the ROM</param>
+    ''' <returns>A boolean indicating whether or not the ROM is decrypted.</returns>
+    Public Shared Async Function Is3DSRomDecrypted(path As String) As Task(Of Boolean)
+        Dim e As New ASCIIEncoding
+        Using file As New GenericFile
+            file.EnableInMemoryLoad = False
+            file.IsReadOnly = True
+            Await file.OpenFile(path, New PhysicalIOProvider)
+
+            If file.Length > 104 AndAlso e.GetString(Await file.ReadAsync(&H100, 4)) = "NCSD" Then
+                'CCI
+
+                'Note: These are always equal
+                Dim ncsdProgramID = Await file.ReadInt64Async(&H108)
+                Dim ncchProgramId = Await file.ReadInt64Async(&H1108)
+                'Return ncsdProgramID = ncchProgramId
+                Throw New NotImplementedException
+            ElseIf file.Length > 104 AndAlso e.GetString(Await file.ReadAsync(&H100, 4)) = "NCCH" Then
+                'CXI
+                Throw New NotImplementedException
+            ElseIf file.Length > Await file.ReadInt32Async(0) AndAlso e.GetString(Await file.ReadAsync(&H100 + GetCIAContentOffset(file), 4)) = "NCCH" Then
+                'CIA
+                Throw New NotImplementedException
+            Else
+                Throw New NotSupportedException(My.Resources.Language.ErrorInvalidFileFormat)
+            End If
+        End Using
+    End Function
 End Class
