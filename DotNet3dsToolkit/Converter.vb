@@ -427,10 +427,6 @@ Public Class Converter
     End Function
 
     Private Async Function BuildPartition0(options As BuildOptions) As Task
-        If Not File.Exists(Path.Combine(ToolDirectory, "CustomPartition0.bin")) Then
-            Throw New MissingFileException(Path.Combine(ToolDirectory, "CustomPartition0.bin"))
-        End If
-
         'Build romfs and exefs
         Dim romfsTask = BuildRomFS(options)
         Dim exefsTask = BuildExeFS(options)
@@ -491,6 +487,10 @@ Public Class Converter
         partitionTasks.Add(BuildPartition6(options))
         partitionTasks.Add(BuildPartition7(options))
         Await Task.WhenAll(partitionTasks)
+
+        If Not File.Exists(Path.Combine(ToolDirectory, "CustomPartition0.bin")) Then
+            Throw New MissingFileException(Path.Combine(ToolDirectory, "CustomPartition0.bin"))
+        End If
 
     End Function
 
