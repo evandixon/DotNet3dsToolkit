@@ -423,7 +423,7 @@ Public Class Converter
 
         'Rename files back
         File.Move(bannerBnr, bannerBin)
-        File.Move(iconIco, bannerBin)
+        File.Move(iconIco, iconBin)
     End Function
 
     Private Async Function BuildPartition0(options As BuildOptions) As Task
