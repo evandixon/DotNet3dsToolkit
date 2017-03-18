@@ -92,6 +92,9 @@ Namespace My.Resources
         
         '''<summary>
         '''  Looks up a localized string similar to // regex: ECMAScript grammar and case insensitive
+        '''//ignore:
+        '''
+        '''//remap ignore:
         '''.
         '''</summary>
         Friend ReadOnly Property ignore_3dstool() As String
