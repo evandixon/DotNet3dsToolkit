@@ -394,9 +394,11 @@ Public Class Converter
         'Rename banner
         If File.Exists(bannerBin) AndAlso Not File.Exists(bannerBnr) Then
             File.Move(bannerBin, bannerBnr)
-        ElseIf File.Exists(bannerBin AndAlso File.Exists(bannerBnr)) Then
+        ElseIf File.Exists(bannerBin) AndAlso File.Exists(bannerBnr) Then
             File.Delete(bannerBnr)
             File.Move(bannerBin, bannerBnr)
+        ElseIf Not File.Exists(bannerBin) AndAlso File.Exists(bannerBnr) Then
+            'Do nothing
         Else 'Both files don't exist
             Throw New MissingFileException(bannerBin)
         End If
@@ -404,9 +406,11 @@ Public Class Converter
         'Rename icon
         If File.Exists(iconBin) AndAlso Not File.Exists(iconIco) Then
             File.Move(iconBin, iconIco)
-        ElseIf File.Exists(iconBin AndAlso File.Exists(iconIco)) Then
+        ElseIf File.Exists(iconBin) AndAlso File.Exists(iconIco) Then
             File.Delete(iconIco)
             File.Move(iconBin, iconIco)
+        ElseIf Not File.Exists(iconBin) AndAlso File.Exists(iconIco) Then
+            'Do nothing
         Else 'Both files don't exist
             Throw New MissingFileException(iconBin)
         End If
