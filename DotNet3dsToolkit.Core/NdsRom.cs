@@ -6,6 +6,7 @@ using System.Text;
 using System.IO;
 using System.Threading.Tasks;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace DotNet3dsToolkit.Core
 {
@@ -14,6 +15,52 @@ namespace DotNet3dsToolkit.Core
     /// </summary>
     public class NdsRom : GenericFile, IReportProgress, IIOProvider, IDisposable
     {
+
+        #region Static Methods
+        /// <summary>
+        /// Gets a regular expression for the given search pattern for use with <see cref="GetFiles(string, string, bool)"/>.  Do not provide asterisks.
+        /// </summary>
+        private static StringBuilder GetFileSearchRegexQuestionMarkOnly(string searchPattern)
+        {
+            var parts = searchPattern.Split('?');
+            var regexString = new StringBuilder();
+            foreach (var item in parts)
+            {
+                regexString.Append(Regex.Escape(item));
+                if (item != parts[parts.Length - 1])
+                {
+                    regexString.Append(".?");
+                }
+            }
+            return regexString;
+        }
+
+        /// <summary>
+        /// Gets a regular expression for the given search pattern for use with <see cref="GetFiles(string, string, bool)"/>.
+        /// </summary>
+        /// <param name="searchPattern"></param>
+        /// <returns></returns>
+        private static string GetFileSearchRegex(string searchPattern)
+        {
+            var asteriskParts = searchPattern.Split('*');
+            var regexString = new StringBuilder();
+
+            foreach (var part in asteriskParts)
+            {
+                if (string.IsNullOrEmpty(part))
+                {
+                    // Asterisk
+                    regexString.Append(".*");
+                }
+                else
+                {
+                    regexString.Append(GetFileSearchRegexQuestionMarkOnly(part));
+                }
+            }
+
+            return regexString.ToString();
+        }
+        #region
 
         #region Child Classes
         private struct OverlayTableEntry
@@ -966,12 +1013,58 @@ namespace DotNet3dsToolkit.Core
 
         public string[] GetFiles(string path, string searchPattern, bool topDirectoryOnly)
         {
-            throw new NotImplementedException();
+            var fixedPath = FixPath(path);
+            switch (fixedPath.ToLower())
+            {
+                case "/data":
+                    throw new NotImplementedException();
+                case "/overlay":
+                case "/overlay7":
+                    var output = new List<string>();
+
+                    // Original files
+                    for (int i=0;i<Arm9OverlayTable.Count;i+=1)
+                    {
+                        var overlayPath = $"{fixedPath.ToLower()}/overlay_{i.ToString().PadLeft(4, '0')}.bin";
+                        if (!BlacklistedPaths.Contains(overlayPath))
+                        {
+                            output.Add(overlayPath);
+                        }
+                    }
+
+                    // Apply shadowed files
+                    foreach (var item in CurrentIOProvider.GetFiles(GetVirtualPath(fixedPath.ToLower()), "overlay_*.bin", true))
+                    {
+                        var overlayPath = "/" + FileSystem.MakeRelativePath(item, VirtualPath);
+                        if (!BlacklistedPaths.Contains(overlayPath) && !output.Contains(overlayPath))
+                        {
+                            output.Add(overlayPath);
+                        }
+                    }
+                    return output.ToArray();
+                default:
+                    throw new NotImplementedException();
+            }
         }
 
         public string[] GetDirectories(string path, bool topDirectoryOnly)
         {
-            throw new NotImplementedException();
+            switch (path.ToLower())
+            {
+                case "":
+                    var output = new List<string> { "/data", "/overlay", "/overlay7" };
+                    if (!topDirectoryOnly)
+                    {
+                        throw new NotImplementedException();
+                    }
+                    return output.ToArray();
+                case "overlay":
+                    return new string[] { };
+                case "overlay7":
+                    return new string[] { };
+                default:
+                    throw new NotImplementedException();
+            }
         }
 
         public byte[] ReadAllBytes(string filename)
