@@ -689,6 +689,8 @@ namespace DotNet3dsToolkit.Core
                     // File
                     var name = await ReadStringAsync(offset + 1, length, Encoding.ASCII);
                     subTables.Add(new FNTSubTable { Length = length, Name = name, ParentFileID = parentFileID });
+                    parentFileID += 1;
+                    offset += length + 1;
                 }
                 else
                 {
