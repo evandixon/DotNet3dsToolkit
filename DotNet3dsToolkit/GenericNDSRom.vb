@@ -111,14 +111,16 @@ Public Class GenericNDSRom
     ''' </summary>
     Public Property DeviceCapacity As Byte
         Get
-            Return Read(&H13)
+            Return Read(&H14)
         End Get
         Set(value As Byte)
-            Write(&H13, value)
+            Write(&H14, value)
         End Set
     End Property
 
-    'Reserved: 9 bytes of 0
+    'Reserved: 8 bytes of 0
+
+    'Region: 1 byte
 
     Public Property RomVersion As Byte
         Get
