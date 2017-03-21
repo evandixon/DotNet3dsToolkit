@@ -2,6 +2,8 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard1.5</TargetFramework>
+    <VersionPrefix>2.0.0</VersionPrefix>
+    <VersionSufix>dev</VersionSufix>
   </PropertyGroup>
 
   <ItemGroup>
