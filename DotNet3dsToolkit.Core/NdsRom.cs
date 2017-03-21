@@ -12,7 +12,7 @@ namespace DotNet3dsToolkit.Core
     /// <summary>
     /// A ROM for the Nintendo DS
     /// </summary>
-    public class NdsRom : GenericFile, IReportProgress, IIOProvider
+    public class NdsRom : GenericFile, IReportProgress, IIOProvider, IDisposable
     {
 
         #region Child Classes
@@ -465,6 +465,16 @@ namespace DotNet3dsToolkit.Core
         {
             await base.OpenFile(filename, provider);
 
+            // Clear virtual path if it exists
+            if (!string.IsNullOrEmpty(VirtualPath) && provider.DirectoryExists(VirtualPath))
+            {
+                provider.DeleteDirectory(VirtualPath);
+            }
+
+            VirtualPath = provider.GetTempDirectory();
+
+
+            // Load data
             Header = new NdsHeader();
             Header.CreateFile(await ReadAsync(0, 512));
 
@@ -533,6 +543,11 @@ namespace DotNet3dsToolkit.Core
         private List<FileAllocationEntry> FAT { get; set; }
 
         private FilenameTable FNT { get; set; }
+
+        /// <summary>
+        /// Path in the current I/O provider where temporary files are stored
+        /// </summary>
+        private string VirtualPath { get; set; }
 
         #endregion
 
@@ -744,6 +759,11 @@ namespace DotNet3dsToolkit.Core
         #endregion
 
         #region IIOProvider Implementation
+        /// <summary>
+        /// Keeps track of files that have been logically deleted
+        /// </summary>
+        private List<string> BlacklistedPaths => new List<string>();
+
         public string WorkingDirectory
         {
             get
@@ -794,6 +814,26 @@ namespace DotNet3dsToolkit.Core
         public void ResetWorkingDirectory()
         {
             WorkingDirectory = "/";
+        }
+
+        private string FixPath(string path)
+        {
+            var fixedPath = path.Replace('\\', '/');
+
+            // Apply working directory
+            if (fixedPath.StartsWith("/"))
+            {
+                return fixedPath;
+            }
+            else
+            {
+                return Path.Combine(WorkingDirectory, path);
+            }
+        }
+
+        private string GetVirtualPath(string path)
+        {
+            return Path.Combine(VirtualPath, path);
         }
 
         private FileAllocationEntry? GetFATEntry(string path, bool throwIfNotFound = true)
@@ -863,7 +903,7 @@ namespace DotNet3dsToolkit.Core
 
         public bool FileExists(string filename)
         {
-            return GetFATEntry(filename, false).HasValue;
+            return CurrentIOProvider.FileExists(GetVirtualPath(filename)) || GetFATEntry(filename, false).HasValue;
         }
 
         private bool DirectoryExists(string[] parts)
@@ -907,12 +947,21 @@ namespace DotNet3dsToolkit.Core
 
         public bool DirectoryExists(string path)
         {
-            return DirectoryExists(GetPathParts(path));
+            return !BlacklistedPaths.Contains(FixPath(path)) && (CurrentIOProvider.DirectoryExists(GetVirtualPath(path)) || DirectoryExists(GetPathParts(path)));
         }
 
         public void CreateDirectory(string path)
         {
-            throw new NotImplementedException();
+            var fixedPath = FixPath(path);
+            if (BlacklistedPaths.Contains(fixedPath))
+            {
+                BlacklistedPaths.Remove(fixedPath);
+            }
+
+            if (!DirectoryExists(fixedPath))
+            {
+                CurrentIOProvider.CreateDirectory(GetVirtualPath(fixedPath));
+            }
         }
 
         public string[] GetFiles(string path, string searchPattern, bool topDirectoryOnly)
@@ -927,63 +976,135 @@ namespace DotNet3dsToolkit.Core
 
         public byte[] ReadAllBytes(string filename)
         {
-            var entry = GetFATEntry(filename);
-            return Read(entry.Value.Offset, entry.Value.Length);
+            var fixedPath = FixPath(filename);
+            if (BlacklistedPaths.Contains(fixedPath))
+            {
+                throw new FileNotFoundException(Properties.Resources.ErrorRomFileNotFound, filename);
+            }
+            else
+            {
+                var virtualPath = GetVirtualPath(fixedPath);
+                if (CurrentIOProvider.FileExists(virtualPath))
+                {
+                    return CurrentIOProvider.ReadAllBytes(virtualPath);
+                }
+                else
+                {
+                    var entry = GetFATEntry(filename);
+                    return Read(entry.Value.Offset, entry.Value.Length);
+                }
+            }
         }
 
         public string ReadAllText(string filename)
         {
-            throw new NotImplementedException();
+            return Encoding.UTF8.GetString(ReadAllBytes(filename));
         }
 
         public void WriteAllBytes(string filename, byte[] data)
         {
-            throw new NotImplementedException();
+            var fixedPath = FixPath(filename);
+            if (BlacklistedPaths.Contains(fixedPath))
+            {
+                BlacklistedPaths.Remove(fixedPath);
+            }
+
+            CurrentIOProvider.WriteAllBytes(GetVirtualPath(filename), data);
         }
 
         public void WriteAllText(string filename, string data)
         {
-            throw new NotImplementedException();
+            WriteAllBytes(filename, Encoding.UTF8.GetBytes(data));
         }
 
         public void CopyFile(string sourceFilename, string destinationFilename)
         {
-            throw new NotImplementedException();
+            WriteAllBytes(destinationFilename, ReadAllBytes(sourceFilename));
         }
 
         public void DeleteFile(string filename)
         {
-            throw new NotImplementedException();
+            var fixedPath = FixPath(filename);
+            if (!BlacklistedPaths.Contains(fixedPath))
+            {
+                BlacklistedPaths.Add(fixedPath);
+            }
+
+            var virtualPath = GetVirtualPath(filename);
+            if (CurrentIOProvider.FileExists(virtualPath))
+            {
+                CurrentIOProvider.DeleteFile(virtualPath);
+            }
         }
 
         public void DeleteDirectory(string path)
         {
-            throw new NotImplementedException();
+            var fixedPath = FixPath(path);
+            if (!BlacklistedPaths.Contains(fixedPath))
+            {
+                BlacklistedPaths.Add(fixedPath);
+            }
+
+            var virtualPath = GetVirtualPath(path);
+            if (CurrentIOProvider.FileExists(virtualPath))
+            {
+                CurrentIOProvider.DeleteFile(virtualPath);
+            }
         }
 
         public string GetTempFilename()
         {
-            throw new NotImplementedException();
+            var path = "/temp/files/" + Guid.NewGuid().ToString();
+            WriteAllBytes(path, new byte[] { });
+            return path;
         }
 
         public string GetTempDirectory()
         {
-            throw new NotImplementedException();
+            var path = "/temp/dirs/" + Guid.NewGuid().ToString();
+            CreateDirectory(path);
+            return path;
+        }
+
+        private Stream OpenFile(string filename, FileAccess access)
+        {
+            var virtualPath = GetVirtualPath(filename);
+            if (!CurrentIOProvider.DirectoryExists(virtualPath))
+            {
+                CurrentIOProvider.CreateDirectory(virtualPath);
+            }
+            CurrentIOProvider.WriteAllBytes(virtualPath, ReadAllBytes(filename));
+
+            return File.Open(virtualPath, FileMode.OpenOrCreate, access);
         }
 
         public Stream OpenFile(string filename)
         {
-            throw new NotImplementedException();
+            return OpenFile(filename, FileAccess.ReadWrite);
         }
 
         public Stream OpenFileReadOnly(string filename)
         {
-            throw new NotImplementedException();
+            return OpenFile(filename, FileAccess.Read);
         }
 
         public Stream OpenFileWriteOnly(string filename)
         {
-            throw new NotImplementedException();
+            return OpenFile(filename, FileAccess.Write);
+        }
+        #endregion
+
+        #region IDisposable Implementation
+
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+
+            if (!string.IsNullOrEmpty(VirtualPath) && CurrentIOProvider.DirectoryExists(VirtualPath))
+            {
+                CurrentIOProvider.DeleteDirectory(VirtualPath);
+                VirtualPath = null;
+            }
         }
         #endregion
     }
