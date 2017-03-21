@@ -7,6 +7,7 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace DotNet3dsToolkit.Core
 {
@@ -60,7 +61,7 @@ namespace DotNet3dsToolkit.Core
 
             return regexString.ToString();
         }
-        #region
+        #endregion
 
         #region Child Classes
         private struct OverlayTableEntry
@@ -698,12 +699,56 @@ namespace DotNet3dsToolkit.Core
             }
             return subTables;
         }
-        #endregion
 
         private bool CheckNeedsArm9Footer()
         {
             return ReadUInt32(Header.Arm9RomOffset + Header.Arm9Size) == 0xDEC00621;
         }
+
+        /// <summary>
+        /// Extracts the files contained within the ROM.
+        /// </summary>
+        /// <param name="targetDir">Directory in the given I/O provider (<paramref name="provider"/>) to store the extracted files</param>
+        /// <param name="provider">The I/O provider to which the files should be written</param>
+        public async Task Unpack(string targetDir, IIOProvider provider)
+        {
+            // Get the files
+            var files = GetFiles("/", "*", false);
+
+            // Set progress
+            TotalFileCount = files.Length;
+            ExtractedFileCount = 0;
+
+            // Ensure directory exists
+            if (!provider.DirectoryExists(targetDir))
+            {
+                provider.CreateDirectory(targetDir);
+            }
+
+            // Extract the files
+            var extractionTasks = new List<Task>();
+            foreach (var item in files)
+            {
+                var currentItem = item;
+                var currentTask = Task.Run(() => 
+                {
+                    provider.WriteAllBytes(Path.Combine(targetDir, currentItem.TrimStart('/')), this.ReadAllBytes(currentItem));
+                    Interlocked.Increment(ref _extractedFileCount);
+                    ReportProgressChanged();
+                });
+
+                if (IsThreadSafe)
+                {
+                    extractionTasks.Add(currentTask);
+                }
+                else
+                {
+                    await currentTask;
+                }
+            }
+            await Task.WhenAll(extractionTasks);
+        }
+        #endregion
 
         #region IReportProgress Implementation
 
@@ -845,6 +890,7 @@ namespace DotNet3dsToolkit.Core
             {
                 switch (item)
                 {
+                    case "":
                     case ".":
                         break;
                     case "..":
@@ -1011,60 +1057,161 @@ namespace DotNet3dsToolkit.Core
             }
         }
 
+        private IEnumerable<string> GetFilesFromNode(string pathBase, FilenameTable currentTable, Regex searchPatternRegex, bool topDirectoryOnly)
+        {
+            var output = new List<string>();
+            foreach (var item in currentTable.Children.Where(x => !x.IsDirectory))
+            {
+                if (searchPatternRegex.IsMatch(item.Name))
+                {
+                    output.Add(pathBase + "/" + item.Name);
+                }
+            }
+            if (!topDirectoryOnly)
+            {
+                foreach (var item in currentTable.Children.Where(x => x.IsDirectory))
+                {
+                    output.AddRange(GetFilesFromNode(pathBase + "/" + item.Name, item, searchPatternRegex, topDirectoryOnly));
+                }
+            }
+            return output;
+        }
+
         public string[] GetFiles(string path, string searchPattern, bool topDirectoryOnly)
         {
-            var fixedPath = FixPath(path);
-            switch (fixedPath.ToLower())
+            var output = new List<string>();
+            var parts = GetPathParts(path);
+            var searchPatternRegex = new Regex(GetFileSearchRegex(searchPattern), RegexOptions.Compiled | RegexOptions.IgnoreCase);
+            switch (parts[0].ToLower())
             {
-                case "/data":
-                    throw new NotImplementedException();
-                case "/overlay":
-                case "/overlay7":
-                    var output = new List<string>();
-
+                case "":
+                    output.Add("/arm7.bin");
+                    output.Add("/arm9.bin");
+                    output.Add("/header.bin");
+                    output.Add("/banner.bin");
+                    output.Add("/y7.bin");
+                    output.Add("/y9.bin");
+                    return output.ToArray();
+                case "overlay":
+                case "overlay7":
                     // Original files
-                    for (int i=0;i<Arm9OverlayTable.Count;i+=1)
+                    for (int i = 0; i < Arm9OverlayTable.Count; i += 1)
                     {
-                        var overlayPath = $"{fixedPath.ToLower()}/overlay_{i.ToString().PadLeft(4, '0')}.bin";
-                        if (!BlacklistedPaths.Contains(overlayPath))
+                        var overlayPath = $"{parts[0].ToLower()}/overlay_{i.ToString().PadLeft(4, '0')}.bin";
+                        if (searchPatternRegex.IsMatch(Path.GetFileName(overlayPath)))
                         {
-                            output.Add(overlayPath);
+                            if (!BlacklistedPaths.Contains(overlayPath))
+                            {
+                                output.Add(overlayPath);
+                            }
                         }
                     }
 
                     // Apply shadowed files
-                    foreach (var item in CurrentIOProvider.GetFiles(GetVirtualPath(fixedPath.ToLower()), "overlay_*.bin", true))
+                    foreach (var item in CurrentIOProvider.GetFiles(GetVirtualPath(parts[0].ToLower()), "overlay_*.bin", true))
                     {
-                        var overlayPath = "/" + FileSystem.MakeRelativePath(item, VirtualPath);
-                        if (!BlacklistedPaths.Contains(overlayPath) && !output.Contains(overlayPath))
+                        if (searchPatternRegex.IsMatch(Path.GetFileName(item)))
                         {
-                            output.Add(overlayPath);
+                            var overlayPath = "/" + FileSystem.MakeRelativePath(item, VirtualPath);
+                            if (!BlacklistedPaths.Contains(overlayPath) && !output.Contains(overlayPath))
+                            {
+                                output.Add(overlayPath);
+                            }
                         }
                     }
                     return output.ToArray();
+                case "data":
+                    // Get the desired directory
+                    var currentEntry = FNT;
+                    var pathBase = new StringBuilder();
+                    pathBase.Append("/data");
+                    for (int i = 1; i < parts.Length; i += 1)
+                    {
+                        var partLower = parts[i].ToLower();
+                        currentEntry = currentEntry?.Children.Where(x => x.Name.ToLower() == partLower && x.IsDirectory).FirstOrDefault();
+                        if (currentEntry == null)
+                        {
+                            break;
+                        }
+                        else
+                        {
+                            pathBase.Append($"/{currentEntry.Name}");
+                        }
+                    }
+
+                    // Get the files
+                    if (currentEntry != null && currentEntry.IsDirectory)
+                    {
+                        output.AddRange(GetFilesFromNode(pathBase.ToString(), currentEntry, searchPatternRegex, topDirectoryOnly));
+                    }
+                    else
+                    {
+                        throw new FileNotFoundException(Properties.Resources.ErrorRomFileNotFound, path);
+                    }
+
+                    // Apply shadowed files
+                    var virtualPath = GetVirtualPath(path);
+                    if (CurrentIOProvider.DirectoryExists(virtualPath))
+                    {
+                        foreach (var item in CurrentIOProvider.GetFiles(virtualPath, searchPattern, topDirectoryOnly))
+                        {
+                            var filePath = "/" + FileSystem.MakeRelativePath(item, VirtualPath);
+                            if (!output.Contains(filePath))
+                            {
+                                output.Add(filePath);
+                            }
+                        }
+                    }
+                    break;
                 default:
-                    throw new NotImplementedException();
+                    throw new FileNotFoundException(Properties.Resources.ErrorRomFileNotFound, path);
             }
+            return output.ToArray();
         }
 
         public string[] GetDirectories(string path, bool topDirectoryOnly)
         {
-            switch (path.ToLower())
+            var output = new List<string>();
+            var parts = GetPathParts(path);
+            switch (parts[0].ToLower())
             {
                 case "":
-                    var output = new List<string> { "/data", "/overlay", "/overlay7" };
-                    if (!topDirectoryOnly)
-                    {
-                        throw new NotImplementedException();
-                    }
-                    return output.ToArray();
+                    output.Add("/data");
+                    output.Add("/overlay");
+                    output.Add("/overlay7");
+                    break;
                 case "overlay":
-                    return new string[] { };
                 case "overlay7":
-                    return new string[] { };
+                    // Overlays have no child directories
+                    break;
+                case "data":
+                    var currentEntry = FNT;
+                    for (int i = 1; i < parts.Length; i += 1)
+                    {
+                        var partLower = parts[i].ToLower();
+                        currentEntry = currentEntry?.Children.Where(x => x.Name.ToLower() == partLower && x.IsDirectory).FirstOrDefault();
+                    }
+
+                    if (currentEntry != null && currentEntry.IsDirectory)
+                    {
+                        output.AddRange(currentEntry.Children.Where(x => x.IsDirectory).Select(x => x.Name));
+                    }
+                    else
+                    {
+                        throw new FileNotFoundException(Properties.Resources.ErrorRomFileNotFound, path);
+                    }
+                    break;
                 default:
-                    throw new NotImplementedException();
+                    throw new FileNotFoundException(Properties.Resources.ErrorRomFileNotFound, path);
             }
+            if (!topDirectoryOnly)
+            {
+                foreach (var item in output)
+                {
+                    output.AddRange(GetDirectories(item, topDirectoryOnly));
+                }
+            }
+            return output.ToArray();
         }
 
         public byte[] ReadAllBytes(string filename)
