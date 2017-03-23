@@ -33,8 +33,24 @@ namespace DotNet3dsToolkit.Core.Tests
             using (var eosUS = new NdsRom())
             {
                 await eosUS.OpenFile(EosUsPath, Provider);
-                //await eosUS.Unpack("RawFiles-EOSUS", Provider);
+                await eosUS.Unpack("RawFiles-EOSUS", Provider);
             }
+
+            // Cleanup
+            Provider.DeleteDirectory("RawFiles-EOSUS");
         }
+
+        //[TestMethod]
+        //[TestCategory(TestCategory)]
+        //public async Task DataFileListing()
+        //{
+        //    // This test will be replaced with something else later.
+        //    // Right now, it just ensures there's no exceptions and that the EosUsPath exists
+        //    using (var eosUS = new NdsRom())
+        //    {
+        //        await eosUS.OpenFile(EosUsPath, Provider);
+        //        var files = eosUS.GetFiles("/data", "*", false);
+        //    }
+        //}
     }
 }

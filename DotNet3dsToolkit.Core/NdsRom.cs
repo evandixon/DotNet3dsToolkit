@@ -504,6 +504,7 @@ namespace DotNet3dsToolkit.Core
         public NdsRom()
         {
             EnableInMemoryLoad = true;
+            ResetWorkingDirectory();
         }
 
         public event EventHandler<ProgressReportedEventArgs> ProgressChanged;
@@ -734,7 +735,18 @@ namespace DotNet3dsToolkit.Core
                 var currentItem = item;
                 var currentTask = Task.Run(() => 
                 {
-                    provider.WriteAllBytes(Path.Combine(targetDir, currentItem.TrimStart('/')), this.ReadAllBytes(currentItem));
+                    var dest = Path.Combine(targetDir, currentItem.TrimStart('/'));
+                    if (!Directory.Exists(Path.GetDirectoryName(dest)))
+                    {
+                        lock (_unpackDirectoryCreateLock)
+                        {
+                            if (!Directory.Exists(Path.GetDirectoryName(dest)))
+                            {
+                                Directory.CreateDirectory(Path.GetDirectoryName(dest));
+                            }                                
+                        }                        
+                    }
+                    provider.WriteAllBytes(dest, this.ReadAllBytes(currentItem));
                     Interlocked.Increment(ref _extractedFileCount);
                     ReportProgressChanged();
                 });
@@ -750,6 +762,7 @@ namespace DotNet3dsToolkit.Core
             }
             await Task.WhenAll(extractionTasks);
         }
+        private object _unpackDirectoryCreateLock = new object();
         #endregion
 
         #region IReportProgress Implementation
@@ -1099,6 +1112,12 @@ namespace DotNet3dsToolkit.Core
                     output.Add("/banner.bin");
                     output.Add("/y7.bin");
                     output.Add("/y9.bin");
+                    if (!topDirectoryOnly)
+                    {
+                        output.AddRange(GetFiles("/overlay", searchPattern, topDirectoryOnly));
+                        output.AddRange(GetFiles("/overlay7", searchPattern, topDirectoryOnly));
+                        output.AddRange(GetFiles("/data", searchPattern, topDirectoryOnly));
+                    }
                     return output.ToArray();
                 case "overlay":
                 case "overlay7":
@@ -1116,17 +1135,21 @@ namespace DotNet3dsToolkit.Core
                     }
 
                     // Apply shadowed files
-                    foreach (var item in CurrentIOProvider.GetFiles(GetVirtualPath(parts[0].ToLower()), "overlay_*.bin", true))
+                    var virtualPath = GetVirtualPath(parts[0].ToLower());
+                    if (CurrentIOProvider.DirectoryExists(virtualPath))
                     {
-                        if (searchPatternRegex.IsMatch(Path.GetFileName(item)))
+                        foreach (var item in CurrentIOProvider.GetFiles(virtualPath, "overlay_*.bin", true))
                         {
-                            var overlayPath = "/" + FileSystem.MakeRelativePath(item, VirtualPath);
-                            if (!BlacklistedPaths.Contains(overlayPath) && !output.Contains(overlayPath))
+                            if (searchPatternRegex.IsMatch(Path.GetFileName(item)))
                             {
-                                output.Add(overlayPath);
+                                var overlayPath = "/" + FileSystem.MakeRelativePath(item, VirtualPath);
+                                if (!BlacklistedPaths.Contains(overlayPath) && !output.Contains(overlayPath))
+                                {
+                                    output.Add(overlayPath);
+                                }
                             }
                         }
-                    }
+                    }                    
                     return output.ToArray();
                 case "data":
                     // Get the desired directory
@@ -1158,10 +1181,10 @@ namespace DotNet3dsToolkit.Core
                     }
 
                     // Apply shadowed files
-                    var virtualPath = GetVirtualPath(path);
-                    if (CurrentIOProvider.DirectoryExists(virtualPath))
+                    var virtualPathData = GetVirtualPath(path);
+                    if (CurrentIOProvider.DirectoryExists(virtualPathData))
                     {
-                        foreach (var item in CurrentIOProvider.GetFiles(virtualPath, searchPattern, topDirectoryOnly))
+                        foreach (var item in CurrentIOProvider.GetFiles(virtualPathData, searchPattern, topDirectoryOnly))
                         {
                             var filePath = "/" + FileSystem.MakeRelativePath(item, VirtualPath);
                             if (!output.Contains(filePath))
