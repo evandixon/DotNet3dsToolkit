@@ -71,7 +71,7 @@ namespace DotNet3dsToolkit.Core.Properties {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to File at the given path in the ROM could not be found..
+        ///   Looks up a localized string similar to File at the given path in the ROM could not be found: &quot;{0}&quot;.
         /// </summary>
         internal static string ErrorRomFileNotFound {
             get {

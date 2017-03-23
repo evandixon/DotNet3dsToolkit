@@ -33,6 +33,7 @@ namespace DotNet3dsToolkit.Core.Tests
             using (var eosUS = new NdsRom())
             {
                 await eosUS.OpenFile(EosUsPath, Provider);
+                //await eosUS.Unpack("RawFiles-EOSUS", Provider);
             }
         }
     }

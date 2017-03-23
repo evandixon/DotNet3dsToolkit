@@ -121,7 +121,7 @@
     <value>Complete</value>
   </data>
   <data name="ErrorRomFileNotFound" xml:space="preserve">
-    <value>File at the given path in the ROM could not be found.</value>
+    <value>File at the given path in the ROM could not be found: "{0}"</value>
   </data>
   <data name="LoadingUnpacking" xml:space="preserve">
     <value>Unpacking...</value>

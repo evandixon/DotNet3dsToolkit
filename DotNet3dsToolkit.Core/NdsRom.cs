@@ -878,7 +878,7 @@ namespace DotNet3dsToolkit.Core
         }
         private string[] _workingDirectoryParts;
 
-        private string[] GetPathParts(string path)
+        protected string[] GetPathParts(string path)
         {
             var parts = new List<string>();
 
@@ -902,6 +902,10 @@ namespace DotNet3dsToolkit.Core
                         parts.Add(item);
                         break;
                 }
+            }
+            if (parts.Count == 0)
+            {
+                parts.Add(string.Empty);
             }
             return parts.ToArray();
         }
@@ -974,6 +978,8 @@ namespace DotNet3dsToolkit.Core
                     }
                 case "header.bin":
                     return new FileAllocationEntry(0, 0x200);
+                case "banner.bin":
+                    return new FileAllocationEntry(Header.IconOffset, Header.IconOffset + Header.IconLength);
                 case "y7.bin":
                     return new FileAllocationEntry(Header.FileArm7OverlayOffset, Header.FileArm7OverlayOffset + Header.FileArm7OverlaySize);
                 case "y9.bin":
@@ -983,7 +989,7 @@ namespace DotNet3dsToolkit.Core
             // Default
             if (throwIfNotFound)
             {
-                throw new FileNotFoundException(Properties.Resources.ErrorRomFileNotFound, path);
+                throw new FileNotFoundException(string.Format(Properties.Resources.ErrorRomFileNotFound, path), path);
             }
             else
             {
@@ -1148,7 +1154,7 @@ namespace DotNet3dsToolkit.Core
                     }
                     else
                     {
-                        throw new FileNotFoundException(Properties.Resources.ErrorRomFileNotFound, path);
+                        throw new FileNotFoundException(string.Format(Properties.Resources.ErrorRomFileNotFound, path), path);
                     }
 
                     // Apply shadowed files
@@ -1166,7 +1172,7 @@ namespace DotNet3dsToolkit.Core
                     }
                     break;
                 default:
-                    throw new FileNotFoundException(Properties.Resources.ErrorRomFileNotFound, path);
+                    throw new FileNotFoundException(string.Format(Properties.Resources.ErrorRomFileNotFound, path), path);
             }
             return output.ToArray();
         }
@@ -1200,11 +1206,11 @@ namespace DotNet3dsToolkit.Core
                     }
                     else
                     {
-                        throw new FileNotFoundException(Properties.Resources.ErrorRomFileNotFound, path);
+                        throw new FileNotFoundException(string.Format(Properties.Resources.ErrorRomFileNotFound, path), path);
                     }
                     break;
                 default:
-                    throw new FileNotFoundException(Properties.Resources.ErrorRomFileNotFound, path);
+                    throw new FileNotFoundException(string.Format(Properties.Resources.ErrorRomFileNotFound, path), path);
             }
             if (!topDirectoryOnly)
             {
@@ -1221,7 +1227,7 @@ namespace DotNet3dsToolkit.Core
             var fixedPath = FixPath(filename);
             if (BlacklistedPaths.Contains(fixedPath))
             {
-                throw new FileNotFoundException(Properties.Resources.ErrorRomFileNotFound, filename);
+                throw new FileNotFoundException(string.Format(Properties.Resources.ErrorRomFileNotFound, filename), filename);
             }
             else
             {
