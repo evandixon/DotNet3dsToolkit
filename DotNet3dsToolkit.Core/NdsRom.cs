@@ -626,7 +626,7 @@ namespace DotNet3dsToolkit.Core
             var output = new List<FileAllocationEntry>();
             for (int i = Header.FileAllocationTableOffset; i < Header.FileAllocationTableOffset + Header.FileAllocationTableSize; i += 8)
             {
-                output.Add(new FileAllocationEntry(await ReadInt32Async(i), await ReadInt32Async(i)));
+                output.Add(new FileAllocationEntry(await ReadInt32Async(i), await ReadInt32Async(i + 4)));
             }
             return output;
         }
@@ -733,7 +733,7 @@ namespace DotNet3dsToolkit.Core
             foreach (var item in files)
             {
                 var currentItem = item;
-                var currentTask = Task.Run(() => 
+                var currentTask = Task.Run(() =>
                 {
                     var dest = Path.Combine(targetDir, currentItem.TrimStart('/'));
                     if (!Directory.Exists(Path.GetDirectoryName(dest)))
@@ -743,8 +743,8 @@ namespace DotNet3dsToolkit.Core
                             if (!Directory.Exists(Path.GetDirectoryName(dest)))
                             {
                                 Directory.CreateDirectory(Path.GetDirectoryName(dest));
-                            }                                
-                        }                        
+                            }
+                        }
                     }
                     provider.WriteAllBytes(dest, this.ReadAllBytes(currentItem));
                     Interlocked.Increment(ref _extractedFileCount);
@@ -878,8 +878,11 @@ namespace DotNet3dsToolkit.Core
                 var path = new StringBuilder();
                 foreach (var item in _workingDirectoryParts)
                 {
-                    path.Append("/");
-                    path.Append(item);
+                    if (!string.IsNullOrEmpty(item))
+                    {
+                        path.Append("/");
+                        path.Append(item);
+                    }
                 }
                 path.Append("/");
                 return path.ToString();
@@ -896,12 +899,12 @@ namespace DotNet3dsToolkit.Core
             var parts = new List<string>();
 
             path = path.Replace('\\', '/');
-            if (!path.StartsWith("/"))
+            if (!path.StartsWith("/") && !(_workingDirectoryParts.Length == 1 && _workingDirectoryParts[0] == string.Empty))
             {
                 parts.AddRange(_workingDirectoryParts);
             }
 
-            foreach (var item in path.Split('/'))
+            foreach (var item in path.TrimStart('/').Split('/'))
             {
                 switch (item)
                 {
@@ -945,7 +948,7 @@ namespace DotNet3dsToolkit.Core
 
         private string GetVirtualPath(string path)
         {
-            return Path.Combine(VirtualPath, path);
+            return Path.Combine(VirtualPath, path.TrimStart('/'));
         }
 
         private FileAllocationEntry? GetFATEntry(string path, bool throwIfNotFound = true)
@@ -957,9 +960,9 @@ namespace DotNet3dsToolkit.Core
                     var currentEntry = FNT;
                     for (int i = 1; i < parts.Length; i += 1)
                     {
-                        currentEntry = currentEntry?.Children.Where(x => x.Name.ToLower() == parts[i]).FirstOrDefault();
+                        currentEntry = currentEntry?.Children.Where(x => x.Name.ToLower() == parts[i].ToLower()).FirstOrDefault();
                     }
-                    if (!currentEntry.IsDirectory)
+                    if (currentEntry != null && !currentEntry.IsDirectory)
                     {
                         return FAT[currentEntry.FileIndex];
                     }
@@ -1120,7 +1123,6 @@ namespace DotNet3dsToolkit.Core
                     }
                     return output.ToArray();
                 case "overlay":
-                case "overlay7":
                     // Original files
                     for (int i = 0; i < Arm9OverlayTable.Count; i += 1)
                     {
@@ -1149,7 +1151,38 @@ namespace DotNet3dsToolkit.Core
                                 }
                             }
                         }
-                    }                    
+                    }
+                    return output.ToArray();
+                case "overlay7":
+                    // Original files
+                    for (int i = 0; i < Arm7OverlayTable.Count; i += 1)
+                    {
+                        var overlayPath = $"{parts[0].ToLower()}/overlay_{i.ToString().PadLeft(4, '0')}.bin";
+                        if (searchPatternRegex.IsMatch(Path.GetFileName(overlayPath)))
+                        {
+                            if (!BlacklistedPaths.Contains(overlayPath))
+                            {
+                                output.Add(overlayPath);
+                            }
+                        }
+                    }
+
+                    // Apply shadowed files
+                    var virtualPath7 = GetVirtualPath(parts[0].ToLower());
+                    if (CurrentIOProvider.DirectoryExists(virtualPath7))
+                    {
+                        foreach (var item in CurrentIOProvider.GetFiles(virtualPath7, "overlay_*.bin", true))
+                        {
+                            if (searchPatternRegex.IsMatch(Path.GetFileName(item)))
+                            {
+                                var overlayPath = "/" + FileSystem.MakeRelativePath(item, VirtualPath);
+                                if (!BlacklistedPaths.Contains(overlayPath) && !output.Contains(overlayPath))
+                                {
+                                    output.Add(overlayPath);
+                                }
+                            }
+                        }
+                    }
                     return output.ToArray();
                 case "data":
                     // Get the desired directory

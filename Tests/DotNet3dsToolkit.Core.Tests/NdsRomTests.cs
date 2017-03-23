@@ -10,7 +10,8 @@ namespace DotNet3dsToolkit.Core.Tests
     public class NdsRomTests
     {
         public const string TestCategory = "NDS ROM";
-        public const string EosUsPath = @"Resources\eosu.nds";
+        public const string EosUsPath = @"C:\Users\evanl\Git\DotNet3dsToolkit\Tests\DotNet3dsToolkit.Core.Tests\bin\Debug\netcoreapp1.1\Resources\eosu.nds";
+        public const string EosUsUnpackDir = @"C:\Users\evanl\Git\DotNet3dsToolkit\Tests\DotNet3dsToolkit.Core.Tests\bin\Debug\netcoreapp1.1\RawFiles-EOSUS";
 
         private IIOProvider Provider { get; set; }
 
@@ -33,11 +34,11 @@ namespace DotNet3dsToolkit.Core.Tests
             using (var eosUS = new NdsRom())
             {
                 await eosUS.OpenFile(EosUsPath, Provider);
-                await eosUS.Unpack("RawFiles-EOSUS", Provider);
+                await eosUS.Unpack(EosUsUnpackDir, Provider);
             }
 
             // Cleanup
-            Provider.DeleteDirectory("RawFiles-EOSUS");
+            Provider.DeleteDirectory(EosUsUnpackDir);
         }
 
         //[TestMethod]
