@@ -135,6 +135,10 @@ namespace DotNet3dsToolkit.Core
             public string Name { get; set; }
             public UInt16 SubDirectoryID { get; set; } // Only used for directories
             public UInt16 ParentFileID { get; set; }
+            public override string ToString()
+            {
+                return $"Length: {Length}, Sub-Directory ID: {SubDirectoryID}, Parent File ID: {ParentFileID}, Name: {Name}";
+            }
         }
 
         private class FilenameTable
@@ -638,7 +642,7 @@ namespace DotNet3dsToolkit.Core
             var rootDirectories = new List<DirectoryMainTable>();
 
             // - In the root directory only, ParentDir means the number of directories
-            for (int i = 1; i <= root.ParentDir; i += 1)
+            for (int i = 1; i < root.ParentDir; i += 1)
             {
                 var offset = Header.FilenameTableOffset + i * 8;
                 rootDirectories.Add(new DirectoryMainTable(await ReadAsync(offset, 8)));
@@ -660,7 +664,7 @@ namespace DotNet3dsToolkit.Core
                 if (item.Length > 128)
                 {
                     // Directory
-                    await BuildFNT(child, directories[item.SubDirectoryID & 0x0FFF - 1], directories);
+                    await BuildFNT(child, directories[(item.SubDirectoryID & 0x0FFF) - 1], directories);
                 }
                 else
                 {
@@ -680,10 +684,10 @@ namespace DotNet3dsToolkit.Core
                 if (length > 128)
                 {
                     // Directory
-                    var name = await ReadStringAsync(offset + 1, length - 128, Encoding.ASCII);
-                    var subDirID = await ReadUInt16Async(offset + 1 + length - 128);
+                    var name = await ReadStringAsync(offset + 1, length & 0x7F, Encoding.ASCII);
+                    var subDirID = await ReadUInt16Async(offset + 1 + (length & 0x7F));
                     subTables.Add(new FNTSubTable { Length = length, Name = name, SubDirectoryID = subDirID });
-                    offset += length - 128 + 1 + 2;
+                    offset += (length & 0x7F) + 1 + 2;
                 }
                 else if (length < 128)
                 {
@@ -1126,7 +1130,7 @@ namespace DotNet3dsToolkit.Core
                     // Original files
                     for (int i = 0; i < Arm9OverlayTable.Count; i += 1)
                     {
-                        var overlayPath = $"{parts[0].ToLower()}/overlay_{i.ToString().PadLeft(4, '0')}.bin";
+                        var overlayPath = $"/overlay/overlay_{i.ToString().PadLeft(4, '0')}.bin";
                         if (searchPatternRegex.IsMatch(Path.GetFileName(overlayPath)))
                         {
                             if (!BlacklistedPaths.Contains(overlayPath))
@@ -1157,7 +1161,7 @@ namespace DotNet3dsToolkit.Core
                     // Original files
                     for (int i = 0; i < Arm7OverlayTable.Count; i += 1)
                     {
-                        var overlayPath = $"{parts[0].ToLower()}/overlay_{i.ToString().PadLeft(4, '0')}.bin";
+                        var overlayPath = $"/overlay7/overlay_{i.ToString().PadLeft(4, '0')}.bin";
                         if (searchPatternRegex.IsMatch(Path.GetFileName(overlayPath)))
                         {
                             if (!BlacklistedPaths.Contains(overlayPath))
