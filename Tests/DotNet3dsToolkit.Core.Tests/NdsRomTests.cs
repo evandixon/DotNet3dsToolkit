@@ -10,9 +10,9 @@ namespace DotNet3dsToolkit.Core.Tests
     public class NdsRomTests
     {
         public const string TestCategory = "NDS ROM";
-        public const string EosUsPath = @"Resources\eosu.nds";
+        public const string EosUsPath = @"Resources/eosu.nds";
         public const string EosUsUnpackDir = @"RawFiles-EOSUS";
-        public const string BrtUsPath = @"Resources\brtu.nds";
+        public const string BrtUsPath = @"Resources/brtu.nds";
         public const string BrtUsUnpackDir = @"RawFiles-BRTUS";
 
         private IIOProvider Provider { get; set; }
@@ -22,7 +22,11 @@ namespace DotNet3dsToolkit.Core.Tests
         {
             if (!File.Exists(EosUsPath))
             {
-                Assert.Inconclusive("Missing test ROM: Pokémon Mystery Dungeon: Explorers of Sky (US).  Place it at the following path: " + EosUsPath);
+                Assert.Fail("Missing test ROM: Pokémon Mystery Dungeon: Explorers of Sky (US).  Place it at the following path: " + EosUsPath);
+            }
+            if (!File.Exists(BrtUsPath))
+            {
+                Assert.Fail("Missing test ROM: Pokémon Mystery Dungeon: Blue Rescue Team (US).  Place it at the following path: " + BrtUsPath);
             }
             Provider = new PhysicalIOProvider();
         }
