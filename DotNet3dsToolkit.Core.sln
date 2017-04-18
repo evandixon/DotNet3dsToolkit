@@ -9,6 +9,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{C627CDFB
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DotNet3dsToolkit.Core.Tests", "Tests\DotNet3dsToolkit.Core.Tests\DotNet3dsToolkit.Core.Tests.csproj", "{95D6113C-73AC-4B54-80CB-853E10C518FA}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ToolkitConsoleCore", "ToolkitConsoleCore\ToolkitConsoleCore.csproj", "{718278F6-4390-469C-8910-5E97394C6F47}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -23,6 +25,10 @@ Global
 		{95D6113C-73AC-4B54-80CB-853E10C518FA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{95D6113C-73AC-4B54-80CB-853E10C518FA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{95D6113C-73AC-4B54-80CB-853E10C518FA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{718278F6-4390-469C-8910-5E97394C6F47}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{718278F6-4390-469C-8910-5E97394C6F47}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{718278F6-4390-469C-8910-5E97394C6F47}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{718278F6-4390-469C-8910-5E97394C6F47}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
