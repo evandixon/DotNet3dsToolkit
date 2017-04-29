@@ -64,6 +64,10 @@ namespace DotNet3dsToolkit.Core
         #endregion
 
         #region Child Classes
+
+        /// <summary>
+        /// A single entry in an overlay table
+        /// </summary>
         private struct OverlayTableEntry
         {
             public OverlayTableEntry(byte[] rawData)
@@ -102,6 +106,9 @@ namespace DotNet3dsToolkit.Core
 
         }
 
+        /// <summary>
+        /// A single entry in the FAT
+        /// </summary>
         private struct FileAllocationEntry
         {
             public FileAllocationEntry(int offset, int endAddress)
@@ -163,6 +170,18 @@ namespace DotNet3dsToolkit.Core
             }
         }
 
+        /// <summary>
+        /// Represents an entry in the overlay table, in addition to the overlay itself
+        /// </summary>
+        private class Overlay
+        {
+            public OverlayTableEntry TableEntry { get; set; }
+            public byte[] Data { get; set; }
+        }
+
+        /// <summary>
+        /// The NDS header
+        /// </summary>
         public class NdsHeader : GenericFile
         {
 
@@ -502,13 +521,13 @@ namespace DotNet3dsToolkit.Core
             // 16Ch    4     Reserved (zero filled) (transferred, and stored, but not used)
             // 170h    90h   Reserved (zero filled) (transferred, but not stored in RAM)
 
-        }
+        }        
         #endregion
 
         public NdsRom()
         {
             EnableInMemoryLoad = true;
-            ResetWorkingDirectory();
+            (this as IIOProvider).ResetWorkingDirectory();
         }
 
         public event EventHandler<ProgressReportedEventArgs> ProgressChanged;
@@ -584,6 +603,31 @@ namespace DotNet3dsToolkit.Core
             // Wait for all loading
 
             await Task.WhenAll(loadingTasks);
+        }
+
+        public override async Task Save(string filename, IIOProvider provider)
+        {
+            // Read header-related files
+            var header = new NdsHeader();
+            await header.OpenFile("/header.bin", this);
+
+            // Identify ARM9 overlays
+
+            // Identify ARM7 overlays
+
+            // Identify files to add to new archive
+
+            // Determine total file size
+
+            // Set ROM size based on files
+
+            // Build FNT and FAT
+
+            // - Place overlay files
+
+            // - Place nitrofs files
+
+            await base.Save(filename, provider);
         }
 
         #region Properties
@@ -720,7 +764,7 @@ namespace DotNet3dsToolkit.Core
         public async Task Unpack(string targetDir, IIOProvider provider)
         {
             // Get the files
-            var files = GetFiles("/", "*", false);
+            var files = (this as IIOProvider).GetFiles("/", "*", false);
 
             // Set progress
             TotalFileCount = files.Length;
@@ -750,7 +794,7 @@ namespace DotNet3dsToolkit.Core
                             }
                         }
                     }
-                    provider.WriteAllBytes(dest, this.ReadAllBytes(currentItem));
+                    provider.WriteAllBytes(dest, (this as IIOProvider).ReadAllBytes(currentItem));
                     Interlocked.Increment(ref _extractedFileCount);
                     ReportProgressChanged();
                 });
@@ -875,7 +919,7 @@ namespace DotNet3dsToolkit.Core
         /// </summary>
         private List<string> BlacklistedPaths => new List<string>();
 
-        public string WorkingDirectory
+        string IIOProvider.WorkingDirectory
         {
             get
             {
@@ -930,9 +974,9 @@ namespace DotNet3dsToolkit.Core
             return parts.ToArray();
         }
 
-        public void ResetWorkingDirectory()
+        void IIOProvider.ResetWorkingDirectory()
         {
-            WorkingDirectory = "/";
+            (this as IIOProvider).WorkingDirectory = "/";
         }
 
         private string FixPath(string path)
@@ -946,7 +990,7 @@ namespace DotNet3dsToolkit.Core
             }
             else
             {
-                return Path.Combine(WorkingDirectory, path);
+                return Path.Combine((this as IIOProvider).WorkingDirectory, path);
             }
         }
 
@@ -1017,12 +1061,12 @@ namespace DotNet3dsToolkit.Core
             }
         }
 
-        public long GetFileLength(string filename)
+        long IIOProvider.GetFileLength(string filename)
         {
             return GetFATEntry(filename).Value.Length;
         }
 
-        public bool FileExists(string filename)
+        bool IIOProvider.FileExists(string filename)
         {
             return CurrentIOProvider.FileExists(GetVirtualPath(filename)) || GetFATEntry(filename, false).HasValue;
         }
@@ -1066,12 +1110,12 @@ namespace DotNet3dsToolkit.Core
             }
         }
 
-        public bool DirectoryExists(string path)
+        bool IIOProvider.DirectoryExists(string path)
         {
             return !BlacklistedPaths.Contains(FixPath(path)) && (CurrentIOProvider.DirectoryExists(GetVirtualPath(path)) || DirectoryExists(GetPathParts(path)));
         }
 
-        public void CreateDirectory(string path)
+        void IIOProvider.CreateDirectory(string path)
         {
             var fixedPath = FixPath(path);
             if (BlacklistedPaths.Contains(fixedPath))
@@ -1079,7 +1123,7 @@ namespace DotNet3dsToolkit.Core
                 BlacklistedPaths.Remove(fixedPath);
             }
 
-            if (!DirectoryExists(fixedPath))
+            if (!(this as IIOProvider).DirectoryExists(fixedPath))
             {
                 CurrentIOProvider.CreateDirectory(GetVirtualPath(fixedPath));
             }
@@ -1105,7 +1149,7 @@ namespace DotNet3dsToolkit.Core
             return output;
         }
 
-        public string[] GetFiles(string path, string searchPattern, bool topDirectoryOnly)
+        string[] IIOProvider.GetFiles(string path, string searchPattern, bool topDirectoryOnly)
         {
             var output = new List<string>();
             var parts = GetPathParts(path);
@@ -1121,9 +1165,9 @@ namespace DotNet3dsToolkit.Core
                     output.Add("/y9.bin");
                     if (!topDirectoryOnly)
                     {
-                        output.AddRange(GetFiles("/overlay", searchPattern, topDirectoryOnly));
-                        output.AddRange(GetFiles("/overlay7", searchPattern, topDirectoryOnly));
-                        output.AddRange(GetFiles("/data", searchPattern, topDirectoryOnly));
+                        output.AddRange((this as IIOProvider).GetFiles("/overlay", searchPattern, topDirectoryOnly));
+                        output.AddRange((this as IIOProvider).GetFiles("/overlay7", searchPattern, topDirectoryOnly));
+                        output.AddRange((this as IIOProvider).GetFiles("/data", searchPattern, topDirectoryOnly));
                     }
                     return output.ToArray();
                 case "overlay":
@@ -1237,7 +1281,7 @@ namespace DotNet3dsToolkit.Core
             return output.ToArray();
         }
 
-        public string[] GetDirectories(string path, bool topDirectoryOnly)
+        string[] IIOProvider.GetDirectories(string path, bool topDirectoryOnly)
         {
             var output = new List<string>();
             var parts = GetPathParts(path);
@@ -1276,13 +1320,13 @@ namespace DotNet3dsToolkit.Core
             {
                 foreach (var item in output)
                 {
-                    output.AddRange(GetDirectories(item, topDirectoryOnly));
+                    output.AddRange((this as IIOProvider).GetDirectories(item, topDirectoryOnly));
                 }
             }
             return output.ToArray();
         }
 
-        public byte[] ReadAllBytes(string filename)
+        byte[] IIOProvider.ReadAllBytes(string filename)
         {
             var fixedPath = FixPath(filename);
             if (BlacklistedPaths.Contains(fixedPath))
@@ -1304,12 +1348,12 @@ namespace DotNet3dsToolkit.Core
             }
         }
 
-        public string ReadAllText(string filename)
+        string IIOProvider.ReadAllText(string filename)
         {
-            return Encoding.UTF8.GetString(ReadAllBytes(filename));
+            return Encoding.UTF8.GetString((this as IIOProvider).ReadAllBytes(filename));
         }
 
-        public void WriteAllBytes(string filename, byte[] data)
+        void IIOProvider.WriteAllBytes(string filename, byte[] data)
         {
             var fixedPath = FixPath(filename);
             if (BlacklistedPaths.Contains(fixedPath))
@@ -1320,17 +1364,17 @@ namespace DotNet3dsToolkit.Core
             CurrentIOProvider.WriteAllBytes(GetVirtualPath(filename), data);
         }
 
-        public void WriteAllText(string filename, string data)
+        void IIOProvider.WriteAllText(string filename, string data)
         {
-            WriteAllBytes(filename, Encoding.UTF8.GetBytes(data));
+            (this as IIOProvider).WriteAllBytes(filename, Encoding.UTF8.GetBytes(data));
         }
 
-        public void CopyFile(string sourceFilename, string destinationFilename)
+        void IIOProvider.CopyFile(string sourceFilename, string destinationFilename)
         {
-            WriteAllBytes(destinationFilename, ReadAllBytes(sourceFilename));
+            (this as IIOProvider).WriteAllBytes(destinationFilename, (this as IIOProvider).ReadAllBytes(sourceFilename));
         }
 
-        public void DeleteFile(string filename)
+        void IIOProvider.DeleteFile(string filename)
         {
             var fixedPath = FixPath(filename);
             if (!BlacklistedPaths.Contains(fixedPath))
@@ -1345,7 +1389,7 @@ namespace DotNet3dsToolkit.Core
             }
         }
 
-        public void DeleteDirectory(string path)
+        void IIOProvider.DeleteDirectory(string path)
         {
             var fixedPath = FixPath(path);
             if (!BlacklistedPaths.Contains(fixedPath))
@@ -1360,17 +1404,17 @@ namespace DotNet3dsToolkit.Core
             }
         }
 
-        public string GetTempFilename()
+        string IIOProvider.GetTempFilename()
         {
             var path = "/temp/files/" + Guid.NewGuid().ToString();
-            WriteAllBytes(path, new byte[] { });
+            (this as IIOProvider).WriteAllBytes(path, new byte[] { });
             return path;
         }
 
-        public string GetTempDirectory()
+        string IIOProvider.GetTempDirectory()
         {
             var path = "/temp/dirs/" + Guid.NewGuid().ToString();
-            CreateDirectory(path);
+            (this as IIOProvider).CreateDirectory(path);
             return path;
         }
 
@@ -1381,22 +1425,22 @@ namespace DotNet3dsToolkit.Core
             {
                 CurrentIOProvider.CreateDirectory(virtualPath);
             }
-            CurrentIOProvider.WriteAllBytes(virtualPath, ReadAllBytes(filename));
+            CurrentIOProvider.WriteAllBytes(virtualPath, (this as IIOProvider).ReadAllBytes(filename));
 
             return File.Open(virtualPath, FileMode.OpenOrCreate, access);
         }
 
-        public Stream OpenFile(string filename)
+        Stream IIOProvider.OpenFile(string filename)
         {
             return OpenFile(filename, FileAccess.ReadWrite);
         }
 
-        public Stream OpenFileReadOnly(string filename)
+        Stream IIOProvider.OpenFileReadOnly(string filename)
         {
             return OpenFile(filename, FileAccess.Read);
         }
 
-        public Stream OpenFileWriteOnly(string filename)
+        Stream IIOProvider.OpenFileWriteOnly(string filename)
         {
             return OpenFile(filename, FileAccess.Write);
         }

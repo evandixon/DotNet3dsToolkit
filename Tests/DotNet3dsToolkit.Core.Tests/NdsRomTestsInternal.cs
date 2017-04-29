@@ -1,4 +1,5 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+using SkyEditor.Core.IO;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -55,7 +56,7 @@ namespace DotNet3dsToolkit.Core.Tests
         public void GetPathParts_OverlayX_RelativeToOverlay()
         {
             var testRom = new TestNdsRom();
-            testRom.WorkingDirectory = "/overlay";
+            (testRom as IIOProvider).WorkingDirectory = "/overlay";
             var parts = testRom.GetPathParts("overlay_0000.bin");
             Assert.AreEqual(2, parts.Length);
             Assert.AreEqual("overlay", parts[0]);
