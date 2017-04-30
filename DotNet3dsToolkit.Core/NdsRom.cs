@@ -607,6 +607,7 @@ namespace DotNet3dsToolkit.Core
 
         public override async Task Save(string filename, IIOProvider provider)
         {
+            var files = new Dictionary<int, byte[]>();
             // Read header-related files
             var header = new NdsHeader();
             await header.OpenFile("/header.bin", this);
@@ -1174,7 +1175,7 @@ namespace DotNet3dsToolkit.Core
                     // Original files
                     for (int i = 0; i < Arm9OverlayTable.Count; i += 1)
                     {
-                        var overlayPath = $"/overlay/overlay_{i.ToString().PadLeft(4, '0')}.bin";
+                        var overlayPath = $"/overlay/overlay_{Arm9OverlayTable[i].FileID.ToString().PadLeft(4, '0')}.bin";
                         if (searchPatternRegex.IsMatch(Path.GetFileName(overlayPath)))
                         {
                             if (!BlacklistedPaths.Contains(overlayPath))
@@ -1205,7 +1206,7 @@ namespace DotNet3dsToolkit.Core
                     // Original files
                     for (int i = 0; i < Arm7OverlayTable.Count; i += 1)
                     {
-                        var overlayPath = $"/overlay7/overlay_{i.ToString().PadLeft(4, '0')}.bin";
+                        var overlayPath = $"/overlay7/overlay_{Arm7OverlayTable[i].FileID.ToString().PadLeft(4, '0')}.bin";
                         if (searchPatternRegex.IsMatch(Path.GetFileName(overlayPath)))
                         {
                             if (!BlacklistedPaths.Contains(overlayPath))
