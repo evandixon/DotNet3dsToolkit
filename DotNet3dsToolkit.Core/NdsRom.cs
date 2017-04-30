@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Collections.Concurrent;
 
 namespace DotNet3dsToolkit.Core
 {
@@ -70,15 +71,15 @@ namespace DotNet3dsToolkit.Core
         /// </summary>
         private struct OverlayTableEntry
         {
-            public OverlayTableEntry(byte[] rawData)
+            public OverlayTableEntry(byte[] rawData, int offset = 0)
             {
-                OverlayID = BitConverter.ToInt32(rawData, 0);
-                RamAddress = BitConverter.ToInt32(rawData, 4);
-                RamSize = BitConverter.ToInt32(rawData, 8);
-                BssSize = BitConverter.ToInt32(rawData, 0xC);
-                StaticInitStart = BitConverter.ToInt32(rawData, 0x10);
-                StaticInitEnd = BitConverter.ToInt32(rawData, 0x14);
-                FileID = BitConverter.ToInt32(rawData, 0x18);
+                OverlayID = BitConverter.ToInt32(rawData, offset + 0);
+                RamAddress = BitConverter.ToInt32(rawData, offset + 4);
+                RamSize = BitConverter.ToInt32(rawData, offset + 8);
+                BssSize = BitConverter.ToInt32(rawData, offset + 0xC);
+                StaticInitStart = BitConverter.ToInt32(rawData, offset + 0x10);
+                StaticInitEnd = BitConverter.ToInt32(rawData, offset + 0x14);
+                FileID = BitConverter.ToInt32(rawData, offset + 0x18);
             }
 
             public int OverlayID { get; set; }
@@ -606,27 +607,63 @@ namespace DotNet3dsToolkit.Core
         }
 
         public override async Task Save(string filename, IIOProvider provider)
-        {
-            var files = new Dictionary<int, byte[]>();
+        {            
+            var filesAlloc = new ConcurrentDictionary<int, byte[]>(); // Allocated files (including overlays)
+            var fileNames = new ConcurrentDictionary<int, string>(); // File names of nitrofs (excluding overlays, so not all entries in filesAlloc have a name)
+            var overlay9 = new ConcurrentDictionary<int, OverlayTableEntry>(); // Key = index in table, value = the entry
+            var overlay7 = new ConcurrentDictionary<int, OverlayTableEntry>(); // Key = index in table, value = the entry
+            
             // Read header-related files
             var header = new NdsHeader();
             await header.OpenFile("/header.bin", this);
 
             // Identify ARM9 overlays
+            var overlay9Raw = provider.ReadAllBytes("/y9.bin");
+            var arm9For = new AsyncFor();
+            arm9For.RunSynchronously = !this.IsThreadSafe;
+            await arm9For.RunFor(i =>
+            {
+                var entry = new OverlayTableEntry(overlay9Raw, i);
+                var overlayPath = $"/overlay/overlay_{entry.FileID.ToString().PadLeft(4, '0')}.bin";
+                if ((this as IIOProvider).FileExists(overlayPath))
+                {
+                    filesAlloc[entry.FileID] = (this as IIOProvider).ReadAllBytes(overlayPath);
+                }
+                overlay9[i / 32] = entry;
+            }, 0, overlay9Raw.Length, 32);
 
             // Identify ARM7 overlays
+            var overlay7Raw = provider.ReadAllBytes("/y7.bin");
+            var arm7For = new AsyncFor();
+            arm9For.RunSynchronously = !this.IsThreadSafe;
+            await arm7For.RunFor(i =>
+            {
+                var entry = new OverlayTableEntry(overlay7Raw, i);
+                var overlayPath = $"/overlay7/overlay_{entry.FileID.ToString().PadLeft(4, '0')}.bin";
+                if ((this as IIOProvider).FileExists(overlayPath))
+                {
+                    filesAlloc[entry.FileID] = (this as IIOProvider).ReadAllBytes(overlayPath);
+                }
+                overlay7[i / 32] = entry;
+            }, 0, overlay7Raw.Length, 32);
 
             // Identify files to add to new archive
+            throw new NotImplementedException();
 
             // Determine total file size
+            throw new NotImplementedException();
 
             // Set ROM size based on files
+            throw new NotImplementedException();
 
             // Build FNT and FAT
+            throw new NotImplementedException();
 
             // - Place overlay files
+            throw new NotImplementedException();
 
             // - Place nitrofs files
+            throw new NotImplementedException();
 
             await base.Save(filename, provider);
         }
