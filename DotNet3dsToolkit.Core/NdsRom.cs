@@ -522,7 +522,7 @@ namespace DotNet3dsToolkit.Core
             // 16Ch    4     Reserved (zero filled) (transferred, and stored, but not used)
             // 170h    90h   Reserved (zero filled) (transferred, but not stored in RAM)
 
-        }        
+        }
         #endregion
 
         public NdsRom()
@@ -607,20 +607,24 @@ namespace DotNet3dsToolkit.Core
         }
 
         public override async Task Save(string filename, IIOProvider provider)
-        {            
+        {
             var filesAlloc = new ConcurrentDictionary<int, byte[]>(); // Allocated files (including overlays)
-            var fileNames = new ConcurrentDictionary<int, string>(); // File names of nitrofs (excluding overlays, so not all entries in filesAlloc have a name)
+            var fileNames = new ConcurrentDictionary<string, int>(); // File names of nitrofs (excluding overlays, so not all entries in filesAlloc have a name)
             var overlay9 = new ConcurrentDictionary<int, OverlayTableEntry>(); // Key = index in table, value = the entry
             var overlay7 = new ConcurrentDictionary<int, OverlayTableEntry>(); // Key = index in table, value = the entry
-            
+
             // Read header-related files
             var header = new NdsHeader();
             await header.OpenFile("/header.bin", this);
 
+            var banner = (this as IIOProvider).ReadAllBytes("/banner.bin");
+            var arm9Bin = (this as IIOProvider).ReadAllBytes("/arm9.bin");
+            var arm7Bin = (this as IIOProvider).ReadAllBytes("/arm7.bin");
+
             // Identify ARM9 overlays
-            var overlay9Raw = provider.ReadAllBytes("/y9.bin");
+            var overlay9Raw = (this as IIOProvider).ReadAllBytes("/y9.bin");
             var arm9For = new AsyncFor();
-            arm9For.RunSynchronously = !this.IsThreadSafe;
+            arm9For.RunSynchronously = !IsThreadSafe;
             await arm9For.RunFor(i =>
             {
                 var entry = new OverlayTableEntry(overlay9Raw, i);
@@ -630,10 +634,10 @@ namespace DotNet3dsToolkit.Core
                     filesAlloc[entry.FileID] = (this as IIOProvider).ReadAllBytes(overlayPath);
                 }
                 overlay9[i / 32] = entry;
-            }, 0, overlay9Raw.Length, 32);
+            }, 0, overlay9Raw.Length - 1, 32);
 
             // Identify ARM7 overlays
-            var overlay7Raw = provider.ReadAllBytes("/y7.bin");
+            var overlay7Raw = (this as IIOProvider).ReadAllBytes("/y7.bin");
             var arm7For = new AsyncFor();
             arm9For.RunSynchronously = !this.IsThreadSafe;
             await arm7For.RunFor(i =>
@@ -642,28 +646,85 @@ namespace DotNet3dsToolkit.Core
                 var overlayPath = $"/overlay7/overlay_{entry.FileID.ToString().PadLeft(4, '0')}.bin";
                 if ((this as IIOProvider).FileExists(overlayPath))
                 {
-                    filesAlloc[entry.FileID] = (this as IIOProvider).ReadAllBytes(overlayPath);
+                    var data = (this as IIOProvider).ReadAllBytes(overlayPath);
+                    filesAlloc[entry.FileID] = data;
                 }
                 overlay7[i / 32] = entry;
-            }, 0, overlay7Raw.Length, 32);
+            }, 0, overlay7Raw.Length - 1, 32);
 
             // Identify files to add to new archive
-            throw new NotImplementedException();
+            var files = (this as IIOProvider).GetFiles("/data", "*", false);
+            var filesFor = new AsyncFor();
+            filesFor.RunSynchronously = !IsThreadSafe;
+            await filesFor.RunFor(i =>
+            {
+                var data = (this as IIOProvider).ReadAllBytes(files[i]);
+                filesAlloc[i] = data;
+                fileNames[files[i]] = i;
 
-            // Determine total file size
-            throw new NotImplementedException();
+            }, 0, files.Length - 1);
 
-            // Set ROM size based on files
-            throw new NotImplementedException();
+            // Build FNT
+            var fntSection = EncodeFNT("/data", fileNames);
 
-            // Build FNT and FAT
-            throw new NotImplementedException();
+            // Set file size
+            var filesAllocSize = filesAlloc.Values.Select(x => x.Length).Sum();
+            var fatSize = filesAlloc.Keys.Max() * 8;
+            int fileSize = (int)(Math.Pow(2, header.DeviceCapacity) * 128 * 1024);
 
-            // - Place overlay files
-            throw new NotImplementedException();
+            // To-do: analyze files and adjust placement and size of arm9/arm7 binaries/overlays
+            // To-do: analyze files and increase capacity if needed
 
-            // - Place nitrofs files
-            throw new NotImplementedException();
+            this.Length = fileSize;
+
+            // Write header sections
+            var headerData = header.Read();
+            await WriteAsync(0, headerData);
+            await WriteAsync(header.Arm9RomOffset, arm9Bin);
+            await WriteAsync(header.Arm7RomOffset, arm7Bin);
+            await WriteAsync(header.IconOffset, banner);
+
+            // Write overlay tables
+            // - ARM9
+            for (int i = 0; i < overlay9.Count; i += 1)
+            {
+                await WriteAsync(header.FileArm9OverlayOffset + 32 * i, overlay9[i].GetBytes());
+            }
+
+            // - ARM7
+            for (int i = 0; i < overlay7.Count; i += 1)
+            {
+                await WriteAsync(header.FileArm7OverlayOffset + 32 * i, overlay7[i].GetBytes());
+            }
+
+            // Write nitrofs files
+            int nextFileOffset = Math.Max(header.FileArm9OverlayOffset + header.FileArm9OverlaySize + 0xA0, header.FileArm7OverlayOffset + header.FileArm7OverlaySize + 0xA0);
+            if (nextFileOffset == 0)
+            {
+                // No overlays to guide to
+                throw new NotImplementedException();
+            }
+
+            // - Generate FAT
+            var fat = new List<byte>(fatSize);
+
+            // - Write Files
+            for (int i = 0; i < fatSize / 8; i += 1)
+            {
+                if (filesAlloc.ContainsKey(i))
+                {
+                    var data = filesAlloc[i];
+                    await WriteAsync(nextFileOffset, data);
+
+                    fat.AddRange(BitConverter.GetBytes(nextFileOffset));
+                    fat.AddRange(BitConverter.GetBytes(nextFileOffset + data.Length - 1));
+                    nextFileOffset += data.Length;
+                }
+                else
+                {
+                    fat.AddRange(Enumerable.Repeat<byte>(0, 8));
+                }
+            }
 
             await base.Save(filename, provider);
         }
@@ -733,27 +794,8 @@ namespace DotNet3dsToolkit.Core
             // Build the filename table
             var output = new FilenameTable();
             output.Name = "data";
-            await BuildFNT(output, root, rootDirectories);
+            await BuildFNTFromROM(output, root, rootDirectories);
             return output;
-        }
-
-        private async Task BuildFNT(FilenameTable parentFNT, DirectoryMainTable root, List<DirectoryMainTable> directories)
-        {
-            foreach (var item in await ReadFNTSubTable(root.SubTableOffset, root.FirstSubTableFileID))
-            {
-                var child = new FilenameTable { Name = item.Name };
-                parentFNT.Children.Add(child);
-                if (item.Length > 128)
-                {
-                    // Directory
-                    await BuildFNT(child, directories[(item.SubDirectoryID & 0x0FFF) - 1], directories);
-                }
-                else
-                {
-                    // File
-                    child.FileIndex = item.ParentFileID;
-                }
-            }
         }
 
         private async Task<List<FNTSubTable>> ReadFNTSubTable(uint rootSubTableOffset, ushort parentFileID)
@@ -787,6 +829,151 @@ namespace DotNet3dsToolkit.Core
                 length = await ReadAsync(offset);
             }
             return subTables;
+        }
+
+        private async Task BuildFNTFromROM(FilenameTable parentFNT, DirectoryMainTable root, List<DirectoryMainTable> directories)
+        {
+            foreach (var item in await ReadFNTSubTable(root.SubTableOffset, root.FirstSubTableFileID))
+            {
+                var child = new FilenameTable { Name = item.Name };
+                parentFNT.Children.Add(child);
+                if (item.Length > 128)
+                {
+                    // Directory
+                    await BuildFNTFromROM(child, directories[(item.SubDirectoryID & 0x0FFF) - 1], directories);
+                }
+                else
+                {
+                    // File
+                    child.FileIndex = item.ParentFileID;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Builds a filename table from current files, including the shadow directory
+        /// </summary>
+        /// <param name="path">Path of the node from which to build the FNT</param>
+        /// <param name="filenames">Dicitonary matching paths to file indexes. </param>
+        private FilenameTable BuildCurrentFNTChild(string path, IDictionary<string, int> filenames, ref int directoryCount, ref int fileCount)
+        {
+            var provider = this as IIOProvider;
+
+            var table = new FilenameTable();
+            table.Name = Path.GetFileName(path);
+
+            if (provider.FileExists(path))
+            {
+                table.FileIndex = filenames[path];
+                fileCount += 1;
+            }
+            else // Assume directory exists
+            {
+                var children = provider.GetDirectories(path, true);
+                foreach (var item in children)
+                {
+                    table.Children.Add(BuildCurrentFNTChild(item, filenames, ref directoryCount, ref fileCount));
+                    directoryCount += 1;
+                }
+            }
+            return table;
+        }
+
+        private int? GetFirstFNTFileID(FilenameTable table)
+        {
+            var firstFileID = table.Children.FirstOrDefault(x => !x.IsDirectory)?.FileIndex;
+            if (firstFileID.HasValue)
+            {
+                return firstFileID;
+            }
+            else
+            {
+                foreach (var item in table.Children)
+                {
+                    firstFileID = GetFirstFNTFileID(item);
+                    if (firstFileID.HasValue)
+                    {
+                        return firstFileID;
+                    }
+                    // Otherwise, keep looking
+                }
+
+                // Couldn't find a file
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Gets the binary representation of the given filename table
+        /// </summary>
+        protected List<byte> EncodeFNT(string path, IDictionary<string, int> filenames)
+        {
+            // Generate the FNT
+            int directoryCount = 0;
+            int fileCount = 0;
+            var table = BuildCurrentFNTChild(path, filenames, ref directoryCount, ref fileCount);
+
+            // Encode the FNT
+            var numberTablesWritten = 0;
+            var nextSubDirOffset = (fileCount + directoryCount) * 8;
+            var tables = new List<byte>(nextSubDirOffset);
+            var subTables = new List<byte>();
+
+            // Write root table
+            tables.AddRange(BitConverter.GetBytes(nextSubDirOffset)); // Offset to Sub-table
+            tables.AddRange(BitConverter.GetBytes(GetFirstFNTFileID(table) ?? -1)); // ID of first file in sub-table
+            tables.AddRange(BitConverter.GetBytes(directoryCount)); // Special root definition
+            numberTablesWritten += 1;
+
+            // Write children
+            WriteFNTChildren(tables, subTables, table, ref numberTablesWritten, ref nextSubDirOffset);
+
+            // Concat tables
+            tables.AddRange(subTables);
+
+            return tables;
+        }
+
+        private void WriteFNTChildren(List<byte> tables, List<byte> subTables, FilenameTable table, ref int numberTablesWritten, ref int nextSubDirOffset)
+        {
+            int parentID = numberTablesWritten;
+
+            // Write children
+            foreach (var item in table.Children)
+            {
+                // Write subtable
+                byte filenameLength = (byte)Math.Max(item.Name.Length, 127);
+
+                if (item.IsDirectory)
+                {
+                    filenameLength &= 0x80; // Set directory flag
+                }
+
+                subTables.Add(filenameLength);
+                subTables.AddRange(Encoding.ASCII.GetBytes(item.Name).Take(127));
+
+                if (item.IsDirectory)
+                {
+                    subTables.AddRange(BitConverter.GetBytes((UInt16)(numberTablesWritten & 0xF000))); // Sub-directory ID
+                }
+                nextSubDirOffset += 1 + (filenameLength & 0x7F) + (item.IsDirectory ? 2 : 0);
+
+                // Write table
+                tables.AddRange(BitConverter.GetBytes(nextSubDirOffset)); // Offset to Sub-table
+                tables.AddRange(BitConverter.GetBytes(GetFirstFNTFileID(table) ?? -1)); // ID of first file in sub-table
+                tables.AddRange(BitConverter.GetBytes(parentID)); // Parent directory ID
+                numberTablesWritten += 1;
+            }
+
+            // End sub table
+            subTables.Add(0);
+            nextSubDirOffset += 1;
+
+            // Write childrens' children
+            foreach (var item in table.Children)
+            {
+                WriteFNTChildren(tables, subTables, item, ref numberTablesWritten, ref nextSubDirOffset);
+            }
         }
 
         private bool CheckNeedsArm9Footer()
@@ -1344,7 +1531,7 @@ namespace DotNet3dsToolkit.Core
 
                     if (currentEntry != null && currentEntry.IsDirectory)
                     {
-                        output.AddRange(currentEntry.Children.Where(x => x.IsDirectory).Select(x => x.Name));
+                        output.AddRange(currentEntry.Children.Where(x => x.IsDirectory).Select(x => path + "/" + x.Name));
                     }
                     else
                     {

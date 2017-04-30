@@ -49,6 +49,20 @@ namespace DotNet3dsToolkit.Core.Tests
 
         [TestMethod]
         [TestCategory(TestCategory)]
+        public async Task TestPack()
+        {
+            using (var eosUS = new NdsRom())
+            {
+                await eosUS.OpenFile(EosUsPath, Provider);
+                await eosUS.Save("eos-repack.nds", Provider);
+            }
+
+            // Cleanup
+            //Provider.DeleteFile("eos-repack.nds");
+        }
+
+        [TestMethod]
+        [TestCategory(TestCategory)]
         public async Task TestOpen_BrtUs()
         {
             // This test will be replaced with something else later.
