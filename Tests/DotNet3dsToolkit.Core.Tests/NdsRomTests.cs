@@ -63,6 +63,28 @@ namespace DotNet3dsToolkit.Core.Tests
 
         [TestMethod]
         [TestCategory(TestCategory)]
+        public async Task TestAnalyzeEOS()
+        {
+            using (var eosUS = new NdsRom())
+            {
+                await eosUS.OpenFile(EosUsPath, Provider);
+                File.WriteAllText("analysis-eos.csv", eosUS.AnalyzeLayout().GenerateCSV());
+            }
+        }
+
+        [TestMethod]
+        [TestCategory(TestCategory)]
+        public async Task TestAnalyzeBRT()
+        {
+            using (var brtUS = new NdsRom())
+            {
+                await brtUS.OpenFile(BrtUsPath, Provider);
+                File.WriteAllText("analysis-brt.csv", brtUS.AnalyzeLayout().GenerateCSV());
+            }
+        }
+
+        [TestMethod]
+        [TestCategory(TestCategory)]
         public async Task TestOpen_BrtUs()
         {
             // This test will be replaced with something else later.

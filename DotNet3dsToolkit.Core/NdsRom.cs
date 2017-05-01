@@ -523,6 +523,104 @@ namespace DotNet3dsToolkit.Core
             // 170h    90h   Reserved (zero filled) (transferred, but not stored in RAM)
 
         }
+
+        public struct Range
+        {
+            public int Start { get; set; }
+
+            public int Length { get; set; }
+
+            public int End
+            {
+                get
+                {
+                    return Start + Length - 1;
+                }
+                set
+                {
+                    Length = (value - Start) + 1;
+                }
+            }
+        }
+
+        public class LayoutAnalysisReport
+        {
+            public LayoutAnalysisReport()
+            {
+                Ranges = new Dictionary<Range, string>();
+            }
+
+            /// <summary>
+            /// The address ranges of the ROM. Key: range; Value: name
+            /// </summary>
+            public Dictionary<Range, string> Ranges { get; set; }
+
+            /// <summary>
+            /// Consolidates consecutive ranges of the same category
+            /// </summary>
+            public void CollapseRanges()
+            {
+                var newRanges = new Dictionary<Range, string>();
+                foreach (var item in Ranges.Where(x => x.Key.Length > 0).OrderBy(x => x.Key.Start).GroupBy(x => x.Value, x => x.Key))
+                {
+                    // Get a set of all Ranges in the same category, ordered by the start address
+                    var ranges = item.ToList();
+
+                    // Collapse consecutive ranges
+                    var currentRange = ranges.First();
+                    if (ranges.Count > 1)
+                    {
+                        for (int i = 1; i < ranges.Count; i += 1)
+                        {
+                            if (currentRange.End + 1 == ranges[i].Start)
+                            {
+                                // This range is consecutive
+                                currentRange.Length += currentRange.Length;
+                            }
+                            else
+                            {
+                                // This range is separate
+                                newRanges.Add(currentRange, item.Key);
+                                currentRange = ranges[i];
+                            }
+                        }
+                    }
+                    else
+                    {
+                        newRanges.Add(currentRange, item.Key);
+                    }                    
+                }
+                Ranges = newRanges;
+            }
+
+            public string GenerateCSV()
+            {
+                CollapseRanges();
+
+                var report = new StringBuilder();
+                report.AppendLine("Section,Start Address (decimal),End Address (decimal),Length (decimal),Start Address (hex),End Address (hex), Length (hex)");
+
+                var ranges = Ranges.OrderBy(x => x.Key.Start).ToList();
+                var currentRange = ranges.First();
+                report.AppendLine($"{currentRange.Value},{currentRange.Key.Start},{currentRange.Key.End},{currentRange.Key.Length},{currentRange.Key.Start.ToString("X")},{currentRange.Key.End.ToString("X")},{currentRange.Key.Length.ToString("X")}");
+                for (int i = 1;i<ranges.Count;i+=1)
+                {
+                    if (currentRange.Key.End + 1 < ranges[i].Key.Start)
+                    {
+                        // There's some unknown parts between the previous one and this one
+                        var section = Properties.Resources.NdsRom_Analysis_UnknownSection;
+                        var start = currentRange.Key.End + 1;
+                        var length = ranges[i].Key.Start - start;
+                        var end = start + length - 1;
+                        report.AppendLine($"{section},{start},{end},{length},{start.ToString("X")},{end.ToString("X")},{length.ToString("X")}");
+                    }
+                    currentRange = ranges[i];
+                    report.AppendLine($"{currentRange.Value},{currentRange.Key.Start},{currentRange.Key.End},{currentRange.Key.Length},{currentRange.Key.Start.ToString("X")},{currentRange.Key.End.ToString("X")},{currentRange.Key.Length.ToString("X")}");
+                }
+
+                return report.ToString();
+            }
+        }
         #endregion
 
         public NdsRom()
@@ -727,6 +825,58 @@ namespace DotNet3dsToolkit.Core
             }
 
             await base.Save(filename, provider);
+        }
+
+        /// <summary>
+        /// Analyzes the layout of the sections of the ROM
+        /// </summary>
+        public LayoutAnalysisReport AnalyzeLayout(bool showPadding = false)
+        {
+            var report = new LayoutAnalysisReport();
+
+            // Header
+            report.Ranges.Add(new Range { Start = 0, Length = (int)Header.Length }, Properties.Resources.NdsRom_Analysis_HeaderSection);
+
+            // Icon
+            report.Ranges.Add(new Range { Start = Header.IconOffset, Length = Header.IconLength }, Properties.Resources.NdsRom_Analysis_IconSection);
+
+            // ARM9 binary
+            var arm9Length = Header.Arm9Size;
+            if (CheckNeedsArm9Footer())
+            {
+                arm9Length += 0xC;
+            }
+            report.Ranges.Add(new Range { Start = Header.Arm9RomOffset, Length = arm9Length }, Properties.Resources.NdsRom_Analysis_ARM9Section);
+
+            // ARM7 binary
+            report.Ranges.Add(new Range { Start = Header.Arm7RomOffset, Length = Header.Arm7Size }, Properties.Resources.NdsRom_Analysis_ARM7Section);
+
+            // ARM9 overlay table
+            report.Ranges.Add(new Range { Start = Header.FileArm9OverlayOffset, Length = Header.FileArm9OverlaySize }, Properties.Resources.NdsRom_Analysis_ARM9OverlaySection);
+
+            // ARM7 overlay table
+            report.Ranges.Add(new Range { Start = Header.FileArm7OverlayOffset, Length = Header.FileArm7OverlaySize }, Properties.Resources.NdsRom_Analysis_ARM7OverlaySection);
+
+            // FNT
+            report.Ranges.Add(new Range { Start = Header.FilenameTableOffset, Length = Header.FilenameTableSize }, Properties.Resources.NdsRom_Analysis_FNTSection);
+
+            // FAT
+            report.Ranges.Add(new Range { Start = Header.FileAllocationTableOffset, Length = Header.FileAllocationTableSize }, Properties.Resources.NdsRom_Analysis_FATSection);
+
+            // Files (includes overlay files)
+            if (showPadding)
+            {
+                foreach (var item in FAT)
+                {
+                    report.Ranges.Add(new Range { Start = item.Offset, Length = item.Length }, Properties.Resources.NdsRom_Analysis_FileSection);
+                }
+            }
+            else
+            {
+                report.Ranges.Add(new Range { Start = FAT.Min(x => x.Offset), Length = FAT.Max(x => x.EndAddress) }, Properties.Resources.NdsRom_Analysis_FileSection);
+            }            
+
+            return report;
         }
 
         #region Properties
@@ -976,6 +1126,9 @@ namespace DotNet3dsToolkit.Core
             }
         }
 
+        /// <summary>
+        /// Determines whether or not an additional 0xC of the ARM9 binary is needed
+        /// </summary>
         private bool CheckNeedsArm9Footer()
         {
             return ReadUInt32(Header.Arm9RomOffset + Header.Arm9Size) == 0xDEC00621;

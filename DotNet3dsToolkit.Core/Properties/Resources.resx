@@ -126,4 +126,34 @@
   <data name="LoadingUnpacking" xml:space="preserve">
     <value>Unpacking...</value>
   </data>
+  <data name="NdsRom_Analysis_ARM7OverlaySection" xml:space="preserve">
+    <value>ARM7 Overlay Table</value>
+  </data>
+  <data name="NdsRom_Analysis_ARM7Section" xml:space="preserve">
+    <value>ARM7 Binary</value>
+  </data>
+  <data name="NdsRom_Analysis_ARM9OverlaySection" xml:space="preserve">
+    <value>ARM9 Overlay Table</value>
+  </data>
+  <data name="NdsRom_Analysis_ARM9Section" xml:space="preserve">
+    <value>ARM9 Binary</value>
+  </data>
+  <data name="NdsRom_Analysis_FATSection" xml:space="preserve">
+    <value>FAT</value>
+  </data>
+  <data name="NdsRom_Analysis_FileSection" xml:space="preserve">
+    <value>File Data</value>
+  </data>
+  <data name="NdsRom_Analysis_FNTSection" xml:space="preserve">
+    <value>FNT</value>
+  </data>
+  <data name="NdsRom_Analysis_HeaderSection" xml:space="preserve">
+    <value>Header</value>
+  </data>
+  <data name="NdsRom_Analysis_IconSection" xml:space="preserve">
+    <value>Icon</value>
+  </data>
+  <data name="NdsRom_Analysis_UnknownSection" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
 </root>

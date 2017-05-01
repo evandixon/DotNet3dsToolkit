@@ -87,5 +87,95 @@ namespace DotNet3dsToolkit.Core.Properties {
                 return ResourceManager.GetString("LoadingUnpacking", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to ARM7 Overlay Table.
+        /// </summary>
+        internal static string NdsRom_Analysis_ARM7OverlaySection {
+            get {
+                return ResourceManager.GetString("NdsRom_Analysis_ARM7OverlaySection", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to ARM7 Binary.
+        /// </summary>
+        internal static string NdsRom_Analysis_ARM7Section {
+            get {
+                return ResourceManager.GetString("NdsRom_Analysis_ARM7Section", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to ARM9 Overlay Table.
+        /// </summary>
+        internal static string NdsRom_Analysis_ARM9OverlaySection {
+            get {
+                return ResourceManager.GetString("NdsRom_Analysis_ARM9OverlaySection", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to ARM9 Binary.
+        /// </summary>
+        internal static string NdsRom_Analysis_ARM9Section {
+            get {
+                return ResourceManager.GetString("NdsRom_Analysis_ARM9Section", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to FAT.
+        /// </summary>
+        internal static string NdsRom_Analysis_FATSection {
+            get {
+                return ResourceManager.GetString("NdsRom_Analysis_FATSection", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to File Data.
+        /// </summary>
+        internal static string NdsRom_Analysis_FileSection {
+            get {
+                return ResourceManager.GetString("NdsRom_Analysis_FileSection", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to FNT.
+        /// </summary>
+        internal static string NdsRom_Analysis_FNTSection {
+            get {
+                return ResourceManager.GetString("NdsRom_Analysis_FNTSection", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Header.
+        /// </summary>
+        internal static string NdsRom_Analysis_HeaderSection {
+            get {
+                return ResourceManager.GetString("NdsRom_Analysis_HeaderSection", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Icon.
+        /// </summary>
+        internal static string NdsRom_Analysis_IconSection {
+            get {
+                return ResourceManager.GetString("NdsRom_Analysis_IconSection", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Unknown.
+        /// </summary>
+        internal static string NdsRom_Analysis_UnknownSection {
+            get {
+                return ResourceManager.GetString("NdsRom_Analysis_UnknownSection", resourceCulture);
+            }
+        }
     }
 }
