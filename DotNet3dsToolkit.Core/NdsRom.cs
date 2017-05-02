@@ -588,7 +588,7 @@ namespace DotNet3dsToolkit.Core
                     else
                     {
                         newRanges.Add(currentRange, item.Key);
-                    }                    
+                    }
                 }
                 Ranges = newRanges;
             }
@@ -603,7 +603,7 @@ namespace DotNet3dsToolkit.Core
                 var ranges = Ranges.OrderBy(x => x.Key.Start).ToList();
                 var currentRange = ranges.First();
                 report.AppendLine($"{currentRange.Value},{currentRange.Key.Start},{currentRange.Key.End},{currentRange.Key.Length},{currentRange.Key.Start.ToString("X")},{currentRange.Key.End.ToString("X")},{currentRange.Key.Length.ToString("X")}");
-                for (int i = 1;i<ranges.Count;i+=1)
+                for (int i = 1; i < ranges.Count; i += 1)
                 {
                     if (currentRange.Key.End + 1 < ranges[i].Key.Start)
                     {
@@ -627,10 +627,16 @@ namespace DotNet3dsToolkit.Core
         {
             EnableInMemoryLoad = true;
             (this as IIOProvider).ResetWorkingDirectory();
+            DataPath = "data";
         }
 
         public event EventHandler<ProgressReportedEventArgs> ProgressChanged;
         public event EventHandler Completed;
+
+        /// <summary>
+        /// The path of the nitrofs file system is stored. Defaults to "data".
+        /// </summary>
+        public string DataPath { get; set; }
 
         public override async Task OpenFile(string filename, IIOProvider provider)
         {
@@ -874,7 +880,7 @@ namespace DotNet3dsToolkit.Core
             else
             {
                 report.Ranges.Add(new Range { Start = FAT.Min(x => x.Offset), Length = FAT.Max(x => x.EndAddress) }, Properties.Resources.NdsRom_Analysis_FileSection);
-            }            
+            }
 
             return report;
         }
@@ -943,7 +949,7 @@ namespace DotNet3dsToolkit.Core
 
             // Build the filename table
             var output = new FilenameTable();
-            output.Name = "data";
+            output.Name = DataPath;
             await BuildFNTFromROM(output, root, rootDirectories);
             return output;
         }
@@ -1380,19 +1386,9 @@ namespace DotNet3dsToolkit.Core
         private FileAllocationEntry? GetFATEntry(string path, bool throwIfNotFound = true)
         {
             var parts = GetPathParts(path);
-            switch (parts[0].ToLower())
+            var partLower = parts[0].ToLower();
+            switch (partLower)
             {
-                case "data":
-                    var currentEntry = FNT;
-                    for (int i = 1; i < parts.Length; i += 1)
-                    {
-                        currentEntry = currentEntry?.Children.Where(x => x.Name.ToLower() == parts[i].ToLower()).FirstOrDefault();
-                    }
-                    if (currentEntry != null && !currentEntry.IsDirectory)
-                    {
-                        return FAT[currentEntry.FileIndex];
-                    }
-                    break;
                 case "overlay":
                     int index;
                     if (int.TryParse(parts[1].ToLower().Substring(8, 4), out index))
@@ -1426,6 +1422,20 @@ namespace DotNet3dsToolkit.Core
                     return new FileAllocationEntry(Header.FileArm7OverlayOffset, Header.FileArm7OverlayOffset + Header.FileArm7OverlaySize);
                 case "y9.bin":
                     return new FileAllocationEntry(Header.FileArm9OverlayOffset, Header.FileArm9OverlayOffset + Header.FileArm9OverlaySize);
+                default:
+                    if (partLower == DataPath)
+                    {
+                        var currentEntry = FNT;
+                        for (int i = 1; i < parts.Length; i += 1)
+                        {
+                            currentEntry = currentEntry?.Children.Where(x => x.Name.ToLower() == parts[i].ToLower()).FirstOrDefault();
+                        }
+                        if (currentEntry != null && !currentEntry.IsDirectory)
+                        {
+                            return FAT[currentEntry.FileIndex];
+                        }
+                    }
+                    break;
             }
 
             // Default
@@ -1455,14 +1465,12 @@ namespace DotNet3dsToolkit.Core
             {
                 switch (parts[0].ToLower())
                 {
-                    case "data":
-                        return true;
                     case "overlay":
                         return true;
                     case "overlay7":
                         return true;
                     default:
-                        return false;
+                        return parts[0].ToLower() == DataPath;
                 }
             }
             else if (parts.Length == 0)
@@ -1471,7 +1479,7 @@ namespace DotNet3dsToolkit.Core
             }
             else
             {
-                if (parts[0].ToLower() == "data")
+                if (parts[0].ToLower() == DataPath)
                 {
                     var currentEntry = FNT;
                     for (int i = 1; i < parts.Length; i += 1)
@@ -1545,7 +1553,7 @@ namespace DotNet3dsToolkit.Core
                     {
                         output.AddRange((this as IIOProvider).GetFiles("/overlay", searchPattern, topDirectoryOnly));
                         output.AddRange((this as IIOProvider).GetFiles("/overlay7", searchPattern, topDirectoryOnly));
-                        output.AddRange((this as IIOProvider).GetFiles("/data", searchPattern, topDirectoryOnly));
+                        output.AddRange((this as IIOProvider).GetFiles("/" + DataPath, searchPattern, topDirectoryOnly));
                     }
                     return output.ToArray();
                 case "overlay":
@@ -1610,51 +1618,56 @@ namespace DotNet3dsToolkit.Core
                         }
                     }
                     return output.ToArray();
-                case "data":
-                    // Get the desired directory
-                    var currentEntry = FNT;
-                    var pathBase = new StringBuilder();
-                    pathBase.Append("/data");
-                    for (int i = 1; i < parts.Length; i += 1)
+                default:
+                    if (parts[0].ToLower() == DataPath)
                     {
-                        var partLower = parts[i].ToLower();
-                        currentEntry = currentEntry?.Children.Where(x => x.Name.ToLower() == partLower && x.IsDirectory).FirstOrDefault();
-                        if (currentEntry == null)
+                        // Get the desired directory
+                        var currentEntry = FNT;
+                        var pathBase = new StringBuilder();
+                        pathBase.Append("/" + DataPath);
+                        for (int i = 1; i < parts.Length; i += 1)
                         {
-                            break;
+                            var partLower = parts[i].ToLower();
+                            currentEntry = currentEntry?.Children.Where(x => x.Name.ToLower() == partLower && x.IsDirectory).FirstOrDefault();
+                            if (currentEntry == null)
+                            {
+                                break;
+                            }
+                            else
+                            {
+                                pathBase.Append($"/{currentEntry.Name}");
+                            }
+                        }
+
+                        // Get the files
+                        if (currentEntry != null && currentEntry.IsDirectory)
+                        {
+                            output.AddRange(GetFilesFromNode(pathBase.ToString(), currentEntry, searchPatternRegex, topDirectoryOnly));
                         }
                         else
                         {
-                            pathBase.Append($"/{currentEntry.Name}");
+                            throw new FileNotFoundException(string.Format(Properties.Resources.ErrorRomFileNotFound, path), path);
                         }
-                    }
 
-                    // Get the files
-                    if (currentEntry != null && currentEntry.IsDirectory)
-                    {
-                        output.AddRange(GetFilesFromNode(pathBase.ToString(), currentEntry, searchPatternRegex, topDirectoryOnly));
+                        // Apply shadowed files
+                        var virtualPathData = GetVirtualPath(path);
+                        if (CurrentIOProvider.DirectoryExists(virtualPathData))
+                        {
+                            foreach (var item in CurrentIOProvider.GetFiles(virtualPathData, searchPattern, topDirectoryOnly))
+                            {
+                                var filePath = "/" + FileSystem.MakeRelativePath(item, VirtualPath);
+                                if (!output.Contains(filePath))
+                                {
+                                    output.Add(filePath);
+                                }
+                            }
+                        }
                     }
                     else
                     {
                         throw new FileNotFoundException(string.Format(Properties.Resources.ErrorRomFileNotFound, path), path);
                     }
-
-                    // Apply shadowed files
-                    var virtualPathData = GetVirtualPath(path);
-                    if (CurrentIOProvider.DirectoryExists(virtualPathData))
-                    {
-                        foreach (var item in CurrentIOProvider.GetFiles(virtualPathData, searchPattern, topDirectoryOnly))
-                        {
-                            var filePath = "/" + FileSystem.MakeRelativePath(item, VirtualPath);
-                            if (!output.Contains(filePath))
-                            {
-                                output.Add(filePath);
-                            }
-                        }
-                    }
                     break;
-                default:
-                    throw new FileNotFoundException(string.Format(Properties.Resources.ErrorRomFileNotFound, path), path);
             }
             return output.ToArray();
         }
@@ -1666,7 +1679,7 @@ namespace DotNet3dsToolkit.Core
             switch (parts[0].ToLower())
             {
                 case "":
-                    output.Add("/data");
+                    output.Add("/" + DataPath);
                     output.Add("/overlay");
                     output.Add("/overlay7");
                     break;
@@ -1674,25 +1687,30 @@ namespace DotNet3dsToolkit.Core
                 case "overlay7":
                     // Overlays have no child directories
                     break;
-                case "data":
-                    var currentEntry = FNT;
-                    for (int i = 1; i < parts.Length; i += 1)
+                default:
+                    if (parts[0].ToLower() == DataPath)
                     {
-                        var partLower = parts[i].ToLower();
-                        currentEntry = currentEntry?.Children.Where(x => x.Name.ToLower() == partLower && x.IsDirectory).FirstOrDefault();
-                    }
+                        var currentEntry = FNT;
+                        for (int i = 1; i < parts.Length; i += 1)
+                        {
+                            var partLower = parts[i].ToLower();
+                            currentEntry = currentEntry?.Children.Where(x => x.Name.ToLower() == partLower && x.IsDirectory).FirstOrDefault();
+                        }
 
-                    if (currentEntry != null && currentEntry.IsDirectory)
-                    {
-                        output.AddRange(currentEntry.Children.Where(x => x.IsDirectory).Select(x => path + "/" + x.Name));
+                        if (currentEntry != null && currentEntry.IsDirectory)
+                        {
+                            output.AddRange(currentEntry.Children.Where(x => x.IsDirectory).Select(x => path + "/" + x.Name));
+                        }
+                        else
+                        {
+                            throw new FileNotFoundException(string.Format(Properties.Resources.ErrorRomFileNotFound, path), path);
+                        }
                     }
                     else
                     {
                         throw new FileNotFoundException(string.Format(Properties.Resources.ErrorRomFileNotFound, path), path);
                     }
                     break;
-                default:
-                    throw new FileNotFoundException(string.Format(Properties.Resources.ErrorRomFileNotFound, path), path);
             }
             if (!topDirectoryOnly)
             {
