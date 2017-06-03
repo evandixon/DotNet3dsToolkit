@@ -105,6 +105,15 @@ namespace DotNet3dsToolkit.Core
                 return output.ToArray();
             }
 
+            public static bool operator ==(OverlayTableEntry a, OverlayTableEntry b)
+            {
+                return a.OverlayID == b.OverlayID && a.RamAddress == b.RamAddress && a.RamSize == b.RamSize && a.BssSize == b.BssSize && a.StaticInitStart == b.StaticInitStart && a.StaticInitEnd == b.StaticInitEnd && a.FileID == b.FileID;
+            }
+
+            public static bool operator !=(OverlayTableEntry a, OverlayTableEntry b)
+            {
+                return a.OverlayID != b.OverlayID || a.RamAddress != b.RamAddress || a.RamSize != b.RamSize || a.BssSize != b.BssSize || a.StaticInitStart != b.StaticInitStart || a.StaticInitEnd != b.StaticInitEnd || a.FileID != b.FileID;
+            }
         }
 
         /// <summary>
@@ -710,22 +719,83 @@ namespace DotNet3dsToolkit.Core
             await Task.WhenAll(loadingTasks);
         }
 
+        /// <summary>
+        /// Calculates the padding size of a file
+        /// </summary>
+        /// <param name="fileLength">Length of the file</param>
+        /// <param name="blockSize">Length of the block</param>
+        /// <returns>Size of the padding</returns>
+        private int CalculatePaddingSize(int fileLength, int blockSize = 0x200)
+        {
+            int paddingLength = blockSize - (fileLength % blockSize);
+            if (paddingLength == blockSize)
+            {
+                paddingLength = 0;
+            }
+            return paddingLength;
+        }
+
+        /// <summary>
+        /// Writes padding for the file
+        /// </summary>
+        /// <param name="index">The offset at which to write padding</param>
+        /// <param name="fileLength">Length of the file to pad</param>
+        /// <param name="blockSize">The current block size. Defaults to 0x200</param>
+        /// <returns>The length in bytes of the padding written</returns>
+        private async Task<int> WritePadding(int index, int fileLength, int blockSize = 0x200)
+        {
+            var paddingLength = CalculatePaddingSize(fileLength, blockSize);
+            await WriteAsync(index, new byte[paddingLength]);
+            return paddingLength;
+        }
+
+        /// <summary>
+        /// Writes files to the ROM and updates the given raw FAT
+        /// </summary>
+        /// <param name="filesAlloc">Data to be written</param>
+        /// <param name="nextFileOffset">Offset to write the data to</param>
+        /// <param name="fat">The raw file allocation table. This will be updated as files are written</param>
+        /// <returns>The updated next file offset</returns>
+        private async Task<int> WriteFATFiles(ConcurrentDictionary<int, byte[]> filesAlloc, int fileIdStart, int nextFileOffset, List<byte> fat)
+        {
+            for (int i = fileIdStart; i <= filesAlloc.Keys.Max(); i += 1)
+            {
+                if (filesAlloc.ContainsKey(i))
+                {
+                    var data = filesAlloc[i];                    
+
+                    await WriteAsync(nextFileOffset, data); // Write data
+                    var paddingLength = await WritePadding(nextFileOffset + data.Length, data.Length);
+
+                    fat.AddRange(BitConverter.GetBytes(nextFileOffset)); // File start index
+                    fat.AddRange(BitConverter.GetBytes(nextFileOffset + data.Length)); // File end index
+                    nextFileOffset += data.Length + paddingLength;
+                }
+                else
+                {
+                    fat.AddRange(Enumerable.Repeat<byte>(0, 8));
+                }
+            }
+            return nextFileOffset;
+        }
+
         public override async Task Save(string filename, IIOProvider provider)
         {
-            var filesAlloc = new ConcurrentDictionary<int, byte[]>(); // Allocated files (including overlays)
+            var overlay9Alloc = new ConcurrentDictionary<int, byte[]>();
+            var overlay7Alloc = new ConcurrentDictionary<int, byte[]>();
+            var filesAlloc = new ConcurrentDictionary<int, byte[]>();
             var fileNames = new ConcurrentDictionary<string, int>(); // File names of nitrofs (excluding overlays, so not all entries in filesAlloc have a name)
             var overlay9 = new ConcurrentDictionary<int, OverlayTableEntry>(); // Key = index in table, value = the entry
             var overlay7 = new ConcurrentDictionary<int, OverlayTableEntry>(); // Key = index in table, value = the entry
+            var fat = new List<byte>();
 
-            // Read header-related files
-            var header = new NdsHeader();
-            await header.OpenFile("/header.bin", this);
+            int nextFileOffset = 0;
 
-            var banner = (this as IIOProvider).ReadAllBytes("/banner.bin");
+            // Identify files
             var arm9Bin = (this as IIOProvider).ReadAllBytes("/arm9.bin");
             var arm7Bin = (this as IIOProvider).ReadAllBytes("/arm7.bin");
-
-            // Identify ARM9 overlays
+            var banner = (this as IIOProvider).ReadAllBytes("/banner.bin");
+            // - Identify ARM9 overlays
             var overlay9Raw = (this as IIOProvider).ReadAllBytes("/y9.bin");
             var arm9For = new AsyncFor();
             arm9For.RunSynchronously = !IsThreadSafe;
@@ -735,15 +805,15 @@ namespace DotNet3dsToolkit.Core
                 var overlayPath = $"/overlay/overlay_{entry.FileID.ToString().PadLeft(4, '0')}.bin";
                 if ((this as IIOProvider).FileExists(overlayPath))
                 {
-                    filesAlloc[entry.FileID] = (this as IIOProvider).ReadAllBytes(overlayPath);
+                    overlay9Alloc[entry.FileID] = (this as IIOProvider).ReadAllBytes(overlayPath);
                 }
-                overlay9[i / 32] = entry;
+                overlay9[entry.OverlayID] = entry;
             }, 0, overlay9Raw.Length - 1, 32);
 
-            // Identify ARM7 overlays
+            // - Identify ARM7 overlays
             var overlay7Raw = (this as IIOProvider).ReadAllBytes("/y7.bin");
             var arm7For = new AsyncFor();
-            arm9For.RunSynchronously = !this.IsThreadSafe;
+            arm7For.RunSynchronously = !this.IsThreadSafe;
             await arm7For.RunFor(i =>
             {
                 var entry = new OverlayTableEntry(overlay7Raw, i);
@@ -751,84 +821,150 @@ namespace DotNet3dsToolkit.Core
                 if ((this as IIOProvider).FileExists(overlayPath))
                 {
                     var data = (this as IIOProvider).ReadAllBytes(overlayPath);
-                    filesAlloc[entry.FileID] = data;
+                    overlay7Alloc[entry.FileID] = data;
                 }
-                overlay7[i / 32] = entry;
+                overlay7[entry.OverlayID] = entry;
             }, 0, overlay7Raw.Length - 1, 32);
 
-            // Identify files to add to new archive
+            // - Nitrofs
+            var overlay9Max = overlay9.Keys.Count > 0 ? overlay9.Keys.Max() : 0;
+            var overlay7Max = overlay7.Keys.Count > 0 ? overlay7.Keys.Max() : 0;
             var files = (this as IIOProvider).GetFiles("/data", "*", false);
             var filesFor = new AsyncFor();
             filesFor.RunSynchronously = !IsThreadSafe;
             await filesFor.RunFor(i =>
             {
                 var data = (this as IIOProvider).ReadAllBytes(files[i]);
-                filesAlloc[i] = data;
-                fileNames[files[i]] = i;
+                var fileID = i + overlay9Max + overlay7Max + 1; // File ID is 1 greater than highest index in overlay9 and overlay7
+                filesAlloc[fileID] = data;
+                fileNames[files[i]] = fileID;
 
             }, 0, files.Length - 1);
-
-            // Build FNT
+            // - FNT
             var fntSection = EncodeFNT("/data", fileNames);
 
+            // Calculate total file size
+            var totalFileSize = 0x4000; // Header size
+            // - Banner
+            totalFileSize += Header.IconLength;
+            // - Arm7 + Arm9 + Padding
+            totalFileSize += arm9Bin.Length + arm7Bin.Length + CalculatePaddingSize(arm9Bin.Length) + CalculatePaddingSize(arm7Bin.Length);
+            // - Arm9 Overlay (files + overlay table + fat)
+            totalFileSize += overlay9Alloc.Values.Select(x => x.Length + CalculatePaddingSize(x.Length) + 32 + 8).Sum(); // File + padding + overlay table entry + fat entry
+            // - Arm7 Overlay (files + overlay table + fat)
+            totalFileSize += overlay7Alloc.Values.Select(x => x.Length + CalculatePaddingSize(x.Length) + 32 + 8).Sum(); // File + padding + overlay table entry + fat entry
+            // - Nitrofs  (files + fat)
+            totalFileSize += filesAlloc.Values.Select(x => x.Length + CalculatePaddingSize(x.Length) + 8).Sum(); // File + padding + fat entry
+            // - FNT
+            totalFileSize += fntSection.Count;
+
             // Set file size
-            var filesAllocSize = filesAlloc.Values.Select(x => x.Length).Sum();
-            var fatSize = filesAlloc.Keys.Max() * 8;
-            int fileSize = (int)(Math.Pow(2, header.DeviceCapacity) * 128 * 1024);
+            // Cartridge size = 128KB * (2 ^ DeviceCapacity)
+            // Log Base 2 (Cartridge size / 128KB) = DeviceCapacity
+            var deviceCapacity = (byte)Math.Ceiling(Math.Log(Math.Ceiling((double)totalFileSize / (128 * 1024)), 2));
+            Header.DeviceCapacity = deviceCapacity;
+            this.Length = (long)(Math.Pow(2, deviceCapacity) * 128 * 1024);
 
-            // To-do: analyze files and adjust placement and size of arm9/arm7 binaries/overlays
-            // To-do: analyze files and increase capacity if needed
+            // Header: always at 0x00
+            // Note: Will rewrite header later to fix file references
+            var header = new NdsHeader();
+            await header.OpenFile("/header.bin", this);
+            await WriteAsync(0, await header.ReadAsync());
 
-            this.Length = fileSize;
+            // ARM9 Binary: always at 0x4000
+            header.FileArm9OverlayOffset = 0x4000;
+            if (CheckNeedsArm9Footer())
+            {
+                header.FileArm9OverlaySize = arm9Bin.Length - 0xC;
+            }
+            else
+            {
+                header.FileArm9OverlaySize = arm9Bin.Length;
+            }
+            var arm9End = header.FileArm9OverlayOffset + arm9Bin.Length;
+            await WriteAsync(header.FileArm9OverlayOffset, arm9Bin);
+            nextFileOffset = arm9End + await WritePadding(arm9End, arm9Bin.Length);
 
-            // Write header sections
-            var headerData = header.Read();
-            await WriteAsync(0, headerData);
-            await WriteAsync(header.Arm9RomOffset, arm9Bin);
-            await WriteAsync(header.Arm7RomOffset, arm7Bin);
-            await WriteAsync(header.IconOffset, banner);
-
-            // Write overlay tables
-            // - ARM9
+            // ARM9 Overlay Table
+            // - Write the table
+            var overlay9Length = 0;
+            header.FileArm9OverlayOffset = nextFileOffset;
             for (int i = 0; i < overlay9.Count; i += 1)
             {
-                await WriteAsync(header.FileArm9OverlayOffset + 32 * i, overlay9[i].GetBytes());
+                var bytes = overlay9[i].GetBytes();
+                await WriteAsync(header.FileArm9OverlayOffset + 32 * i, bytes);
+                overlay9Length += 32;
+            }
+            header.FileArm9OverlaySize = overlay9Length;
+            var overlay9End = header.FileArm9OverlayOffset + overlay9Length;
+            nextFileOffset = overlay9End + await WritePadding(overlay9End, overlay9Length);
+
+            // - Write ARM9 Overlay Files
+            if (overlay9Alloc.Any())
+            {
+                nextFileOffset = await WriteFATFiles(overlay9Alloc, 0, nextFileOffset, fat);
+            }
+            else
+            {
+                header.FileArm9OverlayOffset = 0;
             }
 
-            // - ARM7
+            // ARM7 Binary
+            header.FileArm7OverlayOffset = nextFileOffset;
+            header.FileArm7OverlaySize = arm7Bin.Length;
+            var arm7End = header.FileArm7OverlayOffset + arm7Bin.Length;
+            await WriteAsync(header.FileArm7OverlayOffset, arm7Bin);
+            nextFileOffset = arm7End + await WritePadding(arm7End, arm7Bin.Length);
+
+            // ARM7 Overlay Table
+            // - Write the table
+            var overlay7Length = 0;
+            header.FileArm7OverlayOffset = nextFileOffset;
             for (int i = 0; i < overlay7.Count; i += 1)
             {
-                await WriteAsync(header.FileArm7OverlayOffset + 32 * i, overlay7[i].GetBytes());
+                var bytes = overlay7[i].GetBytes();
+                await WriteAsync(header.FileArm7OverlayOffset + 32 * i, bytes);
+                overlay7Length += bytes.Length;
             }
+            header.FileArm7OverlaySize = overlay7Length;
 
-            // Write nitrofs files
-            int nextFileOffset = Math.Max(header.FileArm9OverlayOffset + header.FileArm9OverlaySize + 0xA0, header.FileArm7OverlayOffset + header.FileArm7OverlaySize + 0xA0);
-            if (nextFileOffset == 0)
+            // - Write ARM7 Overlay Files
+            if (overlay7Alloc.Any())
             {
-                // No overlays to guide to
-                throw new NotImplementedException();
+                nextFileOffset = await WriteFATFiles(overlay7Alloc, overlay7Alloc.Keys.Min(), nextFileOffset, fat);
             }
-
-            // - Generate FAT
-            var fat = new List<byte>(fatSize);
-
-            // - Write Files
-            for (int i = 0; i < fatSize / 8; i += 1)
+            else
             {
-                if (filesAlloc.ContainsKey(i))
-                {
-                    var data = filesAlloc[i];
-                    await WriteAsync(nextFileOffset, data);
-
-                    fat.AddRange(BitConverter.GetBytes(nextFileOffset));
-                    fat.AddRange(BitConverter.GetBytes(nextFileOffset + data.Length - 1));
-                    nextFileOffset += data.Length;
-                }
-                else
-                {
-                    fat.AddRange(Enumerable.Repeat<byte>(0, 8));
-                }
+                header.FileArm7OverlayOffset = 0;
             }
+
+            // Write FNT
+            await WriteAsync(nextFileOffset, fntSection.ToArray());
+            nextFileOffset += fntSection.Count + await WritePadding(nextFileOffset + fntSection.Count, fntSection.Count);
+
+            // Write dummy fat, since it's still being made
+            // -- Calculate total fat size (fat already contains overlays, just need to add nitrofs files)
+            var fatSize = fat.Count + filesAlloc.Keys.Count * 8;
+            var fatIndex = nextFileOffset;
+            await WriteAsync(fatIndex, new byte[fatSize]);
+            nextFileOffset += fatSize + await WritePadding(fatIndex, fatSize);
+
+            // Write banner            
+            header.IconOffset = nextFileOffset;
+            await WriteAsync(header.IconOffset, banner);
+            nextFileOffset += header.IconLength + await WritePadding(header.IconOffset + header.IconLength, header.IconLength);
+
+            // Write Files
+            if (filesAlloc.Any())
+            {
+                nextFileOffset = await WriteFATFiles(filesAlloc, filesAlloc.Keys.Min(), nextFileOffset, fat);
+            }            
+
+            // Write the actual fat
+            await WriteAsync(fatIndex, fat.ToArray());
+
+            // Write the updated header
+            await WriteAsync(0, await header.ReadAsync());
 
             await base.Save(filename, provider);
         }
@@ -1025,11 +1161,18 @@ namespace DotNet3dsToolkit.Core
             }
             else // Assume directory exists
             {
-                var children = provider.GetDirectories(path, true);
-                foreach (var item in children)
+                foreach (var item in provider.GetDirectories(path, true))
                 {
                     table.Children.Add(BuildCurrentFNTChild(item, filenames, ref directoryCount, ref fileCount));
                     directoryCount += 1;
+                }
+                foreach (var item in provider.GetFiles(path, "*", true))
+                {
+                    var child = new FilenameTable();
+                    child.Name = Path.GetFileName(item);
+                    child.FileIndex = filenames[item];
+                    fileCount += 1;
+                    table.Children.Add(child);
                 }
             }
             return table;
@@ -1065,11 +1208,12 @@ namespace DotNet3dsToolkit.Core
         protected List<byte> EncodeFNT(string path, IDictionary<string, int> filenames)
         {
             // Generate the FNT
-            int directoryCount = 0;
+            int directoryCount = 1; // Count the root directory
             int fileCount = 0;
             var table = BuildCurrentFNTChild(path, filenames, ref directoryCount, ref fileCount);
 
             // Encode the FNT
+            fileCount -= table.Children.Count; // Top level children don't count
             var numberTablesWritten = 0;
             var nextSubDirOffset = (fileCount + directoryCount) * 8;
             var tables = new List<byte>(nextSubDirOffset);
@@ -1077,8 +1221,9 @@ namespace DotNet3dsToolkit.Core
 
             // Write root table
             tables.AddRange(BitConverter.GetBytes(nextSubDirOffset)); // Offset to Sub-table
-            tables.AddRange(BitConverter.GetBytes(GetFirstFNTFileID(table) ?? -1)); // ID of first file in sub-table
-            tables.AddRange(BitConverter.GetBytes(directoryCount)); // Special root definition
+            tables.AddRange(BitConverter.GetBytes((UInt16)(GetFirstFNTFileID(table) ?? -1))); // ID of first file in sub-table
+            tables.AddRange(BitConverter.GetBytes((UInt16)directoryCount)); // Special root definition
+            
             numberTablesWritten += 1;
 
             // Write children
@@ -1098,7 +1243,7 @@ namespace DotNet3dsToolkit.Core
             foreach (var item in table.Children)
             {
                 // Write subtable
-                byte filenameLength = (byte)Math.Max(item.Name.Length, 127);
+                byte filenameLength = (byte)Math.Min(item.Name.Length, 127);
 
                 if (item.IsDirectory)
                 {
@@ -1111,14 +1256,17 @@ namespace DotNet3dsToolkit.Core
                 if (item.IsDirectory)
                 {
                     subTables.AddRange(BitConverter.GetBytes((UInt16)(numberTablesWritten & 0xF000))); // Sub-directory ID
-                }
-                nextSubDirOffset += 1 + (filenameLength & 0x7F) + (item.IsDirectory ? 2 : 0);
+                }                
 
                 // Write table
-                tables.AddRange(BitConverter.GetBytes(nextSubDirOffset)); // Offset to Sub-table
-                tables.AddRange(BitConverter.GetBytes(GetFirstFNTFileID(table) ?? -1)); // ID of first file in sub-table
-                tables.AddRange(BitConverter.GetBytes(parentID)); // Parent directory ID
-                numberTablesWritten += 1;
+                if (item.IsDirectory)
+                {
+                    nextSubDirOffset += 1 + (filenameLength & 0x7F) + (item.IsDirectory ? 2 : 0);
+                    tables.AddRange(BitConverter.GetBytes(nextSubDirOffset)); // Offset to Sub-table
+                    tables.AddRange(BitConverter.GetBytes(GetFirstFNTFileID(table) ?? -1)); // ID of first file in sub-table
+                    tables.AddRange(BitConverter.GetBytes(parentID)); // Parent directory ID
+                    numberTablesWritten += 1;
+                }                
             }
 
             // End sub table
@@ -1393,14 +1541,30 @@ namespace DotNet3dsToolkit.Core
                     int index;
                     if (int.TryParse(parts[1].ToLower().Substring(8, 4), out index))
                     {
-                        return FAT[Arm9OverlayTable[index].FileID];
+                        OverlayTableEntry entry = Arm9OverlayTable.FirstOrDefault(x => x.FileID == index);
+                        if (entry != default(OverlayTableEntry))
+                        {
+                            return FAT[entry.FileID];                            
+                        }
+                        else
+                        {
+                            throw new FileNotFoundException(string.Format(Properties.Resources.ErrorRomFileNotFound, path), path);
+                        }                        
                     }
                     break;
                 case "overlay7":
                     int index7;
                     if (int.TryParse(parts[1].ToLower().Substring(8, 4), out index7))
                     {
-                        return FAT[Arm7OverlayTable[index7].FileID];
+                        OverlayTableEntry entry = Arm7OverlayTable.FirstOrDefault(x => x.FileID == index7);
+                        if (entry != default(OverlayTableEntry))
+                        {
+                            return FAT[entry.FileID];
+                        }
+                        else
+                        {
+                            throw new FileNotFoundException(string.Format(Properties.Resources.ErrorRomFileNotFound, path), path);
+                        }
                     }
                     break;
                 case "arm7.bin":
