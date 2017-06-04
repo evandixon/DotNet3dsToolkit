@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "ToolkitConsoleCore": {
+      "commandName": "Project",
+      "commandLineArgs": "D:\\eosu.nds output"
+    }
+  }
+}
