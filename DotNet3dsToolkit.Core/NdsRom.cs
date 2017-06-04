@@ -114,6 +114,16 @@ namespace DotNet3dsToolkit.Core
             {
                 return a.OverlayID != b.OverlayID || a.RamAddress != b.RamAddress || a.RamSize != b.RamSize || a.BssSize != b.BssSize || a.StaticInitStart != b.StaticInitStart || a.StaticInitEnd != b.StaticInitEnd || a.FileID != b.FileID;
             }
+
+            public override bool Equals(object obj)
+            {
+                return obj is OverlayTableEntry && (OverlayTableEntry)obj == this;
+            }
+
+            public override int GetHashCode()
+            {
+                return OverlayID ^ RamAddress ^ RamSize ^ BssSize ^ StaticInitStart ^ StaticInitEnd ^ FileID;
+            }
         }
 
         /// <summary>
@@ -651,74 +661,87 @@ namespace DotNet3dsToolkit.Core
 
         public override async Task OpenFile(string filename, IIOProvider provider)
         {
-            await base.OpenFile(filename, provider);
-
-            // Clear virtual path if it exists
-            if (!string.IsNullOrEmpty(VirtualPath) && provider.DirectoryExists(VirtualPath))
+            if (provider.FileExists(filename))
             {
-                provider.DeleteDirectory(VirtualPath);
+                await base.OpenFile(filename, provider);
+
+                // Clear virtual path if it exists
+                if (!string.IsNullOrEmpty(VirtualPath) && provider.DirectoryExists(VirtualPath))
+                {
+                    provider.DeleteDirectory(VirtualPath);
+                }
+
+                VirtualPath = provider.GetTempDirectory();
+
+
+                // Load data
+                Header = new NdsHeader();
+                Header.CreateFile(await ReadAsync(0, 512));
+
+                var loadingTasks = new List<Task>();
+
+                // Load Arm9 Overlays
+                var arm9overlayTask = Task.Run(async () => Arm9OverlayTable = await ParseArm9OverlayTable());
+
+                if (IsThreadSafe)
+                {
+                    loadingTasks.Add(arm9overlayTask);
+                }
+                else
+                {
+                    await arm9overlayTask;
+                }
+
+                // Load Arm7 Overlays
+                var arm7overlayTask = Task.Run(async () => Arm7OverlayTable = await ParseArm7OverlayTable());
+
+                if (IsThreadSafe)
+                {
+                    loadingTasks.Add(arm7overlayTask);
+                }
+                else
+                {
+                    await arm7overlayTask;
+                }
+
+                // Load FAT
+                var fatTask = Task.Run(async () => FAT = await ParseFAT());
+
+                if (IsThreadSafe)
+                {
+                    loadingTasks.Add(fatTask);
+                }
+                else
+                {
+                    await fatTask;
+                }
+
+                // Load FNT
+                var fntTask = Task.Run(async () => FNT = await ParseFNT());
+
+                if (IsThreadSafe)
+                {
+                    loadingTasks.Add(fntTask);
+                }
+                else
+                {
+                    await fntTask;
+                }
+
+                // Wait for all loading
+                await Task.WhenAll(loadingTasks);
             }
-
-            VirtualPath = provider.GetTempDirectory();
-
-
-            // Load data
-            Header = new NdsHeader();
-            Header.CreateFile(await ReadAsync(0, 512));
-
-            var loadingTasks = new List<Task>();
-
-            // Load Arm9 Overlays
-            var arm9overlayTask = Task.Run(async () => Arm9OverlayTable = await ParseArm9OverlayTable());
-
-            if (IsThreadSafe)
+            else if (provider.DirectoryExists(filename))
             {
-                loadingTasks.Add(arm9overlayTask);
+                this.CurrentIOProvider = provider;
+                base.CreateFile(new byte[0]);
+                VirtualPath = filename;
+                DisposeVirtualPath = false;
             }
             else
             {
-                await arm9overlayTask;
+                throw new FileNotFoundException("Could not find file or directory at the given path", filename);
             }
-
-            // Load Arm7 Overlays
-            var arm7overlayTask = Task.Run(async () => Arm7OverlayTable = await ParseArm7OverlayTable());
-
-            if (IsThreadSafe)
-            {
-                loadingTasks.Add(arm7overlayTask);
-            }
-            else
-            {
-                await arm7overlayTask;
-            }
-
-            // Load FAT
-            var fatTask = Task.Run(async () => FAT = await ParseFAT());
-
-            if (IsThreadSafe)
-            {
-                loadingTasks.Add(fatTask);
-            }
-            else
-            {
-                await fatTask;
-            }
-
-            // Load FNT
-            var fntTask = Task.Run(async () => FNT = await ParseFNT());
-
-            if (IsThreadSafe)
-            {
-                loadingTasks.Add(fntTask);
-            }
-            else
-            {
-                await fntTask;
-            }
-
-            // Wait for all loading
-
-            await Task.WhenAll(loadingTasks);
         }
 
         /// <summary>
@@ -765,7 +788,7 @@ namespace DotNet3dsToolkit.Core
             {
                 if (filesAlloc.ContainsKey(i))
                 {
-                    var data = filesAlloc[i];                    
+                    var data = filesAlloc[i];
 
                     await WriteAsync(nextFileOffset, data); // Write data
                     var paddingLength = await WritePadding(nextFileOffset + data.Length, data.Length);
@@ -795,6 +818,8 @@ namespace DotNet3dsToolkit.Core
             int nextFileOffset = 0;
 
             // Identify files
+            var header = new NdsHeader();
+            await header.OpenFile("/header.bin", this);
             var arm9Bin = (this as IIOProvider).ReadAllBytes("/arm9.bin");
             var arm7Bin = (this as IIOProvider).ReadAllBytes("/arm7.bin");
             var banner = (this as IIOProvider).ReadAllBytes("/banner.bin");
@@ -849,7 +874,7 @@ namespace DotNet3dsToolkit.Core
             // Calculate total file size
             var totalFileSize = 0x4000; // Header size
             // - Banner
-            totalFileSize += Header.IconLength;
+            totalFileSize += header.IconLength;
             // - Arm7 + Arm9 + Padding
             totalFileSize += arm9Bin.Length + arm7Bin.Length + CalculatePaddingSize(arm9Bin.Length) + CalculatePaddingSize(arm7Bin.Length);
             // - Arm9 Overlay (files + overlay table + fat)
@@ -865,18 +890,16 @@ namespace DotNet3dsToolkit.Core
             // Cartridge size = 128KB * (2 ^ DeviceCapacity)
             // Log Base 2 (Cartridge size / 128KB) = DeviceCapacity
             var deviceCapacity = (byte)Math.Ceiling(Math.Log(Math.Ceiling((double)totalFileSize / (128 * 1024)), 2));
-            Header.DeviceCapacity = deviceCapacity;
+            header.DeviceCapacity = deviceCapacity;
             this.Length = (long)(Math.Pow(2, deviceCapacity) * 128 * 1024);
 
             // Header: always at 0x00
             // Note: Will rewrite header later to fix file references
-            var header = new NdsHeader();
-            await header.OpenFile("/header.bin", this);
             await WriteAsync(0, await header.ReadAsync());
 
             // ARM9 Binary: always at 0x4000
             header.FileArm9OverlayOffset = 0x4000;
-            if (CheckNeedsArm9Footer())
+            if (BitConverter.ToUInt32(arm9Bin, arm9Bin.Length - 5) == 0xDEC00621)
             {
                 header.FileArm9OverlaySize = arm9Bin.Length - 0xC;
             }
@@ -961,7 +984,7 @@ namespace DotNet3dsToolkit.Core
             if (filesAlloc.Any())
             {
                 nextFileOffset = await WriteFATFiles(filesAlloc, filesAlloc.Keys.Min(), nextFileOffset, fat);
-            }            
+            }
 
             // Write the actual fat
             await WriteAsync(fatIndex, fat.ToArray());
@@ -1039,6 +1062,11 @@ namespace DotNet3dsToolkit.Core
         /// Path in the current I/O provider where temporary files are stored
         /// </summary>
         private string VirtualPath { get; set; }
+
+        /// <summary>
+        /// Whether or not to delete <see cref="VirtualPath"/> on delete
+        /// </summary>
+        private bool DisposeVirtualPath { get; set; }
 
         #endregion
 
@@ -1800,10 +1828,6 @@ namespace DotNet3dsToolkit.Core
                         {
                             output.AddRange(GetFilesFromNode(pathBase.ToString(), currentEntry, searchPatternRegex, topDirectoryOnly));
                         }
-                        else
-                        {
-                            throw new FileNotFoundException(string.Format(Properties.Resources.ErrorRomFileNotFound, path), path);
-                        }
 
                         // Apply shadowed files
                         var virtualPathData = GetVirtualPath(path);
@@ -1857,9 +1881,19 @@ namespace DotNet3dsToolkit.Core
                         {
                             output.AddRange(currentEntry.Children.Where(x => x.IsDirectory).Select(x => path + "/" + x.Name));
                         }
-                        else
+
+                        // Apply shadowed files
+                        var virtualPathData = GetVirtualPath(path);
+                        if (CurrentIOProvider.DirectoryExists(virtualPathData))
                         {
-                            throw new FileNotFoundException(string.Format(Properties.Resources.ErrorRomFileNotFound, path), path);
+                            foreach (var item in CurrentIOProvider.GetDirectories(virtualPathData, topDirectoryOnly))
+                            {
+                                var filePath = "/" + FileSystem.MakeRelativePath(item, VirtualPath);
+                                if (!output.Contains(filePath))
+                                {
+                                    output.Add(filePath);
+                                }
+                            }
                         }
                     }
                     else
@@ -2004,7 +2038,7 @@ namespace DotNet3dsToolkit.Core
         {
             base.Dispose(disposing);
 
-            if (!string.IsNullOrEmpty(VirtualPath) && CurrentIOProvider.DirectoryExists(VirtualPath))
+            if (!string.IsNullOrEmpty(VirtualPath) && CurrentIOProvider.DirectoryExists(VirtualPath) && DisposeVirtualPath)
             {
                 CurrentIOProvider.DeleteDirectory(VirtualPath);
                 VirtualPath = null;
