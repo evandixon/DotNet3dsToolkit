@@ -60,7 +60,7 @@ namespace DotNet3dsToolkit.Core.Tests
             }
 
             // Cleanup
-            //Provider.DeleteDirectory(BrtUsUnpackDir);
+            Provider.DeleteDirectory(BrtUsUnpackDir);
         }
 
         [TestMethod]
@@ -70,11 +70,19 @@ namespace DotNet3dsToolkit.Core.Tests
             using (var eosUS = new NdsRom())
             {
                 await eosUS.OpenFile(EosUsPath, Provider);
+                await eosUS.Unpack(EosUsUnpackDir, Provider);
                 await eosUS.Save("eos-repack.nds", Provider);
+
+                using (var eosRepack = new NdsRom())
+                {
+                    await eosRepack.OpenFile("eos-repack.nds", Provider);
+                    await eosUS.Unpack(EosUsUnpackDir + "-Reunpack", Provider);
+                }
             }
 
             // Cleanup
-            //Provider.DeleteFile("eos-repack.nds");
+            Provider.DeleteFile("eos-repack.nds");
+            Provider.DeleteDirectory(EosUsUnpackDir + "-Reunpack");
         }
 
         [TestMethod]
@@ -88,7 +96,7 @@ namespace DotNet3dsToolkit.Core.Tests
             }
 
             // Cleanup
-            //Provider.DeleteFile("eos-repack.nds");
+            Provider.DeleteFile("eos-repack.nds");
         }
 
         [TestMethod]

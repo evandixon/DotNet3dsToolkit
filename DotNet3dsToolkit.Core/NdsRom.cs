@@ -170,6 +170,8 @@ namespace DotNet3dsToolkit.Core
 
             public int FileIndex { get; set; }
 
+            public UInt16 DirectoryID { get; set; }
+
             public bool IsDirectory => FileIndex < 0;
 
             public List<FilenameTable> Children { get; set; }
@@ -745,7 +747,8 @@ namespace DotNet3dsToolkit.Core
         private async Task<int> WritePadding(int index, int fileLength, int blockSize = 0x200)
         {
             var paddingLength = CalculatePaddingSize(fileLength, blockSize);
-            await WriteAsync(index, new byte[paddingLength]);
+            // await WriteAsync(index, new byte[paddingLength]); // Faster
+            await WriteAsync(index, Enumerable.Repeat<byte>(0xFF, paddingLength).ToArray());
             return paddingLength;
         }
 
@@ -1147,7 +1150,7 @@ namespace DotNet3dsToolkit.Core
         /// </summary>
         /// <param name="path">Path of the node from which to build the FNT</param>
         /// <param name="filenames">Dicitonary matching paths to file indexes. </param>
-        private FilenameTable BuildCurrentFNTChild(string path, IDictionary<string, int> filenames, ref int directoryCount, ref int fileCount)
+        private FilenameTable BuildCurrentFNTChild(string path, IDictionary<string, int> filenames, ref UInt16 directoryCount, ref int fileCount)
         {
             var provider = this as IIOProvider;
 
@@ -1161,18 +1164,20 @@ namespace DotNet3dsToolkit.Core
             }
             else // Assume directory exists
             {
+                table.DirectoryID = (UInt16)(directoryCount | 0xF000);
+                directoryCount += 1;
                 foreach (var item in provider.GetDirectories(path, true))
                 {
                     table.Children.Add(BuildCurrentFNTChild(item, filenames, ref directoryCount, ref fileCount));
-                    directoryCount += 1;
                 }
                 foreach (var item in provider.GetFiles(path, "*", true))
                 {
                     var child = new FilenameTable();
                     child.Name = Path.GetFileName(item);
                     child.FileIndex = filenames[item];
-                    fileCount += 1;
+                    
                     table.Children.Add(child);
+                    fileCount += 1;
                 }
             }
             return table;
@@ -1208,26 +1213,21 @@ namespace DotNet3dsToolkit.Core
         protected List<byte> EncodeFNT(string path, IDictionary<string, int> filenames)
         {
             // Generate the FNT
-            int directoryCount = 1; // Count the root directory
+            UInt16 directoryCount = 0;
             int fileCount = 0;
             var table = BuildCurrentFNTChild(path, filenames, ref directoryCount, ref fileCount);
 
             // Encode the FNT
-            fileCount -= table.Children.Count; // Top level children don't count
             var numberTablesWritten = 0;
-            var nextSubDirOffset = (fileCount + directoryCount) * 8;
+            var nextSubDirOffset = (directoryCount) * 8;
             var tables = new List<byte>(nextSubDirOffset);
             var subTables = new List<byte>();
-
-            // Write root table
-            tables.AddRange(BitConverter.GetBytes(nextSubDirOffset)); // Offset to Sub-table
-            tables.AddRange(BitConverter.GetBytes((UInt16)(GetFirstFNTFileID(table) ?? -1))); // ID of first file in sub-table
-            tables.AddRange(BitConverter.GetBytes((UInt16)directoryCount)); // Special root definition
             
             numberTablesWritten += 1;
 
             // Write children
-            WriteFNTChildren(tables, subTables, table, ref numberTablesWritten, ref nextSubDirOffset);
+            // Parent dir is directoryCount because of special behavior in the root node.
+            WriteFNTDirectory(tables, subTables, table, directoryCount, ref nextSubDirOffset);
 
             // Concat tables
             tables.AddRange(subTables);
@@ -1235,48 +1235,40 @@ namespace DotNet3dsToolkit.Core
             return tables;
         }
 
-        private void WriteFNTChildren(List<byte> tables, List<byte> subTables, FilenameTable table, ref int numberTablesWritten, ref int nextSubDirOffset)
+        private void WriteFNTDirectory(List<byte> tables, List<byte> subTables, FilenameTable table, UInt16 parentDir, ref int nextSubDirOffset)
         {
-            int parentID = numberTablesWritten;
+            // Current directory info
+            tables.AddRange(BitConverter.GetBytes(nextSubDirOffset));
+            tables.AddRange(BitConverter.GetBytes((UInt16)(GetFirstFNTFileID(table) ?? -1)));
+            tables.AddRange(BitConverter.GetBytes((UInt16)parentDir));
 
-            // Write children
-            foreach (var item in table.Children)
+            // Write children info
+            foreach (var item in table.Children.Where(x => !x.IsDirectory))
             {
-                // Write subtable
-                byte filenameLength = (byte)Math.Min(item.Name.Length, 127);
-
-                if (item.IsDirectory)
-                {
-                    filenameLength &= 0x80; // Set directory flag
-                }
-
+                byte filenameLength = (byte)(Math.Min(item.Name.Length, 127));
                 subTables.Add(filenameLength);
                 subTables.AddRange(Encoding.ASCII.GetBytes(item.Name).Take(127));
-
-                if (item.IsDirectory)
-                {
-                    subTables.AddRange(BitConverter.GetBytes((UInt16)(numberTablesWritten & 0xF000))); // Sub-directory ID
-                }                
-
-                // Write table
-                if (item.IsDirectory)
-                {
-                    nextSubDirOffset += 1 + (filenameLength & 0x7F) + (item.IsDirectory ? 2 : 0);
-                    tables.AddRange(BitConverter.GetBytes(nextSubDirOffset)); // Offset to Sub-table
-                    tables.AddRange(BitConverter.GetBytes(GetFirstFNTFileID(table) ?? -1)); // ID of first file in sub-table
-                    tables.AddRange(BitConverter.GetBytes(parentID)); // Parent directory ID
-                    numberTablesWritten += 1;
-                }                
+                nextSubDirOffset += filenameLength + 1;
             }
 
-            // End sub table
+            foreach (var item in table.Children.Where(x => x.IsDirectory))
+            {
+                byte filenameLength = (byte)(Math.Min(item.Name.Length, 127));
+                subTables.Add((byte)(filenameLength | 0x80)); // Set the directory flag
+                subTables.AddRange(Encoding.ASCII.GetBytes(item.Name).Take(127));
+                nextSubDirOffset += filenameLength + 1;
+
+                subTables.AddRange(BitConverter.GetBytes((UInt16)(item.DirectoryID))); // Sub-directory ID
+                nextSubDirOffset += 2;
+            }
+
             subTables.Add(0);
             nextSubDirOffset += 1;
 
             // Write childrens' children
-            foreach (var item in table.Children)
+            foreach (var item in table.Children.Where(x => x.IsDirectory))
             {
-                WriteFNTChildren(tables, subTables, item, ref numberTablesWritten, ref nextSubDirOffset);
+                WriteFNTDirectory(tables, subTables, item, table.DirectoryID, ref nextSubDirOffset);
             }
         }
 
