@@ -1,5 +1,6 @@
 ﻿Imports System.IO
 Imports System.Text
+Imports DotNetNdsToolkit
 Imports SkyEditor.Core.IO
 
 ''' <summary>
@@ -83,9 +84,9 @@ Public Class MetadataReader
             file.IsReadOnly = True
             Await file.OpenFile(path, New PhysicalIOProvider)
 
-            Dim n As New GenericNDSRom
+            Dim n As New NdsRom
 
-            If Await n.IsFileOfType(file) Then
+            If Await n.IsOfType(file) Then
                 Return SystemType.NDS
             ElseIf file.Length > 104 AndAlso e.GetString(Await file.ReadAsync(&H100, 4)) = "NCSD" Then
                 'CCI
@@ -113,11 +114,11 @@ Public Class MetadataReader
             Case SystemType.NDS
                 Dim code As String
 
-                Using n As New GenericNDSRom
+                Using n As New NdsRom
                     n.EnableInMemoryLoad = False 'In-memory load would be overkill for simply reading the game code
                     n.IsReadOnly = True
                     Await n.OpenFile(path, New PhysicalIOProvider)
-                    code = n.GameCode
+                    code = n.Header.GameCode
                 End Using
 
                 Return code

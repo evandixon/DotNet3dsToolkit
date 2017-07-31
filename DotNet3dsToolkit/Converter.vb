@@ -1,6 +1,7 @@
 ﻿Imports System.IO
 Imports System.Text
 Imports System.Text.RegularExpressions
+Imports DotNetNdsToolkit
 Imports SkyEditor.Core.IO
 Imports SkyEditor.Core.Utilities
 
@@ -628,15 +629,15 @@ Public Class Converter
             Directory.CreateDirectory(outputDirectory)
         End If
 
-        Dim r As New GenericNDSRom
+        Dim r As New NdsRom
         Dim p As New PhysicalIOProvider
 
-        AddHandler r.UnpackProgress, reportProgress
+        AddHandler r.ProgressChanged, reportProgress
 
         Await r.OpenFile(filename, p)
         Await r.Unpack(outputDirectory, p)
 
-        RemoveHandler r.UnpackProgress, reportProgress
+        RemoveHandler r.ProgressChanged, reportProgress
         IsCompleted = True
     End Function
 
