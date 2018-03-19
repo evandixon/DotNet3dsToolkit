@@ -291,8 +291,8 @@ Public Class Converter
         Await Task.WhenAll(tasks)
 
         'Cleanup the rest
-        File.Delete(Path.Combine(ToolDirectory, "DecryptedRomFS.bin"))
-        File.Delete(Path.Combine(ToolDirectory, "DecryptedExeFS.bin"))
+        'File.Delete(Path.Combine(ToolDirectory, "DecryptedRomFS.bin"))
+        'File.Delete(Path.Combine(ToolDirectory, "DecryptedExeFS.bin"))
     End Function
 
     Private Async Function ExtractPartition1(options As ExtractionOptions) As Task
