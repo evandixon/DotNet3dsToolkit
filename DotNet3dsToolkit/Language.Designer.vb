@@ -22,7 +22,7 @@ Namespace My.Resources
     '''<summary>
     '''  A strongly-typed resource class, for looking up localized strings, etc.
     '''</summary>
-    <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "4.0.0.0"),  _
+    <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "15.0.0.0"),  _
      Global.System.Diagnostics.DebuggerNonUserCodeAttribute(),  _
      Global.System.Runtime.CompilerServices.CompilerGeneratedAttribute()>  _
     Friend Class Language
@@ -88,6 +88,15 @@ Namespace My.Resources
         Friend Shared ReadOnly Property ErrorFileDirNotFound() As String
             Get
                 Return ResourceManager.GetString("ErrorFileDirNotFound", resourceCulture)
+            End Get
+        End Property
+        
+        '''<summary>
+        '''  Looks up a localized string similar to Input ROM cannot be inside output directory..
+        '''</summary>
+        Friend Shared ReadOnly Property ErrorInputFileCannotBeInOutput() As String
+            Get
+                Return ResourceManager.GetString("ErrorInputFileCannotBeInOutput", resourceCulture)
             End Get
         End Property
         

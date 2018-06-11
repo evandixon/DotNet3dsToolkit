@@ -97,6 +97,7 @@
     <Compile Include="BuildOptions.vb" />
     <Compile Include="Converter.vb" />
     <Compile Include="ExtractionOptions.vb" />
+    <Compile Include="InputInsideOutputException.vb" />
     <Compile Include="Language.Designer.vb">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>

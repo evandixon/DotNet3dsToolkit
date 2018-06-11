@@ -57,6 +57,18 @@ Public Class Converter
         End If
     End Sub
 
+    Private Sub EnsureInputIsNotInOutputBeforeDeleting(inputFile As String, outputPath As String)
+        If Not outputPath.EndsWith("/") Then
+            outputPath &= "/"
+        End If
+
+        Dim input As New Uri(inputFile)
+        Dim output As New Uri(outputPath)
+        If output.IsBaseOf(input) Then
+            Throw New InputInsideOutputException
+        End If
+    End Sub
+
     Public Event UnpackProgressed As EventHandler(Of ProgressReportedEventArgs) Implements IReportProgress.ProgressChanged
     Public Event Completed As EventHandler Implements IReportProgress.Completed
 
@@ -509,6 +521,8 @@ Public Class Converter
     ''' <param name="filename">Full path of the ROM to extract.</param>
     ''' <param name="outputDirectory">Directory into which to extract the files.</param>
     Public Async Function ExtractCCI(filename As String, outputDirectory As String) As Task
+        EnsureInputIsNotInOutputBeforeDeleting(filename, outputDirectory)
+
         Dim options As New ExtractionOptions
         options.SourceRom = filename
         options.DestinationDirectory = outputDirectory
@@ -519,6 +533,8 @@ Public Class Converter
     ''' Extracts a CCI ROM.
     ''' </summary>
     Public Async Function ExtractCCI(options As ExtractionOptions) As Task
+        EnsureInputIsNotInOutputBeforeDeleting(options.SourceRom, options.DestinationDirectory)
+
         IsIndeterminate = True
         IsCompleted = False
 
@@ -547,6 +563,8 @@ Public Class Converter
     ''' <param name="filename">Full path of the ROM to extract.</param>
     ''' <param name="outputDirectory">Directory into which to extract the files.</param>
     Public Async Function ExtractCXI(filename As String, outputDirectory As String) As Task
+        EnsureInputIsNotInOutputBeforeDeleting(filename, outputDirectory)
+
         Dim options As New ExtractionOptions
         options.SourceRom = filename
         options.DestinationDirectory = outputDirectory
@@ -557,6 +575,8 @@ Public Class Converter
     ''' Extracts a CXI partition.
     ''' </summary>
     Public Async Function ExtractCXI(options As ExtractionOptions) As Task
+        EnsureInputIsNotInOutputBeforeDeleting(options.SourceRom, options.DestinationDirectory)
+
         IsIndeterminate = True
         IsCompleted = False
 
@@ -579,6 +599,8 @@ Public Class Converter
     ''' <param name="filename">Full path of the ROM to extract.</param>
     ''' <param name="outputDirectory">Directory into which to extract the files.</param>
     Public Async Function ExtractCIA(filename As String, outputDirectory As String) As Task
+        EnsureInputIsNotInOutputBeforeDeleting(filename, outputDirectory)
+
         Dim options As New ExtractionOptions
         options.SourceRom = filename
         options.DestinationDirectory = outputDirectory
@@ -589,6 +611,8 @@ Public Class Converter
     ''' Extracts a CIA.
     ''' </summary>
     Public Async Function ExtractCIA(options As ExtractionOptions) As Task
+        EnsureInputIsNotInOutputBeforeDeleting(options.SourceRom, options.DestinationDirectory)
+
         IsIndeterminate = True
         IsCompleted = False
 
@@ -618,6 +642,8 @@ Public Class Converter
     ''' <param name="filename">Full path of the ROM to extract.</param>
     ''' <param name="outputDirectory">Directory into which to extract the files.</param>
     Public Async Function ExtractNDS(filename As String, outputDirectory As String) As Task
+        EnsureInputIsNotInOutputBeforeDeleting(filename, outputDirectory)
+
         Progress = 0
         IsIndeterminate = False
         IsCompleted = False
@@ -649,7 +675,8 @@ Public Class Converter
     ''' <remarks>Extraction type is determined by file extension.  Extensions of ".cxi" are extracted as CXI, all others are extracted as CCI.  To override this behavior, use a more specific extraction function.</remarks>
     ''' <exception cref="NotSupportedException">Thrown when the input file is not a supported file.</exception>
     Public Async Function ExtractAuto(filename As String, outputDirectory As String) As Task
-        Dim ext = Path.GetExtension(filename).ToLower
+        EnsureInputIsNotInOutputBeforeDeleting(filename, outputDirectory)
+
         Select Case Await MetadataReader.GetROMSystem(filename)
             Case SystemType.NDS
                 Await ExtractNDS(filename, outputDirectory)

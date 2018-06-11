@@ -132,34 +132,38 @@ Public Class Form1
             AddHandler c.ConsoleOutputReceived, AddressOf OnConsoleOutputReceived
             AddHandler c.UnpackProgressed, AddressOf OnUnpackProgressed
 
-            If rbExtractAuto.Checked Then
-                lblStatus.Text = "Extracting (type auto-detected)..."
-                Await Task.Run(Async Function() As Task 'Start as a new task to allow running on a new thread right now
-                                   Await c.ExtractAuto(txtExtractSource.Text, txtExtractDestination.Text)
-                               End Function)
-            ElseIf rbExtractCCIDec.Checked Then
-                lblStatus.Text = "Extracting as decrypted CCI..."
-                Await Task.Run(Async Function() As Task
-                                   Await c.ExtractCCI(txtExtractSource.Text, txtExtractDestination.Text)
-                               End Function)
-            ElseIf rbExtractCXIDec.Checked Then
-                lblStatus.Text = "Extracting as decrypted CXI..."
-                Await Task.Run(Async Function() As Task
-                                   Await c.ExtractCXI(txtExtractSource.Text, txtExtractDestination.Text)
-                               End Function)
-            ElseIf rbExtractCIA.Checked Then
-                lblStatus.Text = "Extracting as decrypted CIA..."
-                Await Task.Run(Async Function() As Task
-                                   Await c.ExtractCIA(txtExtractSource.Text, txtExtractDestination.Text)
-                               End Function)
-            ElseIf rbExtractNDS.Checked Then
-                lblStatus.Text = "Extracting as NDS ROM..."
-                Await Task.Run(Async Function() As Task
-                                   Await c.ExtractNDS(txtExtractSource.Text, txtExtractDestination.Text)
-                               End Function)
-            Else
-                MessageBox.Show("Invalid radio button choice.")
-            End If
+            Try
+                If rbExtractAuto.Checked Then
+                    lblStatus.Text = "Extracting (type auto-detected)..."
+                    Await Task.Run(Async Function() As Task 'Start as a new task to allow running on a new thread right now
+                                       Await c.ExtractAuto(txtExtractSource.Text, txtExtractDestination.Text)
+                                   End Function)
+                ElseIf rbExtractCCIDec.Checked Then
+                    lblStatus.Text = "Extracting as decrypted CCI..."
+                    Await Task.Run(Async Function() As Task
+                                       Await c.ExtractCCI(txtExtractSource.Text, txtExtractDestination.Text)
+                                   End Function)
+                ElseIf rbExtractCXIDec.Checked Then
+                    lblStatus.Text = "Extracting as decrypted CXI..."
+                    Await Task.Run(Async Function() As Task
+                                       Await c.ExtractCXI(txtExtractSource.Text, txtExtractDestination.Text)
+                                   End Function)
+                ElseIf rbExtractCIA.Checked Then
+                    lblStatus.Text = "Extracting as decrypted CIA..."
+                    Await Task.Run(Async Function() As Task
+                                       Await c.ExtractCIA(txtExtractSource.Text, txtExtractDestination.Text)
+                                   End Function)
+                ElseIf rbExtractNDS.Checked Then
+                    lblStatus.Text = "Extracting as NDS ROM..."
+                    Await Task.Run(Async Function() As Task
+                                       Await c.ExtractNDS(txtExtractSource.Text, txtExtractDestination.Text)
+                                   End Function)
+                Else
+                    MessageBox.Show("Invalid radio button choice.")
+                End If
+            Catch ex As InputInsideOutputException
+                MessageBox.Show("Input ROM cannot be inside output directory.")
+            End Try
 
             RemoveHandler c.ConsoleOutputReceived, AddressOf OnConsoleOutputReceived
             RemoveHandler c.UnpackProgressed, AddressOf OnUnpackProgressed
