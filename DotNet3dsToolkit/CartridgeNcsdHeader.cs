@@ -8,6 +8,62 @@ namespace DotNet3dsToolkit
     {
         public CartridgeNcsdHeader(byte[] header) : base(header)
         {
+            ExheaderHash = new byte[0x20];
+            Array.Copy(header, 0x160, ExheaderHash, 0, 0x20);
+
+            AdditionalHeaderSize = BitConverter.ToInt32(header, 0x180);
+            SectorZeroOffset = BitConverter.ToInt32(header, 0x184);
+            PartitionFlags = BitConverter.ToInt64(header, 0x188);
+
+            PartitionIdTable = new byte[64];
+            Array.Copy(header, 0x190, PartitionIdTable, 0, 64);
+
+            Reserved1 = new byte[64];
+            Array.Copy(header, 0x1D0, Reserved1, 0, 0x20);
+
+            Reserved2 = new byte[64];
+            Array.Copy(header, 0x1F0, Reserved2, 0, 0xE);
+
+            Unknown1 = header[0x1FE];
+            Unknown2 = header[0x1FF];
+            Card2SaveAddress = BitConverter.ToInt32(header, 0x200);
+            CardInfoBitmask = BitConverter.ToInt32(header, 0x204);
+
+            Reserved3 = new byte[0x108];
+            Array.Copy(header, 0x208, Reserved3, 0, 0x108);
+
+            TitleVersion = BitConverter.ToInt16(header, 0x310);
+            CardRevision = BitConverter.ToInt16(header, 0x312);
+
+            Reserved4 = new byte[0xCEE];
+            Array.Copy(header, 0x314, Reserved4, 0, 0xCEE);
+
+            CardSeedY = new byte[0x10];
+            Array.Copy(header, 0x1000, CardSeedY, 0, 0x10);
+
+            EncryptedCardSeed = new byte[0x10];
+            Array.Copy(header, 0x1010, EncryptedCardSeed, 0, 0x10);
+
+            CardSeedAESMAC = new byte[0x10];
+            Array.Copy(header, 0x1010, CardSeedAESMAC, 0, 0x10);
+
+            CardSeedNonce = new byte[0x10];
+            Array.Copy(header, 0x1020, CardSeedNonce, 0, 0x10);
+
+            Reserved5 = new byte[0xC4];
+            Array.Copy(header, 0x103C, Reserved5, 0, 0xC4);
+
+            FirstNcchHeader = new byte[0x100];
+            Array.Copy(header, 0x1100, FirstNcchHeader, 0, 0x100);
+
+            CardDeviceReserved1 = new byte[0x200];
+            Array.Copy(header, 0x1200, CardDeviceReserved1, 0, 0x200);
+
+            TitleKey = new byte[0x10];
+            Array.Copy(header, 0x1400, TitleKey, 0, 0x10);
+
+            CardDeviceReserved2 = new byte[0xF0];
+            Array.Copy(header, 0x1410, CardDeviceReserved2, 0, 0xF0);
         }
 
         /// <summary>
@@ -23,7 +79,7 @@ namespace DotNet3dsToolkit
 
         public byte[] PartitionIdTable { get; private set; } // Offset: 0x190, Size: 8*8
 
-        protected byte[] Reserved1 { get; set; } // Offset: 0x190, Size: 0x20
+        protected byte[] Reserved1 { get; set; } // Offset: 0x1D0, Size: 0x20
 
         // Documentation is unsure about the use of this
         protected byte[] Reserved2 { get; set; } // Offset: 0x1F0, Size: 0xE
@@ -41,7 +97,7 @@ namespace DotNet3dsToolkit
         /// </summary>
         protected byte Unknown2 { get; set; } // Offset: 0x1FF, Size: 1
 
-        // To-Do: Move this to NcsdHeader maybe?
+        // To-Do: Move this to NcsdHeader maybe? Maybe not?
 
         /// <summary>
         /// Writable address of the CARD2 on-chip savedata, or -1 if the cartridge is CARD1

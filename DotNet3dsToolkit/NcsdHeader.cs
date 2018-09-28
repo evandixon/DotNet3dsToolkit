@@ -18,7 +18,7 @@ namespace DotNet3dsToolkit
             {
                 throw new ArgumentNullException(nameof(header));
             }
-            
+
             if (header.Length < 0x1500)
             {
                 throw new ArgumentException(Properties.Resources.NcsdHeader_ConstructorDataTooSmall, nameof(header));
@@ -30,8 +30,18 @@ namespace DotNet3dsToolkit
 
             Magic = Encoding.ASCII.GetString(header, 0x100, 4);
             ImageSize = BitConverter.ToInt32(header, 0x104);
+            MediaId = BitConverter.ToInt64(header, 0x108);
+            PartitionsFsType = BitConverter.ToInt64(header, 0x110);
 
-            throw new NotImplementedException();
+            for (int i = 0; i < 8; i++)
+            {
+                var partition = new NcsdPartitionInfo
+                {
+                    CryptType = header[0x118 + i],
+                    Offset = header[0x120 + (i * 2)],
+                    Length = header[0x120 + (i * 2) + 1]
+                };
+            }
         }
 
         /// <summary>
@@ -60,6 +70,6 @@ namespace DotNet3dsToolkit
         // Offset and length in media units offset: 0x120, length 4 bytes each
 
         public NcsdPartitionInfo[] Partitions { get; private set; }
-       
+
     }
 }

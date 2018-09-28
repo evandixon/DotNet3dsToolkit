@@ -8,6 +8,11 @@ namespace DotNet3dsToolkit
     {
         public NandNcsdHeader(byte[] header) : base(header)
         {
+            Unknown = new byte[0x5e];
+            Array.Copy(header, 0x160, Unknown, 0, 0x5e);
+
+            EncryptedMbrPartitionTable = new byte[0x42];
+            Array.Copy(header, 0x1BE, Unknown, 0, 0x42);
         }
 
         public byte[] Unknown { get; private set; } // Offset: 0x160, Size: 0x5E
