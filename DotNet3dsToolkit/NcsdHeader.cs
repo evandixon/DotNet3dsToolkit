@@ -1,0 +1,65 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace DotNet3dsToolkit
+{
+    /// <summary>
+    /// A NCSD Header File
+    /// </summary>
+    /// <remarks>
+    /// Documentation from 3dbrew: https://www.3dbrew.org/wiki/NCSD
+    /// </remarks>
+    public abstract class NcsdHeader
+    {
+        public NcsdHeader(byte[] header)
+        {
+            if (header == null)
+            {
+                throw new ArgumentNullException(nameof(header));
+            }
+            
+            if (header.Length < 0x1500)
+            {
+                throw new ArgumentException(Properties.Resources.NcsdHeader_ConstructorDataTooSmall, nameof(header));
+            }
+
+            Signature = new byte[0x100];
+            Array.Copy(header, 0, Signature, 0, 0x100);
+            header.CopyTo(Signature, 0);
+
+            Magic = Encoding.ASCII.GetString(header, 0x100, 4);
+            ImageSize = BitConverter.ToInt32(header, 0x104);
+
+            throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// RSA-2048 SHA-256 signature of the NCSD header
+        /// </summary>
+        public byte[] Signature { get; private set; } // Offset: 0, Size: 0x100
+
+        /// <summary>
+        /// Magic Number 'NCSD'
+        /// </summary>
+        public string Magic { get; private set; } // Offset: 0x100, Size: 0x4
+
+        /// <summary>
+        /// Size of the NCSD image, in media units (1 media unit = 0x200 bytes)
+        /// </summary>
+        public int ImageSize { get; private set; } // Offset: 0x104, Size: 0x4
+
+        public long MediaId { get; private set; } // Offset: 0x108, Size: 0x8
+
+        /// <summary>
+        /// Partitions FS type (0=None, 1=Normal, 3=FIRM, 4=AGB_FIRM save)
+        /// </summary>
+        public long PartitionsFsType { get; private set; } // Offset: 0x110, Size: 0x8
+
+        // Crypt type offset 0x118, size of each entry: 1 byte
+        // Offset and length in media units offset: 0x120, length 4 bytes each
+
+        public NcsdPartitionInfo[] Partitions { get; private set; }
+       
+    }
+}
