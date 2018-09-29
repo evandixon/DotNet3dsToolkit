@@ -61,6 +61,24 @@ namespace DotNet3dsToolkit.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Cannot read data greater than or equal to 2GB in size into memory.
+        /// </summary>
+        public static string BufferOverflow_BecauseIntMaxValue {
+            get {
+                return ResourceManager.GetString("BufferOverflow_BecauseIntMaxValue", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Data must be at least &quot;{0}&quot; bytes.
+        /// </summary>
+        public static string BufferUnderflow {
+            get {
+                return ResourceManager.GetString("BufferUnderflow", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to NCCH header must be at least 0x200 bytes.
         /// </summary>
         public static string NcchHeader_ConstructorDataTooSmall {

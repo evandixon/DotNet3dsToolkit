@@ -7,22 +7,22 @@ namespace DotNet3dsToolkit
 {
     public class NcchPartition
     {
-        public static async Task<NcchPartition> Load(ThreeDsRom parentRom, int partitionIndex)
+        public static async Task<NcchPartition> Load(GenericFileReference data, int partitionIndex)
         {
             NcchHeader header = null;
-            if (parentRom.Header.Partitions[partitionIndex].Length > 0)
+            if (data.Length > 0)
             {
-                header = new NcchHeader(await parentRom.ReadPartitionAsync(partitionIndex, 0, 0x200));
+                header = new NcchHeader(await data.ReadAsync(0, 0x200));
             }            
 
-            var partition = new NcchPartition(parentRom, partitionIndex, header);
+            var partition = new NcchPartition(data, partitionIndex, header);
             await partition.Initialize();
             return partition;
         }
 
-        public NcchPartition(ThreeDsRom parentRom, int partitionIndex, NcchHeader header)
+        public NcchPartition(GenericFileReference data, int partitionIndex, NcchHeader header)
         {
-            ParentRom = parentRom ?? throw new ArgumentNullException(nameof(parentRom));
+            Data = data ?? throw new ArgumentNullException(nameof(data));
             PartitionIndex = partitionIndex;
             Header = header; // Could be null if this is an empty partition
         }
@@ -31,47 +31,17 @@ namespace DotNet3dsToolkit
         {
             if (Header != null && Header.RomFsSize > 0)
             {
-                RomFs = new RomFs(this, new RomFs.RomFsHeader(await ReadRomFsAsync(0, 0x6B)));
+                RomFs = await RomFs.Load(new GenericFileReference(Data, Header.RomFsOffset * 0x200, Header.RomFsSize * 0x200));
             }
         }
 
-        private ThreeDsRom ParentRom { get; }
+        public GenericFileReference Data { get; }
 
         private int PartitionIndex { get; }
 
         public NcchHeader Header { get; } // Could be null if this is an empty partition
 
         public RomFs RomFs { get; private set; } // Could be null if not applicable
-
-        public async Task<byte[]> ReadAsync()
-        {
-            return await ParentRom.ReadPartitionAsync(PartitionIndex);
-        }
-
-        public async Task<byte> ReadAsync(long index)
-        {
-            return await ParentRom.ReadPartitionAsync(PartitionIndex, index);
-        }
-
-        public async Task<byte[]> ReadAsync(long index, int length)
-        {
-            return await ParentRom.ReadPartitionAsync(PartitionIndex, index, length);
-        }
-
-        public async Task<byte[]> ReadRomFsAsync()
-        {
-            return await ParentRom.ReadPartitionAsync(PartitionIndex, (Header.RomFsOffset * 0x200), (Header.RomFsSize * 0x200));
-        }
-
-        public async Task<byte> ReadRomFsAsync(long index)
-        {
-            return await ParentRom.ReadPartitionAsync(PartitionIndex, Header.RomFsOffset * 0x200 + index);
-        }
-
-        public async Task<byte[]> ReadRomFsAsync(long index, int length)
-        {
-            return await ParentRom.ReadPartitionAsync(PartitionIndex, (Header.RomFsOffset * 0x200), Math.Min(length, (Header.RomFsSize * 0x200)));
-        }
 
         #region Child Classes
         public class NcchHeader

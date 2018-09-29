@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace DotNet3dsToolkit
 {
-    public class ThreeDsRom : IOpenableFile
+    public class ThreeDsRom : IOpenableFile, IDisposable
     {
 
         public NcsdHeader Header { get; set; }
@@ -24,59 +24,12 @@ namespace DotNet3dsToolkit
 
             var partitions = new List<NcchPartition>();
             for (int i = 0; i < Header.Partitions.Length; i++)
-            {                
-                partitions.Add(await NcchPartition.Load(this, i));
+            {
+                var partitionStart = (long)Header.Partitions[i].Offset * 0x200;
+                var partitionLength = (long)Header.Partitions[i].Length * 0x200;
+                partitions.Add(await NcchPartition.Load(new GenericFileReference(RawData, partitionStart, (int)partitionLength), i));
             }
             Partitions = partitions.ToArray();
-        }
-
-        public async Task<byte[]> ReadPartitionAsync(int partitionIndex)
-        {
-            var partitionStart = (long)Header.Partitions[partitionIndex].Offset * 0x200;
-            var partitionLength = (long)Header.Partitions[partitionIndex].Length * 0x200;
-
-            if (partitionLength == 0)
-            {
-                throw new IndexOutOfRangeException(Properties.Resources.ThreeDsRom_PartitionDoesNotExist);
-            }
-
-            return await RawData.ReadAsync(partitionStart, (int)partitionLength);
-        }
-
-        public async Task<byte> ReadPartitionAsync(int partitionIndex, long index)
-        {
-            var partitionStart = (long)Header.Partitions[partitionIndex].Offset * 0x200;
-            var partitionLength = (long)Header.Partitions[partitionIndex].Length * 0x200;
-
-            if (partitionLength == 0)
-            {
-                throw new IndexOutOfRangeException(Properties.Resources.ThreeDsRom_PartitionDoesNotExist);
-            }
-
-            if (partitionLength < index)
-            {
-                throw new IndexOutOfRangeException(Properties.Resources.ThreeDsRom_PartitionDataOutOfRange);
-            }
-
-            return await RawData.ReadAsync(partitionStart + partitionLength);
-        }
-
-        public async Task<byte[]> ReadPartitionAsync(int partitionIndex, long index, int length)
-        {
-            var partitionStart = (long)Header.Partitions[partitionIndex].Offset * 0x200;
-            var partitionLength = (long)Header.Partitions[partitionIndex].Length * 0x200;
-
-            if (partitionLength == 0)
-            {
-                throw new IndexOutOfRangeException(Properties.Resources.ThreeDsRom_PartitionDoesNotExist);
-            }
-
-            if (partitionLength < index || partitionLength < length)
-            {
-                throw new IndexOutOfRangeException(Properties.Resources.ThreeDsRom_PartitionDataOutOfRange);
-            }
-
-            return await RawData.ReadAsync(partitionStart + index, (int)length);
         }
 
         #region Child Classes
@@ -328,6 +281,41 @@ namespace DotNet3dsToolkit
             public int Length { get; set; }
         }
 
+        #endregion
+
+        #region IDisposable Support
+        private bool disposedValue = false; // To detect redundant calls
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    RawData?.Dispose();
+                }
+
+                // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.
+                // TODO: set large fields to null.
+
+                disposedValue = true;
+            }
+        }
+
+        // TODO: override a finalizer only if Dispose(bool disposing) above has code to free unmanaged resources.
+        // ~ThreeDsRom() {
+        //   // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+        //   Dispose(false);
+        // }
+
+        // This code added to correctly implement the disposable pattern.
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+            Dispose(true);
+            // TODO: uncomment the following line if the finalizer is overridden above.
+            // GC.SuppressFinalize(this);
+        }
         #endregion
     }
 }
