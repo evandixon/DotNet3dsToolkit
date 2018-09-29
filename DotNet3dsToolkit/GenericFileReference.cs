@@ -49,6 +49,21 @@ namespace DotNet3dsToolkit
 
         public long Length { get; private set; }
 
+        public bool IsThreadSafe
+        {
+            get
+            {
+                if (File != null)
+                {
+                    return File.IsThreadSafe;
+                }
+                else
+                {
+                    return Reference.IsThreadSafe;
+                }
+            }
+        }
+
 
         public async Task<byte[]> ReadAsync()
         {
@@ -88,16 +103,7 @@ namespace DotNet3dsToolkit
 
             if (File != null)
             {
-                try
-                {
-
-                    return await File.ReadAsync(Offset + index, (int)Math.Min(Length, length));
-                }
-                catch (Exception ex)
-                {
-
-                    throw;
-                }
+                return await File.ReadAsync(Offset + index, (int)Math.Min(Length, length));
             }
             else
             {
@@ -108,6 +114,11 @@ namespace DotNet3dsToolkit
         public async Task<int> ReadInt32Async(long index)
         {
             return BitConverter.ToInt32(await ReadAsync(index, 4), 0);
+        }
+
+        public async Task<long> ReadInt64Async(long index)
+        {
+            return BitConverter.ToInt64(await ReadAsync(index, 8), 0);
         }
     }
 }

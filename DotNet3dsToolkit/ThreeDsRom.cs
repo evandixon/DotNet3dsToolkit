@@ -1,6 +1,9 @@
 ﻿using SkyEditor.Core.IO;
+using SkyEditor.Core.Utilities;
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -15,6 +18,14 @@ namespace DotNet3dsToolkit
 
         private GenericFile RawData { get; set; }
 
+        public RomFs RomFs
+        {
+            get
+            {
+                return Partitions[0].RomFs;
+            }
+        }
+
         public async Task OpenFile(string filename, IIOProvider provider)
         {
             RawData = new GenericFile(filename, provider);
@@ -22,14 +33,28 @@ namespace DotNet3dsToolkit
             // To-do: determine which NCSD header to use
             Header = new CartridgeNcsdHeader(await RawData.ReadAsync(0, 0x1500));
 
-            var partitions = new List<NcchPartition>();
-            for (int i = 0; i < Header.Partitions.Length; i++)
+            Partitions = new NcchPartition[Header.Partitions.Length];
+
+            var a = new AsyncFor();
+            a.RunSynchronously = !RawData.IsThreadSafe;
+            await a.RunFor(async i => 
             {
                 var partitionStart = (long)Header.Partitions[i].Offset * 0x200;
                 var partitionLength = (long)Header.Partitions[i].Length * 0x200;
-                partitions.Add(await NcchPartition.Load(new GenericFileReference(RawData, partitionStart, (int)partitionLength), i));
+                Partitions[i] = await NcchPartition.Load(new GenericFileReference(RawData, partitionStart, (int)partitionLength), i);
+            }, 0, Header.Partitions.Length - 1);
+        }
+
+        public async Task ExtractFiles(string directoryName, IIOProvider provider)
+        {        
+            if (!provider.DirectoryExists(directoryName))
+            {
+                provider.CreateDirectory(directoryName);
             }
-            Partitions = partitions.ToArray();
+
+            await Task.WhenAll(
+                RomFs.ExtractFiles(Path.Combine(directoryName, "RomFS"), provider)
+            );
         }
 
         #region Child Classes
