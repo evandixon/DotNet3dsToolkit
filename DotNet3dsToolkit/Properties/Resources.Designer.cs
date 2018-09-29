@@ -79,6 +79,15 @@ namespace DotNet3dsToolkit.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to ROM FS header must be at least 0x6B bytes.
+        /// </summary>
+        public static string RomFsHeader_ConstructorDataTooSmall {
+            get {
+                return ResourceManager.GetString("RomFsHeader_ConstructorDataTooSmall", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to The requested data is out of range of the partition..
         /// </summary>
         public static string ThreeDsRom_PartitionDataOutOfRange {

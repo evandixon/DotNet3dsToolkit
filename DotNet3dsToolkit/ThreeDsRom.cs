@@ -25,7 +25,7 @@ namespace DotNet3dsToolkit
             var partitions = new List<NcchPartition>();
             for (int i = 0; i < Header.Partitions.Length; i++)
             {                
-                partitions.Add(await NcchPartition.LoadPartition(this, i));
+                partitions.Add(await NcchPartition.Load(this, i));
             }
             Partitions = partitions.ToArray();
         }

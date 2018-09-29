@@ -123,6 +123,9 @@
   <data name="NcsdHeader_ConstructorDataTooSmall" xml:space="preserve">
     <value>NCSD header must be at least 0x1500 bytes</value>
   </data>
+  <data name="RomFsHeader_ConstructorDataTooSmall" xml:space="preserve">
+    <value>ROM FS header must be at least 0x6B bytes</value>
+  </data>
   <data name="ThreeDsRom_PartitionDataOutOfRange" xml:space="preserve">
     <value>The requested data is out of range of the partition.</value>
   </data>

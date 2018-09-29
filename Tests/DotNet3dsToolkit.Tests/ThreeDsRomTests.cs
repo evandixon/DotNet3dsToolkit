@@ -34,6 +34,12 @@ namespace DotNet3dsToolkit.Tests
                 if (partition.Header != null)
                 {
                     partition.Header.Magic.Should().Be("NCCH");
+                    if (partition.RomFs != null)
+                    {
+                        partition.RomFs.Header.Should().NotBeNull();
+                        partition.RomFs.Header.Magic.Should().Be("IVFC");
+                        partition.RomFs.Header.MagicNumber.Should().Be(0x10000);
+                    }
                 }
             }
         }

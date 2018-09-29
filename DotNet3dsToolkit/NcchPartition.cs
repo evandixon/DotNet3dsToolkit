@@ -7,14 +7,17 @@ namespace DotNet3dsToolkit
 {
     public class NcchPartition
     {
-        public static async Task<NcchPartition> LoadPartition(ThreeDsRom parentRom, int partitionIndex)
+        public static async Task<NcchPartition> Load(ThreeDsRom parentRom, int partitionIndex)
         {
             NcchHeader header = null;
             if (parentRom.Header.Partitions[partitionIndex].Length > 0)
             {
-                header = new NcchHeader(await parentRom.ReadPartitionAsync(i, 0, 0x200));
-            }
-            return new NcchPartition(parentRom, partitionIndex, header);
+                header = new NcchHeader(await parentRom.ReadPartitionAsync(partitionIndex, 0, 0x200));
+            }            
+
+            var partition = new NcchPartition(parentRom, partitionIndex, header);
+            await partition.Initialize();
+            return partition;
         }
 
         public NcchPartition(ThreeDsRom parentRom, int partitionIndex, NcchHeader header)
@@ -24,11 +27,21 @@ namespace DotNet3dsToolkit
             Header = header; // Could be null if this is an empty partition
         }
 
+        public async Task Initialize()
+        {
+            if (Header != null && Header.RomFsSize > 0)
+            {
+                RomFs = new RomFs(this, new RomFs.RomFsHeader(await ReadRomFsAsync(0, 0x6B)));
+            }
+        }
+
         private ThreeDsRom ParentRom { get; }
 
         private int PartitionIndex { get; }
 
         public NcchHeader Header { get; } // Could be null if this is an empty partition
+
+        public RomFs RomFs { get; private set; } // Could be null if not applicable
 
         public async Task<byte[]> ReadAsync()
         {
@@ -43,6 +56,21 @@ namespace DotNet3dsToolkit
         public async Task<byte[]> ReadAsync(long index, int length)
         {
             return await ParentRom.ReadPartitionAsync(PartitionIndex, index, length);
+        }
+
+        public async Task<byte[]> ReadRomFsAsync()
+        {
+            return await ParentRom.ReadPartitionAsync(PartitionIndex, (Header.RomFsOffset * 0x200), (Header.RomFsSize * 0x200));
+        }
+
+        public async Task<byte> ReadRomFsAsync(long index)
+        {
+            return await ParentRom.ReadPartitionAsync(PartitionIndex, Header.RomFsOffset * 0x200 + index);
+        }
+
+        public async Task<byte[]> ReadRomFsAsync(long index, int length)
+        {
+            return await ParentRom.ReadPartitionAsync(PartitionIndex, (Header.RomFsOffset * 0x200), Math.Min(length, (Header.RomFsSize * 0x200)));
         }
 
         #region Child Classes
