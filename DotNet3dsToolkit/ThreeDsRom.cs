@@ -80,7 +80,7 @@ namespace DotNet3dsToolkit
                 throw new IndexOutOfRangeException(Properties.Resources.ThreeDsRom_PartitionDataOutOfRange);
             }
 
-            return await RawData.ReadAsync(partitionStart + index, (int)(partitionLength + length));
+            return await RawData.ReadAsync(partitionStart + index, (int)length);
         }
     }
 }

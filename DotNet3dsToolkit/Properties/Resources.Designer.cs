@@ -61,6 +61,15 @@ namespace DotNet3dsToolkit.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to NCCH header must be at least 0x200 bytes.
+        /// </summary>
+        public static string NcchHeader_ConstructorDataTooSmall {
+            get {
+                return ResourceManager.GetString("NcchHeader_ConstructorDataTooSmall", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to NCSD header must be at least 0x1500 bytes.
         /// </summary>
         public static string NcsdHeader_ConstructorDataTooSmall {

@@ -21,12 +21,21 @@ namespace DotNet3dsToolkit.Tests
 
         [Theory]
         [MemberData(nameof(TestData))]
-        public async void ReadsHeader(string filename)
+        public async void ReadsHeaders(string filename)
         {
             var rom = new ThreeDsRom();
             await rom.OpenFile(filename, new PhysicalIOProvider());
             rom.Header.Should().NotBeNull();
+            rom.Header.Magic.Should().Be("NCSD");
             rom.Header.Partitions.Should().NotBeNull();
+
+            foreach(var partition in rom.Partitions)
+            {
+                if (partition.Header != null)
+                {
+                    partition.Header.Magic.Should().Be("NCCH");
+                }
+            }
         }
 
         //[Theory]

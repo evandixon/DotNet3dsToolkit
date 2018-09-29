@@ -19,7 +19,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DotNet3dsToolkit.Tests", "T
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "TestData", "TestData", "{7055578D-5CA4-4E04-8A71-58FAD51B22E4}"
 	ProjectSection(SolutionItems) = preProject
-		AddTestDataHere.txt = AddTestDataHere.txt
+		Tests\TestData\AddTestDataHere.txt = Tests\TestData\AddTestDataHere.txt
 	EndProjectSection
 EndProject
 Global
