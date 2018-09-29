@@ -26,6 +26,23 @@ namespace DotNet3dsToolkit.Tests
             var rom = new ThreeDsRom();
             await rom.OpenFile(filename, new PhysicalIOProvider());
             rom.Header.Should().NotBeNull();
+            rom.Header.Partitions.Should().NotBeNull();
         }
+
+        //[Theory]
+        //[MemberData(nameof(TestData))]
+        //public async void ExtractPartitions(string filename)
+        //{
+        //    var rom = new ThreeDsRom();
+        //    await rom.OpenFile(filename, new PhysicalIOProvider());
+
+        //    for (int i = 0; i < rom.Header.Partitions.Length; i++) {
+        //        var partition = rom.Header.Partitions[i];
+        //        if (partition.Length > 0)
+        //        {
+        //            File.WriteAllBytes("partition" + i.ToString() + ".bin", await rom.ReadPartitionAsync(i));
+        //        }
+        //    }
+        //}
     }
 }

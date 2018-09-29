@@ -120,4 +120,10 @@
   <data name="NcsdHeader_ConstructorDataTooSmall" xml:space="preserve">
     <value>NCSD header must be at least 0x1500 bytes</value>
   </data>
+  <data name="ThreeDsRom_PartitionDataOutOfRange" xml:space="preserve">
+    <value>The requested data is out of range of the partition.</value>
+  </data>
+  <data name="ThreeDsRom_PartitionDoesNotExist" xml:space="preserve">
+    <value>The requested partition does not exist.</value>
+  </data>
 </root>

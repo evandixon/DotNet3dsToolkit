@@ -68,5 +68,23 @@ namespace DotNet3dsToolkit.Properties {
                 return ResourceManager.GetString("NcsdHeader_ConstructorDataTooSmall", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The requested data is out of range of the partition..
+        /// </summary>
+        public static string ThreeDsRom_PartitionDataOutOfRange {
+            get {
+                return ResourceManager.GetString("ThreeDsRom_PartitionDataOutOfRange", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The requested partition does not exist..
+        /// </summary>
+        public static string ThreeDsRom_PartitionDoesNotExist {
+            get {
+                return ResourceManager.GetString("ThreeDsRom_PartitionDoesNotExist", resourceCulture);
+            }
+        }
     }
 }

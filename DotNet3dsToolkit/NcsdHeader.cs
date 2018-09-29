@@ -26,22 +26,23 @@ namespace DotNet3dsToolkit
 
             Signature = new byte[0x100];
             Array.Copy(header, 0, Signature, 0, 0x100);
-            header.CopyTo(Signature, 0);
 
             Magic = Encoding.ASCII.GetString(header, 0x100, 4);
             ImageSize = BitConverter.ToInt32(header, 0x104);
             MediaId = BitConverter.ToInt64(header, 0x108);
             PartitionsFsType = BitConverter.ToInt64(header, 0x110);
 
+            var partitions = new List<NcsdPartitionInfo>();
             for (int i = 0; i < 8; i++)
             {
-                var partition = new NcsdPartitionInfo
+                partitions.Add(new NcsdPartitionInfo
                 {
                     CryptType = header[0x118 + i],
-                    Offset = header[0x120 + (i * 2)],
-                    Length = header[0x120 + (i * 2) + 1]
-                };
+                    Offset = BitConverter.ToInt32(header, 0x120 + (i * 2) * 4),
+                    Length = BitConverter.ToInt32(header, 0x120 + (i * 2 + 1) * 4)
+                });
             }
+            Partitions = partitions.ToArray();
         }
 
         /// <summary>
