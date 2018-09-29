@@ -7,12 +7,16 @@ namespace DotNet3dsToolkit
     public class ThreeDsRom : IOpenableFile
     {
 
+        public NcsdHeader Header { get; set; }
+
         private GenericFile RawData { get; set; }
 
-        public Task OpenFile(string filename, IIOProvider provider)
+        public async Task OpenFile(string filename, IIOProvider provider)
         {
             RawData = new GenericFile(filename, provider);
-            return Task.CompletedTask;
+
+            // To-do: determine which NCSD header to use
+            Header = new CartridgeNcsdHeader(await RawData.ReadAsync(0, 0x1500));
         }
     }
 }
