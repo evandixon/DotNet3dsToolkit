@@ -31,7 +31,14 @@ namespace DotNet3dsToolkit
         {
             if (Header != null && Header.RomFsSize > 0)
             {
-                RomFs = await RomFs.Load(new GenericFileReference(Data, Header.RomFsOffset * 0x200, Header.RomFsSize * 0x200));
+                if (Header.ExeFsOffset > 0 && Header.ExeFsSize > 0)
+                {
+                    ExeFs = await ExeFs.Load(new GenericFileReference(Data, Header.ExeFsOffset * 0x200, Header.ExeFsSize * 0x200));
+                }
+                if (Header.RomFsOffset > 0 && Header.RomFsOffset > 0)
+                {
+                    RomFs = await RomFs.Load(new GenericFileReference(Data, Header.RomFsOffset * 0x200, Header.RomFsSize * 0x200));
+                }                    
             }
         }
 
@@ -41,6 +48,7 @@ namespace DotNet3dsToolkit
 
         public NcchHeader Header { get; } // Could be null if this is an empty partition
 
+        public ExeFs ExeFs { get; private set; } // Could be null if not applicable
         public RomFs RomFs { get; private set; } // Could be null if not applicable
 
         #region Child Classes

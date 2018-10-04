@@ -3,7 +3,9 @@ using SkyEditor.Core.IO;
 using SkyEditor.Core.Utilities;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace DotNet3dsToolkit.Tests
@@ -49,56 +51,25 @@ namespace DotNet3dsToolkit.Tests
 
         [Theory]
         [MemberData(nameof(TestData))]
-        public async void ExtractPartitions(string filename)
+        public async Task ExtractRomFsFiles(string filename)
         {
-            using (var rom = new ThreeDsRom())
-            {
-                await rom.OpenFile(filename, new PhysicalIOProvider());
+            var progressReportToken = new ProgressReportToken();
 
-                var a = new AsyncFor();
-                a.RunSynchronously = false;
-                await a.RunFor(async (i) =>
-                {
-                    var partition = rom.Header.Partitions[i];
-                    if (partition.Length > 0)
-                    {
-                        File.WriteAllBytes("partition" + i.ToString() + ".bin", await rom.Partitions[i].Data.ReadAsync());
-                    }
-                }, 0, rom.Header.Partitions.Length - 1);
-            }
-        }
-
-        [Theory]
-        [MemberData(nameof(TestData))]
-        public async void ExtractRomFsBin(string filename)
-        {
-            using (var rom = new ThreeDsRom())
-            {
-                await rom.OpenFile(filename, new PhysicalIOProvider());
-
-                var a = new AsyncFor();
-                a.RunSynchronously = false;
-                await a.RunFor(async (i) =>
-                {
-                    var partition = rom.Partitions[i];
-                    if (partition.RomFs != null)
-                    {
-                        File.WriteAllBytes("romfs" + i.ToString() + ".bin", await partition.RomFs.Data.ReadAsync());
-                    }
-                }, 0, rom.Header.Partitions.Length - 1);
-            }
-        }
-
-        [Theory]
-        [MemberData(nameof(TestData))]
-        public async void ExtractRomFsFiles(string filename)
-        {
             using (var rom = new ThreeDsRom())
             {
                 var provider = new PhysicalIOProvider();
                 await rom.OpenFile(filename, provider);
-                await rom.ExtractFiles("./extracted-" + Path.GetFileNameWithoutExtension(filename), provider);                
+                var extractionTask = rom.ExtractFiles("./extracted-" + Path.GetFileNameWithoutExtension(filename), provider, progressReportToken);
+
+                // Awaiting the task and handling the progressReportToken makes everything wait on Debug.WriteLine, slowing things down a lot
+                // So we asynchronously poll
+                while (!extractionTask.IsCompleted)
+                {
+                    Debug.WriteLine("Extraction progress: " + Math.Round(progressReportToken.Progress * 100, 2).ToString());
+                    await Task.Delay(200);
+                }
             }
+            Debug.WriteLine("Extraction complete!");
         }
     }
 }

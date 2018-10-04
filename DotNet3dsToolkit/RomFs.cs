@@ -1,7 +1,6 @@
 ﻿using SkyEditor.Core.IO;
 using SkyEditor.Core.Utilities;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -82,14 +81,19 @@ namespace DotNet3dsToolkit
 
         private long BodySize { get; }
 
-        public async Task ExtractFiles(string directoryName, IIOProvider provider)
+        public async Task ExtractFiles(string directoryName, IIOProvider provider, ExtractionProgressedToken progressReportToken = null)
         {
+            if (progressReportToken != null)
+            {
+                progressReportToken.TotalFileCount = Level3.RootFiles.Length + Level3.RootDirectoryMetadataTable.CountChildFiles();
+            }
+
             if (!provider.DirectoryExists(directoryName))
             {
                 provider.CreateDirectory(directoryName);
             }
 
-            async Task extractDirectory(RomFs.DirectoryMetadata dir, string subDirectory)
+            async Task extractDirectory(DirectoryMetadata dir, string subDirectory)
             {
                 var destDirectory = Path.Combine(subDirectory, dir.Name);
                 if (!provider.DirectoryExists(destDirectory))
@@ -104,6 +108,10 @@ namespace DotNet3dsToolkit
                     fileExtractor.RunForEach(dir.ChildFiles, async f =>
                     {
                         provider.WriteAllBytes(Path.Combine(destDirectory, f.Name), await f.GetDataReference().ReadAsync());
+                        if (progressReportToken != null)
+                        {
+                            progressReportToken.IncrementExtractedFileCount();
+                        }
                     }),
                     directoryExtractor.RunForEach(dir.ChildDirectories, async d =>
                     {
@@ -323,6 +331,11 @@ namespace DotNet3dsToolkit
                         ChildFiles.Add(currentChild);
                     }
                 }
+            }
+
+            public int CountChildFiles()
+            {
+                return ChildFiles.Count + ChildDirectories.Select(d => d.CountChildFiles()).Sum();
             }
 
             public override string ToString()

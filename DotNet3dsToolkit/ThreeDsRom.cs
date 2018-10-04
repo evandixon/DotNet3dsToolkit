@@ -30,6 +30,7 @@ namespace DotNet3dsToolkit
         {
             RawData = new GenericFile();
             RawData.EnableMemoryMappedFileLoading = true;
+            RawData.EnableInMemoryLoad = true;
             await RawData.OpenFile(filename, provider);
 
             // To-do: determine which NCSD header to use
@@ -39,7 +40,7 @@ namespace DotNet3dsToolkit
 
             var a = new AsyncFor();
             a.RunSynchronously = !RawData.IsThreadSafe;
-            await a.RunFor(async i => 
+            await a.RunFor(async i =>
             {
                 var partitionStart = (long)Header.Partitions[i].Offset * 0x200;
                 var partitionLength = (long)Header.Partitions[i].Length * 0x200;
@@ -47,25 +48,68 @@ namespace DotNet3dsToolkit
             }, 0, Header.Partitions.Length - 1);
         }
 
-        public async Task ExtractFiles(string directoryName, IIOProvider provider)
-        {        
+        public async Task ExtractFiles(string directoryName, IIOProvider provider, ProgressReportToken progressReportToken = null)
+        {
+
+            List<ExtractionProgressedToken> extractionProgressedTokens = null;
+            if (progressReportToken != null)
+            {
+                extractionProgressedTokens = new List<ExtractionProgressedToken>();
+                progressReportToken.IsIndeterminate = false;
+            }
+
+            void onExtractionTokenProgressed(object sender, EventArgs e)
+            {
+                if (progressReportToken != null)
+                {
+                    progressReportToken.Progress = (float)extractionProgressedTokens.Select(t => t.ExtractedFileCount).Sum() / extractionProgressedTokens.Select(t => t.TotalFileCount).Sum();
+                }
+            }
+
             if (!provider.DirectoryExists(directoryName))
             {
                 provider.CreateDirectory(directoryName);
             }
-
+            
             var tasks = new List<Task>();
-            for (int i = 0;i<Partitions.Length;i++)
+            for (int i = 0; i < Partitions.Length; i++)
             {
                 var partition = Partitions[i];
-                if (partition?.RomFs == null)
+
+                if (partition?.ExeFs != null)
                 {
-                    continue;
+                    ExtractionProgressedToken exefsExtractionProgressedToken = null;
+                    if (exefsExtractionProgressedToken != null)
+                    {
+                        exefsExtractionProgressedToken = new ExtractionProgressedToken();
+                        exefsExtractionProgressedToken.FileCountChanged += onExtractionTokenProgressed;
+                        extractionProgressedTokens.Add(exefsExtractionProgressedToken);
+                    }
+                    tasks.Add(partition.ExeFs.ExtractFiles(Path.Combine(directoryName, GetExeFsDirectoryName(i)), provider, exefsExtractionProgressedToken));
                 }
 
-                tasks.Add(partition.RomFs.ExtractFiles(Path.Combine(directoryName, GetRomFsDirectoryName(i)), provider));
+                if (partition?.RomFs != null)
+                {
+                    ExtractionProgressedToken romfsExtractionProgressedToken = null;
+                    if (romfsExtractionProgressedToken != null)
+                    {
+                        romfsExtractionProgressedToken = new ExtractionProgressedToken();
+                        romfsExtractionProgressedToken.FileCountChanged += onExtractionTokenProgressed;
+                        extractionProgressedTokens.Add(romfsExtractionProgressedToken);
+                    }
+
+                    tasks.Add(partition.RomFs.ExtractFiles(Path.Combine(directoryName, GetRomFsDirectoryName(i)), provider, romfsExtractionProgressedToken));
+                }
+
             }
+
             await Task.WhenAll(tasks);
+
+            if (progressReportToken != null)
+            {
+                progressReportToken.Progress = 1;
+                progressReportToken.IsCompleted = true;
+            }
         }
 
         private string GetRomFsDirectoryName(int partitionId)
@@ -85,6 +129,18 @@ namespace DotNet3dsToolkit
                     return "O3DSUpdate";
                 default:
                     return "RomFS-Partition-" + partitionId.ToString();
+            }
+        }
+
+        private string GetExeFsDirectoryName(int partitionId)
+        {
+            // To-do: get this from a an options object
+            switch (partitionId)
+            {
+                case 0:
+                    return "ExeFS";
+                default:
+                    return "ExeFS-Partition-" + partitionId.ToString();
             }
         }
 
