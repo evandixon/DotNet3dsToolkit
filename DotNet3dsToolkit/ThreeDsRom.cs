@@ -28,7 +28,9 @@ namespace DotNet3dsToolkit
 
         public async Task OpenFile(string filename, IIOProvider provider)
         {
-            RawData = new GenericFile(filename, provider);
+            RawData = new GenericFile();
+            RawData.EnableMemoryMappedFileLoading = true;
+            await RawData.OpenFile(filename, provider);
 
             // To-do: determine which NCSD header to use
             Header = new CartridgeNcsdHeader(await RawData.ReadAsync(0, 0x1500));
@@ -52,9 +54,38 @@ namespace DotNet3dsToolkit
                 provider.CreateDirectory(directoryName);
             }
 
-            await Task.WhenAll(
-                RomFs.ExtractFiles(Path.Combine(directoryName, "RomFS"), provider)
-            );
+            var tasks = new List<Task>();
+            for (int i = 0;i<Partitions.Length;i++)
+            {
+                var partition = Partitions[i];
+                if (partition?.RomFs == null)
+                {
+                    continue;
+                }
+
+                tasks.Add(partition.RomFs.ExtractFiles(Path.Combine(directoryName, GetRomFsDirectoryName(i)), provider));
+            }
+            await Task.WhenAll(tasks);
+        }
+
+        private string GetRomFsDirectoryName(int partitionId)
+        {
+            // To-do: get this from a an options object
+            switch (partitionId)
+            {
+                case 0:
+                    return "RomFS";
+                case 1:
+                    return "Manual";
+                case 2:
+                    return "DownloadPlay";
+                case 6:
+                    return "N3DSUpdate";
+                case 7:
+                    return "O3DSUpdate";
+                default:
+                    return "RomFS-Partition-" + partitionId.ToString();
+            }
         }
 
         #region Child Classes
