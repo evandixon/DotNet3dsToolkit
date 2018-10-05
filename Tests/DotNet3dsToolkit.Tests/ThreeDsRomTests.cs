@@ -71,5 +71,29 @@ namespace DotNet3dsToolkit.Tests
             }
             Debug.WriteLine("Extraction complete!");
         }
+
+        [Theory]
+        [MemberData(nameof(TestData))]
+        public async Task VerifyFileSystemInterface(string filename)
+        {
+            using (var rom = new ThreeDsRom())
+            {
+                var provider = new PhysicalIOProvider();
+                await rom.OpenFile(filename, provider);
+
+                var romAsProvider = rom as IIOProvider;
+                var files = romAsProvider.GetFiles("/", "*", false);
+                foreach (var file in files)
+                {
+                    romAsProvider.FileExists(file).Should().BeTrue("File '" + file + "' should exist");
+                }
+
+                var directories = romAsProvider.GetDirectories("/", false);
+                foreach (var dir in directories)
+                {
+                    romAsProvider.DirectoryExists(dir).Should().BeTrue("File '" + dir + "' should exist");
+                }
+            }
+        }
     }
 }

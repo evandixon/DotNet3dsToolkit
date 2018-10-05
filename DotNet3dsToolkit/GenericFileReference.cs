@@ -65,6 +65,23 @@ namespace DotNet3dsToolkit
         }
 
 
+        public byte[] Read()
+        {
+            if (Length > int.MaxValue)
+            {
+                throw new ArgumentException(Properties.Resources.BufferOverflow_BecauseIntMaxValue);
+            }
+
+            if (File != null)
+            {
+                return File.Read(Offset, (int)Length);
+            }
+            else
+            {
+                return Reference.Read(Offset, (int)Length);
+            }
+        }
+
         public async Task<byte[]> ReadAsync()
         {
             if (Length > int.MaxValue)
@@ -82,6 +99,18 @@ namespace DotNet3dsToolkit
             }
         }
 
+        public byte Read(long index)
+        {
+            if (File != null)
+            {
+                return File.Read(Offset + index);
+            }
+            else
+            {
+                return Reference.Read(Offset + index);
+            }
+        }
+
         public async Task<byte> ReadAsync(long index)
         {
             if (File != null)
@@ -91,6 +120,23 @@ namespace DotNet3dsToolkit
             else
             {
                 return await Reference.ReadAsync(Offset + index);
+            }
+        }
+
+        public byte[] Read(long index, int length)
+        {
+            if (Length > int.MaxValue)
+            {
+                throw new ArgumentException(Properties.Resources.BufferOverflow_BecauseIntMaxValue);
+            }
+
+            if (File != null)
+            {
+                return File.Read(Offset + index, (int)Math.Min(Length, length));
+            }
+            else
+            {
+                return Reference.Read(Offset + index, (int)Math.Min(Length, length));
             }
         }
 

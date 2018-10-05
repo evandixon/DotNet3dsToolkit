@@ -106,6 +106,15 @@ namespace DotNet3dsToolkit.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to File at the given path in the ROM could not be found: &quot;{0}&quot;.
+        /// </summary>
+        public static string ThreeDsRom_ErrorRomFileNotFound {
+            get {
+                return ResourceManager.GetString("ThreeDsRom_ErrorRomFileNotFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to The requested data is out of range of the partition..
         /// </summary>
         public static string ThreeDsRom_PartitionDataOutOfRange {

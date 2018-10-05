@@ -76,6 +76,18 @@ namespace DotNet3dsToolkit
             });            
         }
 
+        public GenericFileReference GetDataReference(string filename)
+        {
+            var file = Headers?.FirstOrDefault(h => string.Compare(h.Filename, filename, false) == 0);
+
+            if (file == null)
+            {
+                return null;
+            }
+
+            return new GenericFileReference(ExeFsData, file.Offset, file.FileSize);
+        }
+
         public class ExeFsHeader
         {
             public ExeFsHeader(byte[] data)

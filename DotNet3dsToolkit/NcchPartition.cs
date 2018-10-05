@@ -7,6 +7,8 @@ namespace DotNet3dsToolkit
 {
     public class NcchPartition
     {
+        private const int MediaUnitSize = 0x200;
+
         public static async Task<NcchPartition> Load(GenericFileReference data, int partitionIndex)
         {
             NcchHeader header = null;
@@ -33,12 +35,16 @@ namespace DotNet3dsToolkit
             {
                 if (Header.ExeFsOffset > 0 && Header.ExeFsSize > 0)
                 {
-                    ExeFs = await ExeFs.Load(new GenericFileReference(Data, Header.ExeFsOffset * 0x200, Header.ExeFsSize * 0x200));
+                    ExeFs = await ExeFs.Load(new GenericFileReference(Data, Header.ExeFsOffset * MediaUnitSize, Header.ExeFsSize * MediaUnitSize));
                 }
                 if (Header.RomFsOffset > 0 && Header.RomFsOffset > 0)
                 {
-                    RomFs = await RomFs.Load(new GenericFileReference(Data, Header.RomFsOffset * 0x200, Header.RomFsSize * 0x200));
+                    RomFs = await RomFs.Load(new GenericFileReference(Data, Header.RomFsOffset * MediaUnitSize, Header.RomFsSize * MediaUnitSize));
                 }                    
+                if (Header.ExHeaderSize > 0)
+                {
+                    ExHeader = new GenericFileReference(Data, 0x200, Header.ExHeaderSize);
+                }
             }
         }
 
@@ -50,6 +56,8 @@ namespace DotNet3dsToolkit
 
         public ExeFs ExeFs { get; private set; } // Could be null if not applicable
         public RomFs RomFs { get; private set; } // Could be null if not applicable
+        public GenericFileReference ExHeader { get; private set; } // Could be null if not applicable
+
 
         #region Child Classes
         public class NcchHeader
