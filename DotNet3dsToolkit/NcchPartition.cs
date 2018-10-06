@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SkyEditor.Core.IO;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
@@ -9,7 +10,7 @@ namespace DotNet3dsToolkit
     {
         private const int MediaUnitSize = 0x200;
 
-        public static async Task<NcchPartition> Load(GenericFileReference data, int partitionIndex)
+        public static async Task<NcchPartition> Load(IBinaryDataAccessor data, int partitionIndex)
         {
             NcchHeader header = null;
             if (data.Length > 0)
@@ -22,7 +23,7 @@ namespace DotNet3dsToolkit
             return partition;
         }
 
-        public NcchPartition(GenericFileReference data, int partitionIndex, NcchHeader header)
+        public NcchPartition(IBinaryDataAccessor data, int partitionIndex, NcchHeader header)
         {
             Data = data ?? throw new ArgumentNullException(nameof(data));
             PartitionIndex = partitionIndex;
@@ -35,20 +36,20 @@ namespace DotNet3dsToolkit
             {
                 if (Header.ExeFsOffset > 0 && Header.ExeFsSize > 0)
                 {
-                    ExeFs = await ExeFs.Load(new GenericFileReference(Data, Header.ExeFsOffset * MediaUnitSize, Header.ExeFsSize * MediaUnitSize));
+                    ExeFs = await ExeFs.Load(Data.GetDataReference(Header.ExeFsOffset * MediaUnitSize, Header.ExeFsSize * MediaUnitSize));
                 }
                 if (Header.RomFsOffset > 0 && Header.RomFsOffset > 0)
                 {
-                    RomFs = await RomFs.Load(new GenericFileReference(Data, Header.RomFsOffset * MediaUnitSize, Header.RomFsSize * MediaUnitSize));
+                    RomFs = await RomFs.Load(Data.GetDataReference(Header.RomFsOffset * MediaUnitSize, Header.RomFsSize * MediaUnitSize));
                 }                    
                 if (Header.ExHeaderSize > 0)
                 {
-                    ExHeader = new GenericFileReference(Data, 0x200, Header.ExHeaderSize);
+                    ExHeader = Data.GetDataReference(0x200, Header.ExHeaderSize);
                 }
             }
         }
 
-        public GenericFileReference Data { get; }
+        public IBinaryDataAccessor Data { get; }
 
         private int PartitionIndex { get; }
 
@@ -56,7 +57,7 @@ namespace DotNet3dsToolkit
 
         public ExeFs ExeFs { get; private set; } // Could be null if not applicable
         public RomFs RomFs { get; private set; } // Could be null if not applicable
-        public GenericFileReference ExHeader { get; private set; } // Could be null if not applicable
+        public IBinaryDataAccessor ExHeader { get; private set; } // Could be null if not applicable
 
 
         #region Child Classes

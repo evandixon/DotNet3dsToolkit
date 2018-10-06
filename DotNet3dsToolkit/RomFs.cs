@@ -16,7 +16,7 @@ namespace DotNet3dsToolkit
         /// </summary>
         const int MaxFilenameLength = 1000;
 
-        public static async Task<RomFs> Load(GenericFileReference data)
+        public static async Task<RomFs> Load(IBinaryDataAccessor data)
         {
             var header = new RomFsHeader(await data.ReadAsync(0, 0x6B));
             var romfs = new RomFs(data, header);
@@ -24,7 +24,7 @@ namespace DotNet3dsToolkit
             return romfs;
         }
 
-        public RomFs(GenericFileReference data, RomFsHeader header)
+        public RomFs(IBinaryDataAccessor data, RomFsHeader header)
         {
             Data = data ?? throw new ArgumentNullException(nameof(data));
             Header = header ?? throw new ArgumentNullException(nameof(header));
@@ -69,7 +69,7 @@ namespace DotNet3dsToolkit
             Level3 = await IvfcLevel.Load(Data, LevelLocations[2]);
         }
 
-        public GenericFileReference Data { get; }
+        public IBinaryDataAccessor Data { get; }
 
         public RomFsHeader Header { get; }
 
@@ -123,15 +123,15 @@ namespace DotNet3dsToolkit
             var directoryExtractTasks = Level3
                 .RootDirectoryMetadataTable
                 .ChildDirectories
-                .Select(d => extractDirectory(d, directoryName)
-                );
+                .Select(d => extractDirectory(d, directoryName))
+                .ToList();
 
             var fileExtractTasks = Level3
                 .RootFiles
                 .Select(async f => provider.WriteAllBytes(
                                         Path.Combine(directoryName, f.Name),
-                                        await f.GetDataReference().ReadAsync())
-                );
+                                        await f.GetDataReference().ReadAsync()))
+                .ToList();
 
             await Task.WhenAll(directoryExtractTasks);
             await Task.WhenAll(fileExtractTasks);
@@ -223,7 +223,7 @@ namespace DotNet3dsToolkit
 
         public class DirectoryMetadata
         {
-            public static async Task<DirectoryMetadata> Load(GenericFileReference data, IvfcLevelHeader header, int offsetOffDirTable)
+            public static async Task<DirectoryMetadata> Load(IBinaryDataAccessor data, IvfcLevelHeader header, int offsetOffDirTable)
             {
                 var offset = header.DirectoryMetadataTableOffset + offsetOffDirTable;
                 var metadata = new DirectoryMetadata(data, header);
@@ -237,30 +237,22 @@ namespace DotNet3dsToolkit
                 {
                     metadata.Name = Encoding.Unicode.GetString(await data.ReadAsync(offset + 0x18, Math.Min(metadata.NameLength, MaxFilenameLength)));
                 }
-
-                if (data.IsThreadSafe)
-                {
-                    await Task.WhenAll(
-                        metadata.LoadChildDirectories(),
-                        metadata.LoadChildFiles()
-                    );
-                }
-                else
-                {
-                    await metadata.LoadChildDirectories();
-                    await metadata.LoadChildFiles();
-                }
+                
+                await Task.WhenAll(
+                    metadata.LoadChildDirectories(),
+                    metadata.LoadChildFiles()
+                );
 
                 return metadata;
             }
 
-            public DirectoryMetadata(GenericFileReference data, IvfcLevelHeader header)
+            public DirectoryMetadata(IBinaryDataAccessor data, IvfcLevelHeader header)
             {
                 LevelData = data ?? throw new ArgumentNullException(nameof(data));
                 IvfcLevelHeader = header ?? throw new ArgumentNullException(nameof(data));
             }
 
-            private GenericFileReference LevelData { get; }
+            private IBinaryDataAccessor LevelData { get; }
             private IvfcLevelHeader IvfcLevelHeader { get; }
 
             /// <summary>
@@ -346,7 +338,7 @@ namespace DotNet3dsToolkit
 
         public class FileMetadata
         {
-            public static async Task<FileMetadata> Load(GenericFileReference data, IvfcLevelHeader header, long offsetFromMetadataTable)
+            public static async Task<FileMetadata> Load(IBinaryDataAccessor data, IvfcLevelHeader header, long offsetFromMetadataTable)
             {
                 var offset = header.FileMetadataTableOffset + offsetFromMetadataTable;
                 var metadata = new FileMetadata(data, header);
@@ -363,13 +355,13 @@ namespace DotNet3dsToolkit
                 return metadata;
             }
 
-            public FileMetadata(GenericFileReference data, IvfcLevelHeader header)
+            public FileMetadata(IBinaryDataAccessor data, IvfcLevelHeader header)
             {
                 LevelData = data ?? throw new ArgumentNullException(nameof(data));
                 Header = header ?? throw new ArgumentNullException(nameof(header));
             }
 
-            private GenericFileReference LevelData { get; }
+            private IBinaryDataAccessor LevelData { get; }
 
             public IvfcLevelHeader Header { get; }
 
@@ -408,9 +400,9 @@ namespace DotNet3dsToolkit
             /// </summary>
             public string Name { get; set; } // Offset: 0x20
 
-            public GenericFileReference GetDataReference()
+            public IBinaryDataAccessor GetDataReference()
             {
-                return new GenericFileReference(LevelData, Header.FileDataOffset + FileDataOffset, FileDataLength);
+                return LevelData.GetDataReference(Header.FileDataOffset + FileDataOffset, FileDataLength);
             }
 
             public override string ToString()
@@ -478,15 +470,15 @@ namespace DotNet3dsToolkit
 
         public class IvfcLevel
         {
-            public static async Task<IvfcLevel> Load(GenericFileReference romfsData, IvfcLevelLocation location)
+            public static async Task<IvfcLevel> Load(IBinaryDataAccessor romfsData, IvfcLevelLocation location)
             {
                 var header = new IvfcLevelHeader(await romfsData.ReadAsync(location.DataOffset, 0x28));
-                var level = new IvfcLevel(new GenericFileReference(romfsData, location.DataOffset, location.DataSize), header);
+                var level = new IvfcLevel(romfsData.GetDataReference(location.DataOffset, location.DataSize), header);
                 await level.Initialize();
                 return level;
             }
 
-            public IvfcLevel(GenericFileReference data, IvfcLevelHeader header)
+            public IvfcLevel(IBinaryDataAccessor data, IvfcLevelHeader header)
             {
                 LevelData = data ?? throw new ArgumentNullException(nameof(data));
                 Header = header ?? throw new ArgumentNullException(nameof(header));
@@ -512,7 +504,7 @@ namespace DotNet3dsToolkit
                 RootFiles = rootFiles.ToArray();
             }
 
-            private GenericFileReference LevelData { get; }
+            private IBinaryDataAccessor LevelData { get; }
 
             public IvfcLevelHeader Header { get; } // Offset: 0, size: 0x28
 

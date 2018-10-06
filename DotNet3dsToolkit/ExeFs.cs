@@ -11,14 +11,14 @@ namespace DotNet3dsToolkit
 {
     public class ExeFs
     {
-        public static async Task<ExeFs> Load(GenericFileReference exeFsData)
+        public static async Task<ExeFs> Load(IBinaryDataAccessor exeFsData)
         {
             var exefs = new ExeFs(exeFsData);
             await exefs.Initialize();
             return exefs;
         }
 
-        public ExeFs(GenericFileReference exeFsData)
+        public ExeFs(IBinaryDataAccessor exeFsData)
         {
             ExeFsData = exeFsData ?? throw new ArgumentNullException(nameof(exeFsData));
         }
@@ -35,7 +35,7 @@ namespace DotNet3dsToolkit
             }, 0, 9);
         }
 
-        private GenericFileReference ExeFsData { get; set; }
+        private IBinaryDataAccessor ExeFsData { get; set; }
 
         /// <summary>
         /// Headers of the file data
@@ -76,7 +76,7 @@ namespace DotNet3dsToolkit
             });            
         }
 
-        public GenericFileReference GetDataReference(string filename)
+        public IBinaryDataAccessor GetDataReference(string filename)
         {
             var file = Headers?.FirstOrDefault(h => string.Compare(h.Filename, filename, false) == 0);
 
@@ -85,7 +85,7 @@ namespace DotNet3dsToolkit
                 return null;
             }
 
-            return new GenericFileReference(ExeFsData, file.Offset, file.FileSize);
+            return ExeFsData.GetDataReference(file.Offset, file.FileSize);
         }
 
         public class ExeFsHeader

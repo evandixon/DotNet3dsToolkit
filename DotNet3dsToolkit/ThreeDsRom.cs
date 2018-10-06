@@ -19,11 +19,9 @@ namespace DotNet3dsToolkit
             (this as IIOProvider).ResetWorkingDirectory();
         }
 
-        public NcsdHeader NcsdHeader { get; set; }
+        private INcchPartitionContainer Container { get; set; }
 
-        public CiaHeader CiaHeader { get; set; }
-
-        public NcchPartition[] Partitions { get; set; }
+        public NcchPartition[] Partitions => Container.Partitions;
 
         private GenericFile RawData { get; set; }
 
@@ -48,13 +46,13 @@ namespace DotNet3dsToolkit
 
                 VirtualPath = CurrentIOProvider.GetTempDirectory();
 
-                if (await RawData.ReadStringAsync(0, 4, Encoding.ASCII) == "NCSD")
+                if (await NcsdFile.IsNcsd(RawData))
                 {
-                    await LoadNcsd();
+                    Container = await NcsdFile.Load(RawData);
                 }
-                else if (await IsCia(filename, RawData))
+                else if (await CiaFile.IsCia(filename, RawData))
                 {
-                    await LoadCia();
+                    Container = await CiaFile.Load(RawData);
                 }
                 else
                 {
@@ -72,33 +70,16 @@ namespace DotNet3dsToolkit
             }            
         }
 
-        private async Task LoadNcsd()
-        {                
-            // To-do: determine which NCSD header to use
-            NcsdHeader = new CartridgeNcsdHeader(await RawData.ReadAsync(0, 0x1500));
-
-            Partitions = new NcchPartition[NcsdHeader.Partitions.Length];
-
-            var a = new AsyncFor();
-            a.RunSynchronously = !RawData.IsThreadSafe;
-            await a.RunFor(async i =>
+        public NcchPartition GetPartitionOrDefault(int partitionIndex)
+        {
+            if (Partitions.Length > partitionIndex)
             {
-                var partitionStart = (long)NcsdHeader.Partitions[i].Offset * MediaUnitSize;
-                var partitionLength = (long)NcsdHeader.Partitions[i].Length * MediaUnitSize;
-                Partitions[i] = await NcchPartition.Load(new GenericFileReference(RawData, partitionStart, (int)partitionLength), i);
-            }, 0, NcsdHeader.Partitions.Length - 1);
-        }
-
-        private Task<bool> IsCia(string filename, GenericFile file)
-        {
-            // To-do: look at the actual data
-            return Task.FromResult(filename.ToLower().EndsWith(".cia"));
-        }
-
-        private async Task LoadCia()
-        {
-            var headerSize = await RawData.ReadInt32Async(0);
-            CiaHeader = new CiaHeader(await RawData.ReadAsync(0, headerSize));
+                return Partitions[partitionIndex];
+            }
+            else
+            {
+                return null;
+            }
         }
 
         public async Task ExtractFiles(string directoryName, IIOProvider provider, ProgressReportToken progressReportToken = null)
@@ -127,9 +108,14 @@ namespace DotNet3dsToolkit
             var tasks = new List<Task>();
             for (int i = 0; i < Partitions.Length; i++)
             {
-                var partition = Partitions[i];
+                var partition = GetPartitionOrDefault(i);
 
-                if (partition?.ExeFs != null)
+                if (partition == null)
+                {
+                    continue;
+                }
+
+                if (partition.ExeFs != null)
                 {
                     ExtractionProgressedToken exefsExtractionProgressedToken = null;
                     if (exefsExtractionProgressedToken != null)
@@ -141,7 +127,7 @@ namespace DotNet3dsToolkit
                     tasks.Add(partition.ExeFs.ExtractFiles(Path.Combine(directoryName, GetExeFsDirectoryName(i)), provider, exefsExtractionProgressedToken));
                 }
 
-                if (partition?.ExHeader != null)
+                if (partition.ExHeader != null)
                 {
                     ExtractionProgressedToken exefsExtractionProgressedToken = null;
                     if (exefsExtractionProgressedToken != null)
@@ -153,11 +139,11 @@ namespace DotNet3dsToolkit
                     }
                     tasks.Add(Task.Run(async () => {
                         File.WriteAllBytes(Path.Combine(directoryName, GetExHeaderFileName(i)), await partition.ExHeader.ReadAsync());
-                        exefsExtractionProgressedToken.IncrementExtractedFileCount();
+                        exefsExtractionProgressedToken?.IncrementExtractedFileCount();
                     }));
                 }
 
-                if (partition?.RomFs != null)
+                if (partition.RomFs != null)
                 {
                     ExtractionProgressedToken romfsExtractionProgressedToken = null;
                     if (romfsExtractionProgressedToken != null)
@@ -398,19 +384,19 @@ namespace DotNet3dsToolkit
             return Path.Combine(VirtualPath, path.TrimStart('/'));
         }
         
-        private GenericFileReference GetDataReference(string[] parts, bool throwIfNotFound = true)
+        private IBinaryDataAccessor GetDataReference(string[] parts, bool throwIfNotFound = true)
         {
-            GenericFileReference getExeFsDataReference(string[] pathParts, int partitionId)
+            IBinaryDataAccessor getExeFsDataReference(string[] pathParts, int partitionId)
             {
                 if (pathParts.Length == 2)
                 {
-                    return Partitions[partitionId]?.ExeFs?.GetDataReference(pathParts.Last());
+                    return GetPartitionOrDefault(partitionId)?.ExeFs?.GetDataReference(pathParts.Last());
                 }
 
                 return null;
             }
 
-            GenericFileReference getRomFsDataReference(string[] pathParts, int partitionId)
+            IBinaryDataAccessor getRomFsDataReference(string[] pathParts, int partitionId)
             {
                 var currentDirectory = Partitions[partitionId]?.RomFs?.Level3.RootDirectoryMetadataTable;
                 for (int i = 1; i < pathParts.Length - 1; i += 1)
@@ -422,7 +408,7 @@ namespace DotNet3dsToolkit
                     if (ReferenceEquals(currentDirectory, Partitions[partitionId].RomFs.Level3.RootDirectoryMetadataTable))
                     {
                         // The root RomFS directory doesn't contain files; those are located in the level 3
-                        return Partitions[partitionId].RomFs.Level3.RootFiles.FirstOrDefault(f => string.Compare(f.Name, pathParts.Last(), true) == 0)?.GetDataReference();
+                        return GetPartitionOrDefault(partitionId).RomFs.Level3.RootFiles.FirstOrDefault(f => string.Compare(f.Name, pathParts.Last(), true) == 0)?.GetDataReference();
                     }
                     else
                     {
@@ -434,7 +420,7 @@ namespace DotNet3dsToolkit
                 return null;
             }
 
-            GenericFileReference dataReference = null;
+            IBinaryDataAccessor dataReference = null;
 
             var firstDirectory = parts[0].ToLower();
             switch (firstDirectory)
@@ -458,7 +444,7 @@ namespace DotNet3dsToolkit
                     dataReference = getRomFsDataReference(parts, 7);
                     break;
                 case "exheader.bin":
-                    dataReference = Partitions[0]?.ExHeader;
+                    dataReference = GetPartitionOrDefault(0)?.ExHeader;
                     break;
             }
 
@@ -493,7 +479,7 @@ namespace DotNet3dsToolkit
         {
             bool romfsDirectoryExists(string[] pathParts, int partitionId)
             {
-                var currentDirectory = Partitions[partitionId]?.RomFs?.Level3.RootDirectoryMetadataTable;
+                var currentDirectory = GetPartitionOrDefault(partitionId)?.RomFs?.Level3.RootDirectoryMetadataTable;
                 for (int i = 1; i < pathParts.Length - 1; i += 1)
                 {
                     currentDirectory = currentDirectory?.ChildDirectories.Where(x => string.Compare(x.Name, pathParts[i], true) == 0).FirstOrDefault();
@@ -506,17 +492,17 @@ namespace DotNet3dsToolkit
                 switch (parts[0].ToLower())
                 {
                     case "exefs":
-                        return Partitions[0]?.ExeFs != null;
+                        return GetPartitionOrDefault(0)?.ExeFs != null;
                     case "romfs":
-                        return Partitions[0]?.RomFs != null;
+                        return GetPartitionOrDefault(0)?.RomFs != null;
                     case "manual":
-                        return Partitions[1]?.RomFs != null;
+                        return GetPartitionOrDefault(1)?.RomFs != null;
                     case "downloadplay":
-                        return Partitions[2]?.RomFs != null;
+                        return GetPartitionOrDefault(2)?.RomFs != null;
                     case "n3dsupdate":
-                        return Partitions[6]?.RomFs != null;
+                        return GetPartitionOrDefault(6)?.RomFs != null;
                     case "o3dsupdate":
-                        return Partitions[7]?.RomFs != null;
+                        return GetPartitionOrDefault(7)?.RomFs != null;
                     default:
                         return false;
                 }
@@ -581,7 +567,7 @@ namespace DotNet3dsToolkit
             {
                 var directory = "/" + GetRomFsDirectoryName(partitionId) + "/";
 
-                var currentDirectory = Partitions[partitionId]?.RomFs?.Level3.RootDirectoryMetadataTable;
+                var currentDirectory = GetPartitionOrDefault(partitionId)?.RomFs?.Level3.RootDirectoryMetadataTable;
                 for (int i = 1; i < parts.Length; i += 1)
                 {
                     currentDirectory = currentDirectory?.ChildDirectories.Where(x => string.Compare(x.Name, parts[i], true) == 0).FirstOrDefault();
@@ -591,9 +577,9 @@ namespace DotNet3dsToolkit
                 if (currentDirectory != null)
                 {
                     IEnumerable<string> files;
-                    if (ReferenceEquals(currentDirectory, Partitions[partitionId].RomFs.Level3.RootDirectoryMetadataTable)) {
+                    if (ReferenceEquals(currentDirectory, GetPartitionOrDefault(partitionId).RomFs.Level3.RootDirectoryMetadataTable)) {
                         // The root RomFS directory doesn't contain files; those are located in the level 3
-                        files = Partitions[partitionId].RomFs.Level3.RootFiles
+                        files = GetPartitionOrDefault(partitionId).RomFs.Level3.RootFiles
                         .Where(f => searchPatternRegex.IsMatch(f.Name))
                         .Select(f => directory + f.Name);
                     }
@@ -619,7 +605,7 @@ namespace DotNet3dsToolkit
             switch (parts[0].ToLower())
             {
                 case "" when parts.Length == 1:
-                    if (Partitions[0]?.ExHeader != null && searchPatternRegex.IsMatch("ExHeader.bin"))
+                    if (GetPartitionOrDefault(0)?.ExHeader != null && searchPatternRegex.IsMatch("ExHeader.bin"))
                     {
                         output.Add("ExHeader.bin");
                     }
@@ -633,7 +619,7 @@ namespace DotNet3dsToolkit
                     }
                     break;
                 case "exefs" when parts.Length == 1:
-                    foreach (var file in Partitions[0]?.ExeFs?.Headers
+                    foreach (var file in GetPartitionOrDefault(0)?.ExeFs?.Headers
                         ?.Where(h => searchPatternRegex.IsMatch(h.Filename) && !string.IsNullOrWhiteSpace(h.Filename))
                         ?.Select(h => h.Filename))
                     {
@@ -683,7 +669,7 @@ namespace DotNet3dsToolkit
             {
                 var directory = "/" + GetRomFsDirectoryName(partitionId) + "/";
 
-                var currentDirectory = Partitions[partitionId]?.RomFs?.Level3.RootDirectoryMetadataTable;
+                var currentDirectory = GetPartitionOrDefault(partitionId)?.RomFs?.Level3.RootDirectoryMetadataTable;
                 for (int i = 1; i < parts.Length; i += 1)
                 {
                     currentDirectory = currentDirectory?.ChildDirectories.Where(x => string.Compare(x.Name, parts[i], true) == 0).FirstOrDefault();
@@ -708,27 +694,27 @@ namespace DotNet3dsToolkit
             switch (parts[0].ToLower())
             {
                 case "" when parts.Length == 1:
-                    if (Partitions[0]?.ExeFs != null)
+                    if (GetPartitionOrDefault(0)?.ExeFs != null)
                     {
                         output.Add("/ExeFS/");
                     }
-                    if (Partitions[0]?.RomFs != null)
+                    if (GetPartitionOrDefault(0)?.RomFs != null)
                     {
                         output.Add("/RomFS/");
                     }
-                    if (Partitions[1]?.RomFs != null)
+                    if (GetPartitionOrDefault(1)?.RomFs != null)
                     {
                         output.Add("/Manual/");
                     }
-                    if (Partitions[2]?.RomFs != null)
+                    if (GetPartitionOrDefault(2)?.RomFs != null)
                     {
                         output.Add("/DownloadPlay/");
                     }
-                    if (Partitions[6]?.RomFs != null)
+                    if (GetPartitionOrDefault(6)?.RomFs != null)
                     {
                         output.Add("/N3DSUpdate/");
                     }
-                    if (Partitions[7]?.RomFs != null)
+                    if (GetPartitionOrDefault(7)?.RomFs != null)
                     {
                         output.Add("/O3DSUpdate/");
                     }

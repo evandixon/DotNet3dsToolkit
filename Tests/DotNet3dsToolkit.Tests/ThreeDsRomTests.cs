@@ -2,6 +2,7 @@ using FluentAssertions;
 using SkyEditor.Core.IO;
 using SkyEditor.Core.Utilities;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -10,8 +11,9 @@ using Xunit;
 
 namespace DotNet3dsToolkit.Tests
 {
+    [Collection("3DS ROM Tests")] // Required to run tests synchronously (can't open multiple memory mapped file instances with the current implementation)
     public class ThreeDsRomTests
-    {
+    {        
         public static IEnumerable<object[]> NcsdTestData()
         {
             // Assume we're in DotNet3dsToolkit/Tests/DotNet3dsToolkit.Tests/bin/Debug/netcoreapp2.0
@@ -34,14 +36,13 @@ namespace DotNet3dsToolkit.Tests
 
         [Theory]
         [MemberData(nameof(NcsdTestData))]
-        public async void ReadsNcsdHeaders(string filename)
+        [MemberData(nameof(CiaTestData))]
+        public async void ReadsNcchPartitions(string filename)
         {
             using (var rom = new ThreeDsRom())
             {
                 await rom.OpenFile(filename, new PhysicalIOProvider());
-                rom.NcsdHeader.Should().NotBeNull();
-                rom.NcsdHeader.Magic.Should().Be("NCSD");
-                rom.NcsdHeader.Partitions.Should().NotBeNull();
+                rom.Partitions.Should().NotBeNull();
 
                 foreach (var partition in rom.Partitions)
                 {
@@ -60,31 +61,6 @@ namespace DotNet3dsToolkit.Tests
         }
 
         [Theory]
-        [MemberData(nameof(CiaTestData))]
-        public async void ReadsCiaHeaders(string filename)
-        {
-            using (var rom = new ThreeDsRom())
-            {
-                await rom.OpenFile(filename, new PhysicalIOProvider());
-                rom.CiaHeader.Should().NotBeNull();
-
-                //foreach (var partition in rom.Partitions)
-                //{
-                //    if (partition.Header != null)
-                //    {
-                //        partition.Header.Magic.Should().Be("NCCH");
-                //        if (partition.RomFs != null)
-                //        {
-                //            partition.RomFs.Header.Should().NotBeNull();
-                //            partition.RomFs.Header.Magic.Should().Be("IVFC");
-                //            partition.RomFs.Header.MagicNumber.Should().Be(0x10000);
-                //        }
-                //    }
-                //}
-            }
-        }
-
-        [Theory]
         [MemberData(nameof(NcsdTestData))]
         [MemberData(nameof(CiaTestData))]
         public async Task ExtractRomFsFiles(string filename)
@@ -97,13 +73,15 @@ namespace DotNet3dsToolkit.Tests
                 await rom.OpenFile(filename, provider);
                 var extractionTask = rom.ExtractFiles("./extracted-" + Path.GetFileName(filename), provider, progressReportToken);
 
-                // Awaiting the task and handling the progressReportToken makes everything wait on Debug.WriteLine, slowing things down a lot
-                // So we asynchronously poll
-                while (!extractionTask.IsCompleted)
-                {
-                    Debug.WriteLine("Extraction progress: " + Math.Round(progressReportToken.Progress * 100, 2).ToString());
-                    await Task.Delay(200);
-                }
+                //// Awaiting the task and handling the progressReportToken makes everything wait on Debug.WriteLine, slowing things down a lot
+                //// So we asynchronously poll
+                //while (!extractionTask.IsCompleted && !extractionTask.IsFaulted)
+                //{
+                //    Debug.WriteLine("Extraction progress: " + Math.Round(progressReportToken.Progress * 100, 2).ToString());
+                //    await Task.Delay(200);
+                //}
+
+                await extractionTask;
             }
             Debug.WriteLine("Extraction complete!");
         }
