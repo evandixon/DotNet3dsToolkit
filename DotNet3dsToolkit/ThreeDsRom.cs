@@ -19,7 +19,9 @@ namespace DotNet3dsToolkit
             (this as IIOProvider).ResetWorkingDirectory();
         }
 
-        public NcsdHeader Header { get; set; }
+        public NcsdHeader NcsdHeader { get; set; }
+
+        public CiaHeader CiaHeader { get; set; }
 
         public NcchPartition[] Partitions { get; set; }
 
@@ -33,32 +35,31 @@ namespace DotNet3dsToolkit
 
             if (provider.FileExists(filename))
             {
-                // Clear virtual path if it exists
-                if (!string.IsNullOrEmpty(VirtualPath) && provider.DirectoryExists(VirtualPath))
-                {
-                    provider.DeleteDirectory(VirtualPath);
-                }
-
-                VirtualPath = provider.GetTempDirectory();
-
                 RawData = new GenericFile();
                 RawData.EnableMemoryMappedFileLoading = true;
                 RawData.EnableInMemoryLoad = true;
-                await RawData.OpenFile(filename, provider);
+                await RawData.OpenFile(filename, CurrentIOProvider);
 
-                // To-do: determine which NCSD header to use
-                Header = new CartridgeNcsdHeader(await RawData.ReadAsync(0, 0x1500));
-
-                Partitions = new NcchPartition[Header.Partitions.Length];
-
-                var a = new AsyncFor();
-                a.RunSynchronously = !RawData.IsThreadSafe;
-                await a.RunFor(async i =>
+                // Clear virtual path if it exists
+                if (!string.IsNullOrEmpty(VirtualPath) && CurrentIOProvider.DirectoryExists(VirtualPath))
                 {
-                    var partitionStart = (long)Header.Partitions[i].Offset * MediaUnitSize;
-                    var partitionLength = (long)Header.Partitions[i].Length * MediaUnitSize;
-                    Partitions[i] = await NcchPartition.Load(new GenericFileReference(RawData, partitionStart, (int)partitionLength), i);
-                }, 0, Header.Partitions.Length - 1);
+                    CurrentIOProvider.DeleteDirectory(VirtualPath);
+                }
+
+                VirtualPath = CurrentIOProvider.GetTempDirectory();
+
+                if (await RawData.ReadStringAsync(0, 4, Encoding.ASCII) == "NCSD")
+                {
+                    await LoadNcsd();
+                }
+                else if (await IsCia(filename, RawData))
+                {
+                    await LoadCia();
+                }
+                else
+                {
+                    throw new BadImageFormatException(Properties.Resources.ThreeDsRom_UnsupportedFileFormat);
+                }
             }
             else if (provider.DirectoryExists(filename))
             {
@@ -69,6 +70,35 @@ namespace DotNet3dsToolkit
             {
                 throw new FileNotFoundException("Could not find file or directory at the given path", filename);
             }            
+        }
+
+        private async Task LoadNcsd()
+        {                
+            // To-do: determine which NCSD header to use
+            NcsdHeader = new CartridgeNcsdHeader(await RawData.ReadAsync(0, 0x1500));
+
+            Partitions = new NcchPartition[NcsdHeader.Partitions.Length];
+
+            var a = new AsyncFor();
+            a.RunSynchronously = !RawData.IsThreadSafe;
+            await a.RunFor(async i =>
+            {
+                var partitionStart = (long)NcsdHeader.Partitions[i].Offset * MediaUnitSize;
+                var partitionLength = (long)NcsdHeader.Partitions[i].Length * MediaUnitSize;
+                Partitions[i] = await NcchPartition.Load(new GenericFileReference(RawData, partitionStart, (int)partitionLength), i);
+            }, 0, NcsdHeader.Partitions.Length - 1);
+        }
+
+        private Task<bool> IsCia(string filename, GenericFile file)
+        {
+            // To-do: look at the actual data
+            return Task.FromResult(filename.ToLower().EndsWith(".cia"));
+        }
+
+        private async Task LoadCia()
+        {
+            var headerSize = await RawData.ReadInt32Async(0);
+            CiaHeader = new CiaHeader(await RawData.ReadAsync(0, headerSize));
         }
 
         public async Task ExtractFiles(string directoryName, IIOProvider provider, ProgressReportToken progressReportToken = null)

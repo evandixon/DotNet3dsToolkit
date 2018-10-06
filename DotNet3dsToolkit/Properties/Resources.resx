@@ -141,4 +141,7 @@
   <data name="ThreeDsRom_PartitionDoesNotExist" xml:space="preserve">
     <value>The requested partition does not exist.</value>
   </data>
+  <data name="ThreeDsRom_UnsupportedFileFormat" xml:space="preserve">
+    <value>The given file format is not supported</value>
+  </data>
 </root>

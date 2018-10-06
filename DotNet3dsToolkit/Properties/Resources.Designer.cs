@@ -131,5 +131,14 @@ namespace DotNet3dsToolkit.Properties {
                 return ResourceManager.GetString("ThreeDsRom_PartitionDoesNotExist", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The given file format is not supported.
+        /// </summary>
+        public static string ThreeDsRom_UnsupportedFileFormat {
+            get {
+                return ResourceManager.GetString("ThreeDsRom_UnsupportedFileFormat", resourceCulture);
+            }
+        }
     }
 }

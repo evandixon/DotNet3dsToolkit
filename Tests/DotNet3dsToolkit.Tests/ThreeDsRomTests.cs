@@ -12,7 +12,7 @@ namespace DotNet3dsToolkit.Tests
 {
     public class ThreeDsRomTests
     {
-        public static IEnumerable<object[]> TestData()
+        public static IEnumerable<object[]> NcsdTestData()
         {
             // Assume we're in DotNet3dsToolkit/Tests/DotNet3dsToolkit.Tests/bin/Debug/netcoreapp2.0
             // We're looking for DotNet3dsToolkit/TestData
@@ -22,16 +22,26 @@ namespace DotNet3dsToolkit.Tests
             }
         }
 
+        public static IEnumerable<object[]> CiaTestData()
+        {
+            // Assume we're in DotNet3dsToolkit/Tests/DotNet3dsToolkit.Tests/bin/Debug/netcoreapp2.0
+            // We're looking for DotNet3dsToolkit/TestData
+            foreach (var filename in Directory.GetFiles("../../../../TestData", "*.cia"))
+            {
+                yield return new object[] { filename };
+            }
+        }
+
         [Theory]
-        [MemberData(nameof(TestData))]
-        public async void ReadsHeaders(string filename)
+        [MemberData(nameof(NcsdTestData))]
+        public async void ReadsNcsdHeaders(string filename)
         {
             using (var rom = new ThreeDsRom())
             {
                 await rom.OpenFile(filename, new PhysicalIOProvider());
-                rom.Header.Should().NotBeNull();
-                rom.Header.Magic.Should().Be("NCSD");
-                rom.Header.Partitions.Should().NotBeNull();
+                rom.NcsdHeader.Should().NotBeNull();
+                rom.NcsdHeader.Magic.Should().Be("NCSD");
+                rom.NcsdHeader.Partitions.Should().NotBeNull();
 
                 foreach (var partition in rom.Partitions)
                 {
@@ -50,7 +60,33 @@ namespace DotNet3dsToolkit.Tests
         }
 
         [Theory]
-        [MemberData(nameof(TestData))]
+        [MemberData(nameof(CiaTestData))]
+        public async void ReadsCiaHeaders(string filename)
+        {
+            using (var rom = new ThreeDsRom())
+            {
+                await rom.OpenFile(filename, new PhysicalIOProvider());
+                rom.CiaHeader.Should().NotBeNull();
+
+                //foreach (var partition in rom.Partitions)
+                //{
+                //    if (partition.Header != null)
+                //    {
+                //        partition.Header.Magic.Should().Be("NCCH");
+                //        if (partition.RomFs != null)
+                //        {
+                //            partition.RomFs.Header.Should().NotBeNull();
+                //            partition.RomFs.Header.Magic.Should().Be("IVFC");
+                //            partition.RomFs.Header.MagicNumber.Should().Be(0x10000);
+                //        }
+                //    }
+                //}
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(NcsdTestData))]
+        [MemberData(nameof(CiaTestData))]
         public async Task ExtractRomFsFiles(string filename)
         {
             var progressReportToken = new ProgressReportToken();
@@ -59,7 +95,7 @@ namespace DotNet3dsToolkit.Tests
             {
                 var provider = new PhysicalIOProvider();
                 await rom.OpenFile(filename, provider);
-                var extractionTask = rom.ExtractFiles("./extracted-" + Path.GetFileNameWithoutExtension(filename), provider, progressReportToken);
+                var extractionTask = rom.ExtractFiles("./extracted-" + Path.GetFileName(filename), provider, progressReportToken);
 
                 // Awaiting the task and handling the progressReportToken makes everything wait on Debug.WriteLine, slowing things down a lot
                 // So we asynchronously poll
@@ -73,7 +109,8 @@ namespace DotNet3dsToolkit.Tests
         }
 
         [Theory]
-        [MemberData(nameof(TestData))]
+        [MemberData(nameof(NcsdTestData))]
+        [MemberData(nameof(CiaTestData))]
         public async Task VerifyFileSystemInterface(string filename)
         {
             using (var rom = new ThreeDsRom())
