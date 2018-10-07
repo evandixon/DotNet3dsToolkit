@@ -30,6 +30,8 @@ namespace DotNet3dsToolkit
         {
             var headerSize = await CiaData.ReadInt32Async(0);
             CiaHeader = new CiaHeader(await CiaData.ReadAsync(0, headerSize));
+
+            throw new NotImplementedException("Loading CIA files is currently not supported.");
         }
 
         private IBinaryDataAccessor CiaData { get; set; }
