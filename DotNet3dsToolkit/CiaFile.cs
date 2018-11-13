@@ -31,7 +31,12 @@ namespace DotNet3dsToolkit
             var headerSize = await CiaData.ReadInt32Async(0);
             CiaHeader = new CiaHeader(await CiaData.ReadAsync(0, headerSize));
 
-            TmdMetadata = await TmdMetadata.Load(CiaData.GetDataReference(CiaHeader.CertificateChainSize + CiaHeader.TicketSize, CiaHeader.TmdFileSize));
+            TmdMetadata = await TmdMetadata.Load(
+                CiaData.GetDataReference(
+                    headerSize + // TODO: + 0x50?
+                        CiaHeader.CertificateChainSize +
+                        CiaHeader.TicketSize,
+                    CiaHeader.TmdFileSize));
 
             throw new NotImplementedException("Loading CIA files is currently not supported.");
         }

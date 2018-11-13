@@ -22,6 +22,8 @@ namespace DotNet3dsToolkit
 
         private async Task Initalize()
         {
+            throw new NotImplementedException("Need to use Big Endian");
+
             SignatureType = await TmdData.ReadInt32Async(0);
             int signatureLength;
             int signaturePadding;
@@ -183,8 +185,28 @@ namespace DotNet3dsToolkit
         {
             public int ContentId { get; set; } // Index 0, size 4
 
+            /// <summary>
+            /// Indicates the content type
+            /// </summary>
+            /// <remarks>
+            /// Index	Content Type
+            /// 0000	Main Content(.CXI for 3DS executable content/.CFA for 3DS Data Archives/.SRL for TWL content)
+            /// 0001	Home Menu Manual(.CFA)
+            /// 0002	DLP Child Container(.CFA)
+            /// </remarks>
             public short ContentIndex { get; set; } // Index 4, size 2
 
+            /// <summary>
+            /// 
+            /// </summary>
+            /// <remarks>
+            /// Flags	Description
+            /// 1	Encrypted
+            /// 2	Disc
+            /// 4	CFM(abbreviation for?)
+            /// 0x4000	Optional
+            /// 0x8000	Shared
+            /// </remarks>
             public short ContentType { get; set; } // Index 6, size 2
 
             public long ContentSize { get; set; } // Index 8, size 8
