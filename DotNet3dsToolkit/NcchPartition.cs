@@ -10,7 +10,7 @@ namespace DotNet3dsToolkit
     {
         private const int MediaUnitSize = 0x200;
 
-        public static async Task<NcchPartition> Load(IBinaryDataAccessor data, int partitionIndex)
+        public static async Task<NcchPartition> Load(IBinaryDataAccessor data)
         {
             NcchHeader header = null;
             if (data.Length > 0)
@@ -18,15 +18,14 @@ namespace DotNet3dsToolkit
                 header = new NcchHeader(await data.ReadAsync(0, 0x200));
             }            
 
-            var partition = new NcchPartition(data, partitionIndex, header);
+            var partition = new NcchPartition(data, header);
             await partition.Initialize();
             return partition;
         }
 
-        public NcchPartition(IBinaryDataAccessor data, int partitionIndex, NcchHeader header)
+        public NcchPartition(IBinaryDataAccessor data, NcchHeader header)
         {
             Data = data ?? throw new ArgumentNullException(nameof(data));
-            PartitionIndex = partitionIndex;
             Header = header; // Could be null if this is an empty partition
         }
 
@@ -50,8 +49,6 @@ namespace DotNet3dsToolkit
         }
 
         public IBinaryDataAccessor Data { get; }
-
-        private int PartitionIndex { get; }
 
         public NcchHeader Header { get; } // Could be null if this is an empty partition
 

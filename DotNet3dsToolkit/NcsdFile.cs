@@ -47,7 +47,7 @@ namespace DotNet3dsToolkit
             {
                 var partitionStart = (long)Header.Partitions[i].Offset * MediaUnitSize;
                 var partitionLength = (long)Header.Partitions[i].Length * MediaUnitSize;
-                Partitions[i] = await NcchPartition.Load(NcsdData.GetDataReference(partitionStart, (int)partitionLength), i);
+                Partitions[i] = await NcchPartition.Load(NcsdData.GetDataReference(partitionStart, (int)partitionLength));
             }, 0, Header.Partitions.Length - 1);
         }
 

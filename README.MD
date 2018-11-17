@@ -5,10 +5,10 @@ It is currently being rewritten in .Net Standard 2.0. Please see the Old folder 
 
 Current features:
 * Extract decrypted CCI files
+* Extract decrypted CIA files
 * Allow reading data of individual files without extraction
 
 Planned features:
-* Extract decrypted CIA files
 * Load CXI files
 * Load RomFS or ExeFS files
 * Build ROMs
