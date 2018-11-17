@@ -1,10 +1,7 @@
 ﻿using SkyEditor.Core.IO;
-using SkyEditor.Core.Utilities;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace DotNet3dsToolkit
