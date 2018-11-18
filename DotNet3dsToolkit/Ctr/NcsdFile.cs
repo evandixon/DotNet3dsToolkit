@@ -15,6 +15,11 @@ namespace DotNet3dsToolkit.Ctr
         {
             try
             {
+                if (file.Length < 0x104)
+                {
+                    return false;
+                }
+
                 return await file.ReadStringAsync(0x100, 4, Encoding.ASCII) == "NCSD";
             }
             catch (Exception)

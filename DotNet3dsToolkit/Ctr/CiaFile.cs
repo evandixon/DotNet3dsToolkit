@@ -8,10 +8,10 @@ namespace DotNet3dsToolkit.Ctr
 {
     public class CiaFile : INcchPartitionContainer
     {
-        public static Task<bool> IsCia(string filename, GenericFile file)
+        public static Task<bool> IsCia(GenericFile file)
         {
             // To-do: look at the actual data
-            return Task.FromResult(filename.ToLower().EndsWith(".cia"));
+            return Task.FromResult(file.Filename.ToLower().EndsWith(".cia"));
         }
 
         public static async Task<CiaFile> Load(IBinaryDataAccessor data)

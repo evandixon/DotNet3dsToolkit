@@ -1,5 +1,6 @@
 ﻿using DotNet3dsToolkit.Ctr;
 using SkyEditor.Core.IO;
+using SkyEditor.Core.IO.PluginInfrastructure;
 using SkyEditor.Core.Utilities;
 using System;
 using System.Collections.Generic;
@@ -11,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace DotNet3dsToolkit
 {
-    public class ThreeDsRom : IOpenableFile, IIOProvider,  IDisposable
+    public class ThreeDsRom : IOpenableFile, IIOProvider, IDetectableFileType, IDisposable
     {
         private const int MediaUnitSize = 0x200;
 
@@ -71,9 +72,13 @@ namespace DotNet3dsToolkit
                 {
                     Container = await NcsdFile.Load(RawData);
                 }
-                else if (await CiaFile.IsCia(filename, RawData))
+                else if (await CiaFile.IsCia(RawData))
                 {
                     Container = await CiaFile.Load(RawData);
+                }
+                else if (await NcchPartition.IsNcch(RawData))
+                {
+                    Container = new SingleNcchPartitionContainer(await NcchPartition.Load(RawData));
                 }
                 else
                 {
@@ -932,6 +937,15 @@ namespace DotNet3dsToolkit
             CurrentIOProvider.WriteAllBytes(virtualPath, (this as IIOProvider).ReadAllBytes(filename));
 
             return CurrentIOProvider.OpenFileWriteOnly(filename);
+        }
+
+        #endregion
+
+        #region IDetectableFileType Implementation
+
+        public async Task<bool> IsOfType(GenericFile file)
+        {
+            return await NcsdFile.IsNcsd(file) || await CiaFile.IsCia(file) || await NcchPartition.IsNcch(file);
         }
 
         #endregion
