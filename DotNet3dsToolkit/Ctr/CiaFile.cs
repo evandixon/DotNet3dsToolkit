@@ -40,16 +40,19 @@ namespace DotNet3dsToolkit.Ctr
             TmdMetadata = await TmdMetadata.Load(CiaData.GetDataReference(tmdOffset, CiaHeader.TmdFileSize));
 
             ContentPartitions = new Dictionary<int, List<NcchPartition>>();
+            long partitionStart = contentOffset;
             foreach (var chunkRecord in TmdMetadata.ContentChunkRecords)
-            {
-                var partitionStart = contentOffset + TmdMetadata.ContentInfoRecords[chunkRecord.ContentId].ContentIndexOffset;
+            {                
                 var partitionLength = chunkRecord.ContentSize;
+                int contentIndex = chunkRecord.ContentIndex;
 
-                if (!ContentPartitions.ContainsKey(chunkRecord.ContentIndex))
+                if (!ContentPartitions.ContainsKey(contentIndex))
                 {
-                    ContentPartitions.Add(chunkRecord.ContentIndex, new List<NcchPartition>());
+                    ContentPartitions.Add(contentIndex, new List<NcchPartition>());
                 }
-                ContentPartitions[chunkRecord.ContentIndex].Add(await NcchPartition.Load(CiaData.GetDataReference(partitionStart, (int)partitionLength)));
+                ContentPartitions[contentIndex].Add(await NcchPartition.Load(CiaData.GetDataReference(partitionStart, (int)partitionLength)));
+
+                partitionStart += partitionLength;
             }
 
             Partitions = new NcchPartition[ContentPartitions.Keys.Max() + 1];
