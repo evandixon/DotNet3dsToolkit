@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace DotNet3dsToolkit
+namespace DotNet3dsToolkit.Ctr
 {
     public class TmdMetadata
     {

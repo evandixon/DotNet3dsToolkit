@@ -1,4 +1,5 @@
-﻿using SkyEditor.Core.IO;
+﻿using DotNet3dsToolkit.Ctr;
+using SkyEditor.Core.IO;
 using SkyEditor.Core.Utilities;
 using System;
 using System.Collections.Generic;
@@ -14,9 +15,29 @@ namespace DotNet3dsToolkit
     {
         private const int MediaUnitSize = 0x200;
 
+        public static async Task<ThreeDsRom> Load(string filename)
+        {
+            var rom = new ThreeDsRom();
+            await rom.OpenFile(filename);
+            return rom;
+        }
+
+        public static async Task<ThreeDsRom> Load(string filename, IIOProvider provider)
+        {
+            var rom = new ThreeDsRom(provider);
+            await rom.OpenFile(filename);
+            return rom;
+        }
+
         public ThreeDsRom()
         {
             (this as IIOProvider).ResetWorkingDirectory();
+            CurrentIOProvider = new PhysicalIOProvider();
+        }
+
+        public ThreeDsRom(IIOProvider ioProvider)
+        {
+            CurrentIOProvider = ioProvider;
         }
 
         private INcchPartitionContainer Container { get; set; }
@@ -68,6 +89,11 @@ namespace DotNet3dsToolkit
             {
                 throw new FileNotFoundException("Could not find file or directory at the given path", filename);
             }            
+        }
+
+        public async Task OpenFile(string filename)
+        {
+            await this.OpenFile(filename, CurrentIOProvider);
         }
 
         public NcchPartition GetPartitionOrDefault(int partitionIndex)
