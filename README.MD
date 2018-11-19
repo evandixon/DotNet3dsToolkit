@@ -6,9 +6,12 @@ It is currently being rewritten in .Net Standard 2.0. Please see the Old folder 
 Current features:
 * Extract decrypted CCI files
 * Extract decrypted CIA files
+* Extract decrypted CXI files
 * Allow reading data of individual files without extraction
 
 Planned features:
-* Load CXI files
 * Load RomFS or ExeFS files
 * Build ROMs
+
+Known issues:
+* DLC CIA files have some partitions incorrectly identified as Manual, Download Play, Updates, etc.

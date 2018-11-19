@@ -1,4 +1,6 @@
-﻿using SkyEditor.Core.IO;
+﻿using DotNet3dsToolkit.Ctr;
+using SkyEditor.Core.IO;
+using SkyEditor.Core.IO.PluginInfrastructure;
 using SkyEditor.Core.Utilities;
 using System;
 using System.Collections.Generic;
@@ -10,13 +12,33 @@ using System.Threading.Tasks;
 
 namespace DotNet3dsToolkit
 {
-    public class ThreeDsRom : IOpenableFile, IIOProvider,  IDisposable
+    public class ThreeDsRom : IOpenableFile, IIOProvider, IDetectableFileType, IDisposable
     {
         private const int MediaUnitSize = 0x200;
+
+        public static async Task<ThreeDsRom> Load(string filename)
+        {
+            var rom = new ThreeDsRom();
+            await rom.OpenFile(filename);
+            return rom;
+        }
+
+        public static async Task<ThreeDsRom> Load(string filename, IIOProvider provider)
+        {
+            var rom = new ThreeDsRom(provider);
+            await rom.OpenFile(filename);
+            return rom;
+        }
 
         public ThreeDsRom()
         {
             (this as IIOProvider).ResetWorkingDirectory();
+            CurrentIOProvider = new PhysicalIOProvider();
+        }
+
+        public ThreeDsRom(IIOProvider ioProvider)
+        {
+            CurrentIOProvider = ioProvider;
         }
 
         private INcchPartitionContainer Container { get; set; }
@@ -50,9 +72,13 @@ namespace DotNet3dsToolkit
                 {
                     Container = await NcsdFile.Load(RawData);
                 }
-                else if (await CiaFile.IsCia(filename, RawData))
+                else if (await CiaFile.IsCia(RawData))
                 {
                     Container = await CiaFile.Load(RawData);
+                }
+                else if (await NcchPartition.IsNcch(RawData))
+                {
+                    Container = new SingleNcchPartitionContainer(await NcchPartition.Load(RawData));
                 }
                 else
                 {
@@ -68,6 +94,11 @@ namespace DotNet3dsToolkit
             {
                 throw new FileNotFoundException("Could not find file or directory at the given path", filename);
             }            
+        }
+
+        public async Task OpenFile(string filename)
+        {
+            await this.OpenFile(filename, CurrentIOProvider);
         }
 
         public NcchPartition GetPartitionOrDefault(int partitionIndex)
@@ -906,6 +937,15 @@ namespace DotNet3dsToolkit
             CurrentIOProvider.WriteAllBytes(virtualPath, (this as IIOProvider).ReadAllBytes(filename));
 
             return CurrentIOProvider.OpenFileWriteOnly(filename);
+        }
+
+        #endregion
+
+        #region IDetectableFileType Implementation
+
+        public async Task<bool> IsOfType(GenericFile file)
+        {
+            return await NcsdFile.IsNcsd(file) || await CiaFile.IsCia(file) || await NcchPartition.IsNcch(file);
         }
 
         #endregion

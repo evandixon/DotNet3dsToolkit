@@ -4,14 +4,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace DotNet3dsToolkit
+namespace DotNet3dsToolkit.Ctr
 {
     public class CiaFile : INcchPartitionContainer
     {
-        public static Task<bool> IsCia(string filename, GenericFile file)
+        public static Task<bool> IsCia(GenericFile file)
         {
             // To-do: look at the actual data
-            return Task.FromResult(filename.ToLower().EndsWith(".cia"));
+            return Task.FromResult(file.Filename.ToLower().EndsWith(".cia"));
         }
 
         public static async Task<CiaFile> Load(IBinaryDataAccessor data)
@@ -40,16 +40,19 @@ namespace DotNet3dsToolkit
             TmdMetadata = await TmdMetadata.Load(CiaData.GetDataReference(tmdOffset, CiaHeader.TmdFileSize));
 
             ContentPartitions = new Dictionary<int, List<NcchPartition>>();
+            long partitionStart = contentOffset;
             foreach (var chunkRecord in TmdMetadata.ContentChunkRecords)
-            {
-                var partitionStart = contentOffset + TmdMetadata.ContentInfoRecords[chunkRecord.ContentId].ContentIndexOffset;
+            {                
                 var partitionLength = chunkRecord.ContentSize;
+                int contentIndex = chunkRecord.ContentIndex;
 
-                if (!ContentPartitions.ContainsKey(chunkRecord.ContentIndex))
+                if (!ContentPartitions.ContainsKey(contentIndex))
                 {
-                    ContentPartitions.Add(chunkRecord.ContentIndex, new List<NcchPartition>());
+                    ContentPartitions.Add(contentIndex, new List<NcchPartition>());
                 }
-                ContentPartitions[chunkRecord.ContentIndex].Add(await NcchPartition.Load(CiaData.GetDataReference(partitionStart, (int)partitionLength)));
+                ContentPartitions[contentIndex].Add(await NcchPartition.Load(CiaData.GetDataReference(partitionStart, (int)partitionLength)));
+
+                partitionStart += partitionLength;
             }
 
             Partitions = new NcchPartition[ContentPartitions.Keys.Max() + 1];

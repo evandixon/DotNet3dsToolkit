@@ -4,11 +4,28 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace DotNet3dsToolkit
+namespace DotNet3dsToolkit.Ctr
 {
     public class NcchPartition
     {
         private const int MediaUnitSize = 0x200;
+
+        public static async Task<bool> IsNcch(IBinaryDataAccessor file)
+        {
+            try
+            {
+                if (file.Length < 0x104)
+                {
+                    return false;
+                }
+
+                return await file.ReadStringAsync(0x100, 4, Encoding.ASCII) == "NCCH";
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
 
         public static async Task<NcchPartition> Load(IBinaryDataAccessor data)
         {

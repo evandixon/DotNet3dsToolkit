@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace DotNet3dsToolkit
+namespace DotNet3dsToolkit.Ctr
 {
     public class NcsdFile : INcchPartitionContainer
     {
@@ -15,6 +15,11 @@ namespace DotNet3dsToolkit
         {
             try
             {
+                if (file.Length < 0x104)
+                {
+                    return false;
+                }
+
                 return await file.ReadStringAsync(0x100, 4, Encoding.ASCII) == "NCSD";
             }
             catch (Exception)
