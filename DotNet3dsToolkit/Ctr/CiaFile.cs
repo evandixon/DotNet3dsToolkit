@@ -1,4 +1,5 @@
 ﻿using SkyEditor.Core.IO;
+using SkyEditor.Core.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -39,43 +40,30 @@ namespace DotNet3dsToolkit.Ctr
 
             TmdMetadata = await TmdMetadata.Load(CiaData.GetDataReference(tmdOffset, CiaHeader.TmdFileSize));
 
-            ContentPartitions = new Dictionary<int, List<NcchPartition>>();
+            Partitions = new NcchPartition[TmdMetadata.ContentChunkRecords.Length];
             long partitionStart = contentOffset;
-            foreach (var chunkRecord in TmdMetadata.ContentChunkRecords)
-            {                
+            for (var i = 0; i < TmdMetadata.ContentChunkRecords.Length; i++)
+            {
+                var chunkRecord = TmdMetadata.ContentChunkRecords[i];
                 var partitionLength = chunkRecord.ContentSize;
                 int contentIndex = chunkRecord.ContentIndex;
 
-                if (!ContentPartitions.ContainsKey(contentIndex))
-                {
-                    ContentPartitions.Add(contentIndex, new List<NcchPartition>());
-                }
-                ContentPartitions[contentIndex].Add(await NcchPartition.Load(CiaData.GetDataReference(partitionStart, (int)partitionLength)));
+                Partitions[i] = await NcchPartition.Load(CiaData.GetDataReference(partitionStart, partitionLength));
 
                 partitionStart += partitionLength;
             }
 
-            Partitions = new NcchPartition[ContentPartitions.Keys.Max() + 1];
-            foreach (var chunkKey in ContentPartitions.Keys)
-            {
-                Partitions[chunkKey] = ContentPartitions[chunkKey].First();
-            }
+            IsDlcContainer = TmdMetadata.TitleId >> 32 == 0x0004008C;
         }
 
         private IBinaryDataAccessor CiaData { get; set; }
-        
+
         public CiaHeader CiaHeader { get; private set; }
 
         public TmdMetadata TmdMetadata { get; private set; }
 
-        /// <summary>
-        /// All partitions grouped by content index
-        /// </summary>
-        public Dictionary<int, List<NcchPartition>> ContentPartitions { get; set; }
-
-        /// <summary>
-        /// The first partition of each content type
-        /// </summary>
         public NcchPartition[] Partitions { get; private set; }
+
+        public bool IsDlcContainer { get; private set; }
     }
 }

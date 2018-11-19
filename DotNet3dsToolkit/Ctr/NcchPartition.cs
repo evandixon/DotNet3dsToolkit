@@ -35,44 +35,47 @@ namespace DotNet3dsToolkit.Ctr
                 header = new NcchHeader(await data.ReadAsync(0, 0x200));
             }            
 
-            var partition = new NcchPartition(data, header);
-            await partition.Initialize();
+            var partition = new NcchPartition(header);
+            await partition.Initialize(data);
             return partition;
         }
 
-        public NcchPartition(IBinaryDataAccessor data, NcchHeader header)
+        public NcchPartition(NcchHeader header)
         {
-            Data = data ?? throw new ArgumentNullException(nameof(data));
-            Header = header; // Could be null if this is an empty partition
+            Header = header;
         }
 
-        public async Task Initialize()
+        public NcchPartition(RomFs romfs = null, ExeFs exefs = null, IBinaryDataAccessor exheader = null)
+        {
+            RomFs = romfs;
+            ExeFs = exefs;
+            ExHeader = exheader;
+        }
+
+        public async Task Initialize(IBinaryDataAccessor data)
         {
             if (Header != null && Header.RomFsSize > 0)
             {
                 if (Header.ExeFsOffset > 0 && Header.ExeFsSize > 0)
                 {
-                    ExeFs = await ExeFs.Load(Data.GetDataReference(Header.ExeFsOffset * MediaUnitSize, Header.ExeFsSize * MediaUnitSize));
+                    ExeFs = await ExeFs.Load(data.GetDataReference(Header.ExeFsOffset * MediaUnitSize, Header.ExeFsSize * MediaUnitSize));
                 }
                 if (Header.RomFsOffset > 0 && Header.RomFsOffset > 0)
                 {
-                    RomFs = await RomFs.Load(Data.GetDataReference(Header.RomFsOffset * MediaUnitSize, Header.RomFsSize * MediaUnitSize));
+                    RomFs = await RomFs.Load(data.GetDataReference(Header.RomFsOffset * MediaUnitSize, Header.RomFsSize * MediaUnitSize));
                 }                    
                 if (Header.ExHeaderSize > 0)
                 {
-                    ExHeader = Data.GetDataReference(0x200, Header.ExHeaderSize);
+                    ExHeader = data.GetDataReference(0x200, Header.ExHeaderSize);
                 }
             }
         }
-
-        public IBinaryDataAccessor Data { get; }
 
         public NcchHeader Header { get; } // Could be null if this is an empty partition
 
         public ExeFs ExeFs { get; private set; } // Could be null if not applicable
         public RomFs RomFs { get; private set; } // Could be null if not applicable
         public IBinaryDataAccessor ExHeader { get; private set; } // Could be null if not applicable
-
 
         #region Child Classes
         public class NcchHeader

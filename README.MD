@@ -7,11 +7,9 @@ Current features:
 * Extract decrypted CCI files
 * Extract decrypted CIA files
 * Extract decrypted CXI files
-* Allow reading data of individual files without extraction
+* Extract decrypted RomFS files
+* Extract decrypted ExeFS files
+* Allow reading data of individual files for all above formats without extraction
 
 Planned features:
-* Load RomFS or ExeFS files
 * Build ROMs
-
-Known issues:
-* DLC CIA files have some partitions incorrectly identified as Manual, Download Play, Updates, etc.

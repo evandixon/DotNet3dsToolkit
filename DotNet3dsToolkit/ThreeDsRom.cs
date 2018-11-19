@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace DotNet3dsToolkit
 {
-    public class ThreeDsRom : IOpenableFile, IIOProvider, IDetectableFileType, IDisposable
+    public class ThreeDsRom : IOpenableFile, IOpenableFromGenericFile, IIOProvider, IDetectableFileType, IDisposable
     {
         private const int MediaUnitSize = 0x200;
 
@@ -60,30 +60,7 @@ namespace DotNet3dsToolkit
                 RawData.EnableInMemoryLoad = true;
                 await RawData.OpenFile(filename, CurrentIOProvider);
 
-                // Clear virtual path if it exists
-                if (!string.IsNullOrEmpty(VirtualPath) && CurrentIOProvider.DirectoryExists(VirtualPath))
-                {
-                    CurrentIOProvider.DeleteDirectory(VirtualPath);
-                }
-
-                VirtualPath = CurrentIOProvider.GetTempDirectory();
-
-                if (await NcsdFile.IsNcsd(RawData))
-                {
-                    Container = await NcsdFile.Load(RawData);
-                }
-                else if (await CiaFile.IsCia(RawData))
-                {
-                    Container = await CiaFile.Load(RawData);
-                }
-                else if (await NcchPartition.IsNcch(RawData))
-                {
-                    Container = new SingleNcchPartitionContainer(await NcchPartition.Load(RawData));
-                }
-                else
-                {
-                    throw new BadImageFormatException(Properties.Resources.ThreeDsRom_UnsupportedFileFormat);
-                }
+                await OpenFile(RawData);
             }
             else if (provider.DirectoryExists(filename))
             {
@@ -93,7 +70,43 @@ namespace DotNet3dsToolkit
             else
             {
                 throw new FileNotFoundException("Could not find file or directory at the given path", filename);
-            }            
+            }
+        }
+
+        public async Task OpenFile(GenericFile file)
+        {
+            // Clear virtual path if it exists
+            if (!string.IsNullOrEmpty(VirtualPath) && CurrentIOProvider.DirectoryExists(VirtualPath))
+            {
+                CurrentIOProvider.DeleteDirectory(VirtualPath);
+            }
+
+            VirtualPath = CurrentIOProvider.GetTempDirectory();
+
+            if (await NcsdFile.IsNcsd(file))
+            {
+                Container = await NcsdFile.Load(file);
+            }
+            else if (await CiaFile.IsCia(file))
+            {
+                Container = await CiaFile.Load(file);
+            }
+            else if (await NcchPartition.IsNcch(file))
+            {
+                Container = new SingleNcchPartitionContainer(await NcchPartition.Load(file));
+            }
+            else if (await RomFs.IsRomFs(file))
+            {
+                Container = new SingleNcchPartitionContainer(new NcchPartition(romfs: await RomFs.Load(file)));
+            }
+            else if (await ExeFs.IsExeFs(file))
+            {
+                Container = new SingleNcchPartitionContainer(new NcchPartition(exefs: await ExeFs.Load(file)));
+            }
+            else
+            {
+                throw new BadImageFormatException(Properties.Resources.ThreeDsRom_UnsupportedFileFormat);
+            }
         }
 
         public async Task OpenFile(string filename)
@@ -135,7 +148,7 @@ namespace DotNet3dsToolkit
             {
                 provider.CreateDirectory(directoryName);
             }
-            
+
             var tasks = new List<Task>();
             for (int i = 0; i < Partitions.Length; i++)
             {
@@ -168,7 +181,8 @@ namespace DotNet3dsToolkit
                         exefsExtractionProgressedToken.FileCountChanged += onExtractionTokenProgressed;
                         extractionProgressedTokens.Add(exefsExtractionProgressedToken);
                     }
-                    tasks.Add(Task.Run(async () => {
+                    tasks.Add(Task.Run(async () =>
+                    {
                         File.WriteAllBytes(Path.Combine(directoryName, GetExHeaderFileName(i)), await partition.ExHeader.ReadAsync());
                         exefsExtractionProgressedToken?.IncrementExtractedFileCount();
                     }));
@@ -200,20 +214,27 @@ namespace DotNet3dsToolkit
 
         private string GetRomFsDirectoryName(int partitionId)
         {
-            switch (partitionId)
+            if (Container.IsDlcContainer)
             {
-                case 0:
-                    return "RomFS";
-                case 1:
-                    return "Manual";
-                case 2:
-                    return "DownloadPlay";
-                case 6:
-                    return "N3DSUpdate";
-                case 7:
-                    return "O3DSUpdate";
-                default:
-                    return "RomFS-Partition-" + partitionId.ToString();
+                return "RomFS-Partition-" + partitionId.ToString();
+            }
+            else
+            {
+                switch (partitionId)
+                {
+                    case 0:
+                        return "RomFS";
+                    case 1:
+                        return "Manual";
+                    case 2:
+                        return "DownloadPlay";
+                    case 6:
+                        return "N3DSUpdate";
+                    case 7:
+                        return "O3DSUpdate";
+                    default:
+                        return "RomFS-Partition-" + partitionId.ToString();
+                }
             }
         }
 
@@ -235,7 +256,7 @@ namespace DotNet3dsToolkit
                 case 0:
                     return "ExHeader.bin";
                 default:
-                    return "ExHeader" + partitionId.ToString() + ".bin";
+                    return "ExHeader-" + partitionId.ToString() + ".bin";
             }
         }
 
@@ -414,7 +435,7 @@ namespace DotNet3dsToolkit
         {
             return Path.Combine(VirtualPath, path.TrimStart('/'));
         }
-        
+
         private IBinaryDataAccessor GetDataReference(string[] parts, bool throwIfNotFound = true)
         {
             IBinaryDataAccessor getExeFsDataReference(string[] pathParts, int partitionId)
@@ -445,7 +466,7 @@ namespace DotNet3dsToolkit
                     {
                         return currentDirectory.ChildFiles.FirstOrDefault(f => string.Compare(f.Name, pathParts.Last(), true) == 0)?.GetDataReference();
                     }
-                    
+
                 }
 
                 return null;
@@ -456,26 +477,58 @@ namespace DotNet3dsToolkit
             var firstDirectory = parts[0].ToLower();
             switch (firstDirectory)
             {
+                case "exefs-partition-0":
                 case "exefs":
                     dataReference = getExeFsDataReference(parts, 0);
                     break;
+                case "romfs-partition-0":
                 case "romfs":
                     dataReference = getRomFsDataReference(parts, 0);
                     break;
+                case "romfs-partition-1":
                 case "manual":
                     dataReference = getRomFsDataReference(parts, 1);
                     break;
+                case "romfs-partition-2":
                 case "downloadplay":
                     dataReference = getRomFsDataReference(parts, 2);
                     break;
+                case "romfs-partition-6":
                 case "n3dsupdate":
                     dataReference = getRomFsDataReference(parts, 6);
                     break;
+                case "romfs-partition-7":
                 case "o3dsupdate":
                     dataReference = getRomFsDataReference(parts, 7);
                     break;
                 case "exheader.bin":
                     dataReference = GetPartitionOrDefault(0)?.ExHeader;
+                    break;
+                default:
+                    if (firstDirectory.StartsWith("romfs-partition-"))
+                    {
+                        var partitionNumRaw = firstDirectory.Split("-".ToCharArray(), 3)[2];
+                        if (int.TryParse(partitionNumRaw, out var partitionNum))
+                        {
+                            dataReference = getRomFsDataReference(parts, partitionNum);
+                        }
+                    }
+                    else if (firstDirectory.StartsWith("exefs-partition-"))
+                    {
+                        var partitionNumRaw = firstDirectory.Split("-".ToCharArray(), 3)[2];
+                        if (int.TryParse(partitionNumRaw, out var partitionNum))
+                        {
+                            dataReference = getExeFsDataReference(parts, partitionNum);
+                        }
+                    }
+                    else if (firstDirectory.StartsWith("exheader-"))
+                    {
+                        var partitionNumRaw = firstDirectory.Split("-".ToCharArray(), 2)[1].Split(".".ToCharArray(), 2)[0];
+                        if (int.TryParse(partitionNumRaw, out var partitionNum))
+                        {
+                            dataReference = GetPartitionOrDefault(partitionNum)?.ExHeader;
+                        }
+                    }
                     break;
             }
 
@@ -520,21 +573,44 @@ namespace DotNet3dsToolkit
 
             if (parts.Length == 1)
             {
-                switch (parts[0].ToLower())
+                var dirName = parts[0].ToLower();
+                switch (dirName)
                 {
+                    case "exefs-partition-0":
                     case "exefs":
                         return GetPartitionOrDefault(0)?.ExeFs != null;
+                    case "romfs-partition-0":
                     case "romfs":
                         return GetPartitionOrDefault(0)?.RomFs != null;
+                    case "romfs-partition-1":
                     case "manual":
                         return GetPartitionOrDefault(1)?.RomFs != null;
+                    case "romfs-partition-2":
                     case "downloadplay":
                         return GetPartitionOrDefault(2)?.RomFs != null;
+                    case "romfs-partition-6":
                     case "n3dsupdate":
                         return GetPartitionOrDefault(6)?.RomFs != null;
+                    case "romfs-partition-7":
                     case "o3dsupdate":
                         return GetPartitionOrDefault(7)?.RomFs != null;
                     default:
+                        if (dirName.StartsWith("romfs-partition-"))
+                        {
+                            var partitionNumRaw = dirName.Split("-".ToCharArray(), 3)[2];
+                            if (int.TryParse(partitionNumRaw, out var partitionNum))
+                            {
+                                return GetPartitionOrDefault(partitionNum)?.RomFs != null;
+                            }
+                        }
+                        else if (dirName.StartsWith("exefs-partition-"))
+                        {
+                            var partitionNumRaw = dirName.Split("-".ToCharArray(), 3)[2];
+                            if (int.TryParse(partitionNumRaw, out var partitionNum))
+                            {
+                                return GetPartitionOrDefault(partitionNum)?.ExeFs != null;
+                            }
+                        }
                         return false;
                 }
             }
@@ -544,22 +620,42 @@ namespace DotNet3dsToolkit
             }
             else
             {
-                switch (parts[0].ToLower())
+                var dirName = parts[0].ToLower();
+                switch (dirName)
                 {
+                    case "exefs-partition-0":
                     case "exefs":
                         // Directories inside exefs are not supported
                         return false;
+                    case "romfs-partition-0":
                     case "romfs":
                         return romfsDirectoryExists(parts, 0);
+                    case "romfs-partition-1":
                     case "manual":
                         return romfsDirectoryExists(parts, 1);
+                    case "romfs-partition-2":
                     case "downloadplay":
                         return romfsDirectoryExists(parts, 2);
+                    case "romfs-partition-6":
                     case "n3dsupdate":
                         return romfsDirectoryExists(parts, 6);
+                    case "romfs-partition-7":
                     case "o3dsupdate":
                         return romfsDirectoryExists(parts, 7);
                     default:
+                        if (dirName.StartsWith("romfs-partition-"))
+                        {
+                            var partitionNumRaw = dirName.Split("-".ToCharArray(), 3)[2];
+                            if (int.TryParse(partitionNumRaw, out var partitionNum))
+                            {
+                                return romfsDirectoryExists(parts, partitionNum);
+                            }
+                        }
+                        else if (dirName.StartsWith("exefs-partition-"))
+                        {
+                            // Directories inside exefs are not supported
+                            return false;
+                        }
                         return false;
                 }
             }
@@ -594,7 +690,7 @@ namespace DotNet3dsToolkit
             var parts = GetPathParts(path);
             var output = new List<string>();
 
-            void addRomFsFiles(int partitionId) 
+            void addRomFsFiles(int partitionId)
             {
                 var directory = "/" + GetRomFsDirectoryName(partitionId) + "/";
 
@@ -608,7 +704,8 @@ namespace DotNet3dsToolkit
                 if (currentDirectory != null)
                 {
                     IEnumerable<string> files;
-                    if (ReferenceEquals(currentDirectory, GetPartitionOrDefault(partitionId).RomFs.Level3.RootDirectoryMetadataTable)) {
+                    if (ReferenceEquals(currentDirectory, GetPartitionOrDefault(partitionId).RomFs.Level3.RootDirectoryMetadataTable))
+                    {
                         // The root RomFS directory doesn't contain files; those are located in the level 3
                         files = GetPartitionOrDefault(partitionId).RomFs.Level3.RootFiles
                         .Where(f => searchPatternRegex.IsMatch(f.Name))
@@ -620,7 +717,7 @@ namespace DotNet3dsToolkit
                         .Where(f => searchPatternRegex.IsMatch(f.Name))
                         .Select(f => directory + f.Name);
                     }
-                    
+
                     output.AddRange(files);
 
                     if (!topDirectoryOnly)
@@ -633,23 +730,35 @@ namespace DotNet3dsToolkit
                 }
             }
 
-            switch (parts[0].ToLower())
+            var dirName = parts[0].ToLower();
+            switch (dirName)
             {
                 case "" when parts.Length == 1:
-                    if (GetPartitionOrDefault(0)?.ExHeader != null && searchPatternRegex.IsMatch("ExHeader.bin"))
-                    {
-                        output.Add("ExHeader.bin");
-                    }
                     if (!topDirectoryOnly)
                     {
-                        output.AddRange((this as IIOProvider).GetFiles("/ExeFS", searchPattern, topDirectoryOnly));
-                        output.AddRange((this as IIOProvider).GetFiles("/RomFS", searchPattern, topDirectoryOnly));
-                        output.AddRange((this as IIOProvider).GetFiles("/Manual", searchPattern, topDirectoryOnly));
-                        output.AddRange((this as IIOProvider).GetFiles("/N3DSUpdate", searchPattern, topDirectoryOnly));
-                        output.AddRange((this as IIOProvider).GetFiles("/O3DSUpdate", searchPattern, topDirectoryOnly));
+                        for (int i = 0; i < Partitions.Length; i++)
+                        {
+                            if (Partitions[i].ExHeader != null)
+                            {
+                                var exheaderName = GetExHeaderFileName(i);
+                                if (!searchPatternRegex.IsMatch(exheaderName))
+                                {
+                                    output.Add(exheaderName);
+                                }
+                            }
+                            if (Partitions[i].ExeFs != null)
+                            {
+                                output.AddRange((this as IIOProvider).GetFiles("/" + GetExeFsDirectoryName(i), searchPattern, topDirectoryOnly));
+                            }
+                            if (Partitions[i].RomFs != null)
+                            {
+                                output.AddRange((this as IIOProvider).GetFiles("/" + GetRomFsDirectoryName(i), searchPattern, topDirectoryOnly));
+                            }
+                        }
                     }
                     break;
                 case "exefs" when parts.Length == 1:
+                case "exefs-partition-0" when parts.Length == 1:
                     foreach (var file in GetPartitionOrDefault(0)?.ExeFs?.Headers
                         ?.Where(h => searchPatternRegex.IsMatch(h.Filename) && !string.IsNullOrWhiteSpace(h.Filename))
                         ?.Select(h => h.Filename))
@@ -658,19 +767,47 @@ namespace DotNet3dsToolkit
                     }
                     break;
                 case "romfs":
+                case "romfs-partition-0":
                     addRomFsFiles(0);
                     break;
                 case "manual":
+                case "romfs-partition-1":
                     addRomFsFiles(1);
                     break;
                 case "downloadplay":
+                case "romfs-partition-2":
                     addRomFsFiles(2);
                     break;
                 case "n3dsupdate":
+                case "romfs-partition-6":
                     addRomFsFiles(6);
                     break;
                 case "o3dsupdate":
+                case "romfs-partition-7":
                     addRomFsFiles(7);
+                    break;
+                default:
+                    if (dirName.StartsWith("romfs-partition-"))
+                    {
+                        var partitionNumRaw = dirName.Split("-".ToCharArray(), 3)[2];
+                        if (int.TryParse(partitionNumRaw, out var partitionNum))
+                        {
+                            addRomFsFiles(partitionNum);
+                        }
+                    }
+                    else if (dirName.StartsWith("exefs-partition-"))
+                    {
+                        var partitionNumRaw = dirName.Split("-".ToCharArray(), 3)[2];
+                        if (int.TryParse(partitionNumRaw, out var partitionNum))
+                        {
+                            foreach (var file in GetPartitionOrDefault(partitionNum)?.ExeFs?.Headers
+                             ?.Where(h => searchPatternRegex.IsMatch(h.Filename) && !string.IsNullOrWhiteSpace(h.Filename))
+                             ?.Select(h => h.Filename))
+                            {
+                                output.Add("/ExeFS/" + file);
+                            }
+                        }
+                    }
                     break;
             }
 
@@ -722,60 +859,62 @@ namespace DotNet3dsToolkit
                 }
             }
 
-            switch (parts[0].ToLower())
+            var dirName = parts[0].ToLower();
+            switch (dirName)
             {
                 case "" when parts.Length == 1:
-                    if (GetPartitionOrDefault(0)?.ExeFs != null)
+                    for (int i = 0; i < Partitions.Length; i++)
                     {
-                        output.Add("/ExeFS/");
-                    }
-                    if (GetPartitionOrDefault(0)?.RomFs != null)
-                    {
-                        output.Add("/RomFS/");
-                    }
-                    if (GetPartitionOrDefault(1)?.RomFs != null)
-                    {
-                        output.Add("/Manual/");
-                    }
-                    if (GetPartitionOrDefault(2)?.RomFs != null)
-                    {
-                        output.Add("/DownloadPlay/");
-                    }
-                    if (GetPartitionOrDefault(6)?.RomFs != null)
-                    {
-                        output.Add("/N3DSUpdate/");
-                    }
-                    if (GetPartitionOrDefault(7)?.RomFs != null)
-                    {
-                        output.Add("/O3DSUpdate/");
-                    }
-
-                    if (!topDirectoryOnly)
-                    {
-                        output.AddRange((this as IIOProvider).GetDirectories("/ExeFS", topDirectoryOnly));
-                        output.AddRange((this as IIOProvider).GetDirectories("/RomFS", topDirectoryOnly));
-                        output.AddRange((this as IIOProvider).GetDirectories("/Manual", topDirectoryOnly));
-                        output.AddRange((this as IIOProvider).GetDirectories("/N3DSUpdate", topDirectoryOnly));
-                        output.AddRange((this as IIOProvider).GetDirectories("/O3DSUpdate", topDirectoryOnly));
+                        if (Partitions[i].ExeFs != null)
+                        {
+                            output.Add("/" + GetExeFsDirectoryName(i) + "/");
+                            if (!topDirectoryOnly)
+                            {
+                                output.AddRange((this as IIOProvider).GetDirectories("/" + GetExeFsDirectoryName(i), topDirectoryOnly));
+                            }
+                        }
+                        if (Partitions[i].RomFs != null)
+                        {
+                            output.Add("/" + GetRomFsDirectoryName(i)  + "/");
+                            if (!topDirectoryOnly)
+                            {
+                                output.AddRange((this as IIOProvider).GetDirectories("/" + GetRomFsDirectoryName(i), topDirectoryOnly));
+                            }
+                        }
                     }
                     break;
                 case "exefs" when parts.Length == 1:
                     // ExeFs doesn't support directories
                     break;
                 case "romfs":
+                case "romfs-partition-0":
                     addRomFsDirectories(0);
                     break;
                 case "manual":
+                case "romfs-partition-1":
                     addRomFsDirectories(1);
                     break;
                 case "downloadplay":
+                case "romfs-partition-2":
                     addRomFsDirectories(2);
                     break;
                 case "n3dsupdate":
+                case "romfs-partition-6":
                     addRomFsDirectories(6);
                     break;
                 case "o3dsupdate":
+                case "romfs-partition-7":
                     addRomFsDirectories(7);
+                    break;
+                default:
+                    if (dirName.StartsWith("romfs-partition-"))
+                    {
+                        var partitionNumRaw = dirName.Split("-".ToCharArray(), 3)[2];
+                        if (int.TryParse(partitionNumRaw, out var partitionNum))
+                        {
+                            addRomFsDirectories(partitionNum);
+                        }
+                    }
                     break;
             }
 
@@ -945,7 +1084,7 @@ namespace DotNet3dsToolkit
 
         public async Task<bool> IsOfType(GenericFile file)
         {
-            return await NcsdFile.IsNcsd(file) || await CiaFile.IsCia(file) || await NcchPartition.IsNcch(file);
+            return await NcsdFile.IsNcsd(file) || await CiaFile.IsCia(file) || await NcchPartition.IsNcch(file) || await RomFs.IsRomFs(file) || await ExeFs.IsExeFs(file);
         }
 
         #endregion

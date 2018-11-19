@@ -52,7 +52,7 @@ namespace DotNet3dsToolkit.Ctr
             {
                 var partitionStart = (long)Header.Partitions[i].Offset * MediaUnitSize;
                 var partitionLength = (long)Header.Partitions[i].Length * MediaUnitSize;
-                Partitions[i] = await NcchPartition.Load(NcsdData.GetDataReference(partitionStart, (int)partitionLength));
+                Partitions[i] = await NcchPartition.Load(NcsdData.GetDataReference(partitionStart, partitionLength));
             }, 0, Header.Partitions.Length - 1);
         }
 
@@ -61,5 +61,7 @@ namespace DotNet3dsToolkit.Ctr
         public NcsdHeader Header { get; set; }
 
         public NcchPartition[] Partitions { get; set; }
+
+        public bool IsDlcContainer => false;
     }
 }

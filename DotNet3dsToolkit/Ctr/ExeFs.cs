@@ -11,6 +11,29 @@ namespace DotNet3dsToolkit.Ctr
 {
     public class ExeFs
     {
+        public static async Task<bool> IsExeFs(IBinaryDataAccessor file)
+        {
+            try
+            {
+                if (file.Length < 0x200)
+                {
+                    return false;
+                }
+
+                var exefsHeaders = (await ExeFs.Load(file)).Headers.Where(h => !string.IsNullOrEmpty(h.Filename));
+                if (!exefsHeaders.Any())
+                {
+                    return false;
+                }
+
+                return exefsHeaders.All(h => h.Offset >= 0x200 && (h.Offset + h.FileSize) < file.Length);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
         public static async Task<ExeFs> Load(IBinaryDataAccessor exeFsData)
         {
             var exefs = new ExeFs(exeFsData);

@@ -18,5 +18,7 @@ namespace DotNet3dsToolkit.Ctr
         }
 
         public NcchPartition[] Partitions { get; }
+
+        public bool IsDlcContainer => false;
     }
 }

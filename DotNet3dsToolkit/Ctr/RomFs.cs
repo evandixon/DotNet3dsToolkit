@@ -16,6 +16,23 @@ namespace DotNet3dsToolkit.Ctr
         /// </summary>
         const int MaxFilenameLength = 1000;
 
+        public static async Task<bool> IsRomFs(IBinaryDataAccessor file)
+        {
+            try
+            {
+                if (file.Length < 4)
+                {
+                    return false;
+                }
+
+                return await file.ReadStringAsync(0, 4, Encoding.ASCII) == "IVFC";
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
         public static async Task<RomFs> Load(IBinaryDataAccessor data)
         {
             var header = new RomFsHeader(await data.ReadAsync(0, 0x6B));
