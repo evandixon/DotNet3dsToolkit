@@ -12,4 +12,7 @@ Current features:
 * Allow reading data of individual files for all above formats without extraction
 
 Planned features:
+* Console interface
+* GUI (using Avalonia for cross-platform support)
 * Build ROMs
+* Allow reading of individual partitions without extraction

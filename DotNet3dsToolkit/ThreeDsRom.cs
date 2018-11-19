@@ -521,6 +521,22 @@ namespace DotNet3dsToolkit
                             dataReference = getExeFsDataReference(parts, partitionNum);
                         }
                     }
+                    if (firstDirectory.StartsWith("romfs-"))
+                    {
+                        var partitionNumRaw = firstDirectory.Split("-".ToCharArray(), 2)[1].Split(".".ToCharArray(), 2)[0];
+                        if (int.TryParse(partitionNumRaw, out var partitionNum))
+                        {
+                            throw new NotImplementedException();
+                        }
+                    }
+                    else if (firstDirectory.StartsWith("exefs-"))
+                    {
+                        var partitionNumRaw = firstDirectory.Split("-".ToCharArray(), 2)[1].Split(".".ToCharArray(), 2)[0];
+                        if (int.TryParse(partitionNumRaw, out var partitionNum))
+                        {
+                            throw new NotImplementedException();
+                        }
+                    }
                     else if (firstDirectory.StartsWith("exheader-"))
                     {
                         var partitionNumRaw = firstDirectory.Split("-".ToCharArray(), 2)[1].Split(".".ToCharArray(), 2)[0];
