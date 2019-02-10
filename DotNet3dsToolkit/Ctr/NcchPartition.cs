@@ -58,11 +58,11 @@ namespace DotNet3dsToolkit.Ctr
             {
                 if (Header.ExeFsOffset > 0 && Header.ExeFsSize > 0)
                 {
-                    ExeFs = await ExeFs.Load(data.GetDataReference(Header.ExeFsOffset * MediaUnitSize, Header.ExeFsSize * MediaUnitSize));
+                    ExeFs = await ExeFs.Load(data.GetDataReference((long)Header.ExeFsOffset * MediaUnitSize, (long)Header.ExeFsSize * MediaUnitSize));
                 }
                 if (Header.RomFsOffset > 0 && Header.RomFsOffset > 0)
                 {
-                    RomFs = await RomFs.Load(data.GetDataReference(Header.RomFsOffset * MediaUnitSize, Header.RomFsSize * MediaUnitSize));
+                    RomFs = await RomFs.Load(data.GetDataReference((long)Header.RomFsOffset * MediaUnitSize, (long)Header.RomFsSize * MediaUnitSize));
                 }                    
                 if (Header.ExHeaderSize > 0)
                 {
