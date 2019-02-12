@@ -58,6 +58,7 @@ namespace DotNet3dsToolkit
                 RawData = new GenericFile();
                 RawData.EnableMemoryMappedFileLoading = true;
                 RawData.EnableInMemoryLoad = true;
+                RawData.IsReadOnly = true;
                 await RawData.OpenFile(filename, CurrentIOProvider);
 
                 await OpenFile(RawData);
