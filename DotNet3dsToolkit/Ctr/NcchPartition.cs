@@ -1,4 +1,5 @@
-﻿using SkyEditor.Core.IO;
+﻿using SkyEditor.IO;
+using SkyEditor.IO.Binary;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -32,7 +33,7 @@ namespace DotNet3dsToolkit.Ctr
             NcchHeader header = null;
             if (data.Length > 0)
             {
-                header = new NcchHeader(await data.ReadAsync(0, 0x200));
+                header = new NcchHeader(await data.ReadArrayAsync(0, 0x200));
             }            
 
             var partition = new NcchPartition(header);

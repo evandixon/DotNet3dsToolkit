@@ -1,11 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFrameworks>net462;netcoreapp2.2</TargetFrameworks>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="SkyEditor.Core" Version="4.2.6" />
+    <PackageReference Include="SkyEditor.IO" Version="5.0.3" />
   </ItemGroup>
 
   <ItemGroup>

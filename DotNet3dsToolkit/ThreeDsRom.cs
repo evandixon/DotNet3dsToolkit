@@ -1,7 +1,8 @@
 ﻿using DotNet3dsToolkit.Ctr;
-using SkyEditor.Core.IO;
-using SkyEditor.Core.IO.PluginInfrastructure;
 using SkyEditor.Core.Utilities;
+using SkyEditor.IO;
+using SkyEditor.IO.Binary;
+using SkyEditor.IO.FileSystem;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -12,7 +13,7 @@ using System.Threading.Tasks;
 
 namespace DotNet3dsToolkit
 {
-    public class ThreeDsRom : IOpenableFile, IOpenableFromGenericFile, IIOProvider, IDetectableFileType, IDisposable
+    public class ThreeDsRom : IFileSystem, IDisposable
     {
         private const int MediaUnitSize = 0x200;
 
@@ -23,46 +24,48 @@ namespace DotNet3dsToolkit
             return rom;
         }
 
-        public static async Task<ThreeDsRom> Load(string filename, IIOProvider provider)
+        public static async Task<ThreeDsRom> Load(string filename, IFileSystem fileSystem)
         {
-            var rom = new ThreeDsRom(provider);
+            var rom = new ThreeDsRom(fileSystem);
             await rom.OpenFile(filename);
             return rom;
         }
 
-        public ThreeDsRom()
+        public static async Task<bool> IsThreeDsRom(BinaryFile file)
         {
-            (this as IIOProvider).ResetWorkingDirectory();
-            CurrentIOProvider = new PhysicalIOProvider();
+            return await NcsdFile.IsNcsd(file) || await CiaFile.IsCia(file) || await NcchPartition.IsNcch(file) || await RomFs.IsRomFs(file) || await ExeFs.IsExeFs(file);
         }
 
-        public ThreeDsRom(IIOProvider ioProvider)
+        public ThreeDsRom()
         {
-            CurrentIOProvider = ioProvider;
+            (this as IFileSystem).ResetWorkingDirectory();
+            CurrentFileSystem = new PhysicalFileSystem();
+        }
+
+        public ThreeDsRom(IFileSystem fileSystem)
+        {
+            CurrentFileSystem = fileSystem;
         }
 
         private INcchPartitionContainer Container { get; set; }
 
         public NcchPartition[] Partitions => Container.Partitions;
 
-        private GenericFile RawData { get; set; }
+        private BinaryFile RawData { get; set; }
 
-        private IIOProvider CurrentIOProvider { get; set; }
+        private IFileSystem CurrentFileSystem { get; set; }
 
-        public async Task OpenFile(string filename, IIOProvider provider)
+        public async Task OpenFile(string filename, IFileSystem fileSystem)
         {
-            CurrentIOProvider = provider;
+            CurrentFileSystem = fileSystem;
 
-            if (provider.FileExists(filename))
+            if (fileSystem.FileExists(filename))
             {
-                RawData = new GenericFile();
-                RawData.EnableMemoryMappedFileLoading = true;
-                RawData.EnableInMemoryLoad = true;
-                await RawData.OpenFile(filename, CurrentIOProvider);
+                RawData = new BinaryFile(filename, CurrentFileSystem);
 
                 await OpenFile(RawData);
             }
-            else if (provider.DirectoryExists(filename))
+            else if (fileSystem.DirectoryExists(filename))
             {
                 VirtualPath = filename;
                 DisposeVirtualPath = false;
@@ -73,15 +76,15 @@ namespace DotNet3dsToolkit
             }
         }
 
-        public async Task OpenFile(GenericFile file)
+        public async Task OpenFile(BinaryFile file)
         {
             // Clear virtual path if it exists
-            if (!string.IsNullOrEmpty(VirtualPath) && CurrentIOProvider.DirectoryExists(VirtualPath))
+            if (!string.IsNullOrEmpty(VirtualPath) && CurrentFileSystem.DirectoryExists(VirtualPath))
             {
-                CurrentIOProvider.DeleteDirectory(VirtualPath);
+                CurrentFileSystem.DeleteDirectory(VirtualPath);
             }
 
-            VirtualPath = CurrentIOProvider.GetTempDirectory();
+            VirtualPath = CurrentFileSystem.GetTempDirectory();
 
             if (await NcsdFile.IsNcsd(file))
             {
@@ -111,7 +114,7 @@ namespace DotNet3dsToolkit
 
         public async Task OpenFile(string filename)
         {
-            await this.OpenFile(filename, CurrentIOProvider);
+            await this.OpenFile(filename, CurrentFileSystem);
         }
 
         public NcchPartition GetPartitionOrDefault(int partitionIndex)
@@ -126,9 +129,8 @@ namespace DotNet3dsToolkit
             }
         }
 
-        public async Task ExtractFiles(string directoryName, IIOProvider provider, ProgressReportToken progressReportToken = null)
+        public async Task ExtractFiles(string directoryName, IFileSystem fileSystem, ProgressReportToken progressReportToken = null)
         {
-
             List<ExtractionProgressedToken> extractionProgressedTokens = null;
             if (progressReportToken != null)
             {
@@ -144,9 +146,9 @@ namespace DotNet3dsToolkit
                 }
             }
 
-            if (!provider.DirectoryExists(directoryName))
+            if (!fileSystem.DirectoryExists(directoryName))
             {
-                provider.CreateDirectory(directoryName);
+                fileSystem.CreateDirectory(directoryName);
             }
 
             var tasks = new List<Task>();
@@ -168,7 +170,7 @@ namespace DotNet3dsToolkit
                         exefsExtractionProgressedToken.FileCountChanged += onExtractionTokenProgressed;
                         extractionProgressedTokens.Add(exefsExtractionProgressedToken);
                     }
-                    tasks.Add(partition.ExeFs.ExtractFiles(Path.Combine(directoryName, GetExeFsDirectoryName(i)), provider, exefsExtractionProgressedToken));
+                    tasks.Add(partition.ExeFs.ExtractFiles(Path.Combine(directoryName, GetExeFsDirectoryName(i)), fileSystem, exefsExtractionProgressedToken));
                 }
 
                 if (partition.ExHeader != null)
@@ -183,7 +185,7 @@ namespace DotNet3dsToolkit
                     }
                     tasks.Add(Task.Run(async () =>
                     {
-                        File.WriteAllBytes(Path.Combine(directoryName, GetExHeaderFileName(i)), await partition.ExHeader.ReadAsync());
+                        File.WriteAllBytes(Path.Combine(directoryName, GetExHeaderFileName(i)), await partition.ExHeader.ReadArrayAsync());
                         exefsExtractionProgressedToken?.IncrementExtractedFileCount();
                     }));
                 }
@@ -198,7 +200,7 @@ namespace DotNet3dsToolkit
                         extractionProgressedTokens.Add(romfsExtractionProgressedToken);
                     }
 
-                    tasks.Add(partition.RomFs.ExtractFiles(Path.Combine(directoryName, GetRomFsDirectoryName(i)), provider, romfsExtractionProgressedToken));
+                    tasks.Add(partition.RomFs.ExtractFiles(Path.Combine(directoryName, GetRomFsDirectoryName(i)), fileSystem, romfsExtractionProgressedToken));
                 }
 
             }
@@ -210,6 +212,11 @@ namespace DotNet3dsToolkit
                 progressReportToken.Progress = 1;
                 progressReportToken.IsCompleted = true;
             }
+        }
+
+        public async Task ExtractFiles(string directoryName, ProgressReportToken progressReportToken = null)
+        {
+            await ExtractFiles(directoryName, this.CurrentFileSystem, progressReportToken);
         }
 
         private string GetRomFsDirectoryName(int partitionId)
@@ -356,7 +363,7 @@ namespace DotNet3dsToolkit
         /// </summary>
         private bool DisposeVirtualPath { get; set; }
 
-        string IIOProvider.WorkingDirectory
+        string IFileSystem.WorkingDirectory
         {
             get
             {
@@ -411,9 +418,9 @@ namespace DotNet3dsToolkit
             return parts.ToArray();
         }
 
-        void IIOProvider.ResetWorkingDirectory()
+        void IFileSystem.ResetWorkingDirectory()
         {
-            (this as IIOProvider).WorkingDirectory = "/";
+            (this as IFileSystem).WorkingDirectory = "/";
         }
 
         private string FixPath(string path)
@@ -427,7 +434,7 @@ namespace DotNet3dsToolkit
             }
             else
             {
-                return Path.Combine((this as IIOProvider).WorkingDirectory, path);
+                return Path.Combine((this as IFileSystem).WorkingDirectory, path);
             }
         }
 
@@ -564,14 +571,14 @@ namespace DotNet3dsToolkit
             }
         }
 
-        long IIOProvider.GetFileLength(string filename)
+        long IFileSystem.GetFileLength(string filename)
         {
             return GetDataReference(GetPathParts(filename)).Length;
         }
 
-        bool IIOProvider.FileExists(string filename)
+        bool IFileSystem.FileExists(string filename)
         {
-            return (CurrentIOProvider != null && CurrentIOProvider.FileExists(GetVirtualPath(filename)))
+            return (CurrentFileSystem != null && CurrentFileSystem.FileExists(GetVirtualPath(filename)))
                 || GetDataReference(GetPathParts(filename), false) != null;
         }
 
@@ -677,16 +684,16 @@ namespace DotNet3dsToolkit
             }
         }
 
-        bool IIOProvider.DirectoryExists(string path)
+        bool IFileSystem.DirectoryExists(string path)
         {
             return !BlacklistedPaths.Contains(FixPath(path))
                     &&
-                    ((CurrentIOProvider != null && CurrentIOProvider.DirectoryExists(GetVirtualPath(path)))
+                    ((CurrentFileSystem != null && CurrentFileSystem.DirectoryExists(GetVirtualPath(path)))
                         || DirectoryExists(GetPathParts(path))
                     );
         }
 
-        void IIOProvider.CreateDirectory(string path)
+        void IFileSystem.CreateDirectory(string path)
         {
             var fixedPath = FixPath(path);
             if (BlacklistedPaths.Contains(fixedPath))
@@ -694,13 +701,13 @@ namespace DotNet3dsToolkit
                 BlacklistedPaths.Remove(fixedPath);
             }
 
-            if (!(this as IIOProvider).DirectoryExists(fixedPath))
+            if (!(this as IFileSystem).DirectoryExists(fixedPath))
             {
-                CurrentIOProvider?.CreateDirectory(GetVirtualPath(fixedPath));
+                CurrentFileSystem?.CreateDirectory(GetVirtualPath(fixedPath));
             }
         }
 
-        string[] IIOProvider.GetFiles(string path, string searchPattern, bool topDirectoryOnly)
+        string[] IFileSystem.GetFiles(string path, string searchPattern, bool topDirectoryOnly)
         {
             var searchPatternRegex = new Regex(GetFileSearchRegex(searchPattern), RegexOptions.Compiled | RegexOptions.IgnoreCase);
             var parts = GetPathParts(path);
@@ -740,7 +747,7 @@ namespace DotNet3dsToolkit
                     {
                         foreach (var d in currentDirectory.ChildDirectories)
                         {
-                            output.AddRange((this as IIOProvider).GetFiles(directory + d.Name + "/", searchPattern, topDirectoryOnly));
+                            output.AddRange((this as IFileSystem).GetFiles(directory + d.Name + "/", searchPattern, topDirectoryOnly));
                         }
                     }
                 }
@@ -764,11 +771,11 @@ namespace DotNet3dsToolkit
                             }
                             if (Partitions[i].ExeFs != null)
                             {
-                                output.AddRange((this as IIOProvider).GetFiles("/" + GetExeFsDirectoryName(i), searchPattern, topDirectoryOnly));
+                                output.AddRange((this as IFileSystem).GetFiles("/" + GetExeFsDirectoryName(i), searchPattern, topDirectoryOnly));
                             }
                             if (Partitions[i].RomFs != null)
                             {
-                                output.AddRange((this as IIOProvider).GetFiles("/" + GetRomFsDirectoryName(i), searchPattern, topDirectoryOnly));
+                                output.AddRange((this as IFileSystem).GetFiles("/" + GetRomFsDirectoryName(i), searchPattern, topDirectoryOnly));
                             }
                         }
                     }
@@ -829,11 +836,11 @@ namespace DotNet3dsToolkit
 
             // Apply shadowed files
             var virtualPath = GetVirtualPath(path);
-            if (CurrentIOProvider != null && CurrentIOProvider.DirectoryExists(virtualPath))
+            if (CurrentFileSystem != null && CurrentFileSystem.DirectoryExists(virtualPath))
             {
-                foreach (var item in CurrentIOProvider.GetFiles(virtualPath, searchPattern, topDirectoryOnly))
+                foreach (var item in CurrentFileSystem.GetFiles(virtualPath, searchPattern, topDirectoryOnly))
                 {
-                    var overlayPath = "/" + FileSystem.MakeRelativePath(item, VirtualPath);
+                    var overlayPath = "/" + SkyEditor.Core.Utilities.FileSystem.MakeRelativePath(item, VirtualPath);
                     if (!BlacklistedPaths.Contains(overlayPath) && !output.Contains(overlayPath, StringComparer.OrdinalIgnoreCase))
                     {
                         output.Add(overlayPath);
@@ -844,7 +851,7 @@ namespace DotNet3dsToolkit
             return output.ToArray();
         }
 
-        string[] IIOProvider.GetDirectories(string path, bool topDirectoryOnly)
+        string[] IFileSystem.GetDirectories(string path, bool topDirectoryOnly)
         {
             var parts = GetPathParts(path);
             var output = new List<string>();
@@ -869,7 +876,7 @@ namespace DotNet3dsToolkit
                     {
                         foreach (var d in currentDirectory.ChildDirectories)
                         {
-                            output.AddRange((this as IIOProvider).GetDirectories(directory + d.Name + "/", topDirectoryOnly));
+                            output.AddRange((this as IFileSystem).GetDirectories(directory + d.Name + "/", topDirectoryOnly));
                         }
                     }
                 }
@@ -886,7 +893,7 @@ namespace DotNet3dsToolkit
                             output.Add("/" + GetExeFsDirectoryName(i) + "/");
                             if (!topDirectoryOnly)
                             {
-                                output.AddRange((this as IIOProvider).GetDirectories("/" + GetExeFsDirectoryName(i), topDirectoryOnly));
+                                output.AddRange((this as IFileSystem).GetDirectories("/" + GetExeFsDirectoryName(i), topDirectoryOnly));
                             }
                         }
                         if (Partitions[i].RomFs != null)
@@ -894,7 +901,7 @@ namespace DotNet3dsToolkit
                             output.Add("/" + GetRomFsDirectoryName(i)  + "/");
                             if (!topDirectoryOnly)
                             {
-                                output.AddRange((this as IIOProvider).GetDirectories("/" + GetRomFsDirectoryName(i), topDirectoryOnly));
+                                output.AddRange((this as IFileSystem).GetDirectories("/" + GetRomFsDirectoryName(i), topDirectoryOnly));
                             }
                         }
                     }
@@ -936,11 +943,11 @@ namespace DotNet3dsToolkit
 
             // Apply shadowed files
             var virtualPath = GetVirtualPath(path);
-            if (CurrentIOProvider != null && CurrentIOProvider.DirectoryExists(virtualPath))
+            if (CurrentFileSystem != null && CurrentFileSystem.DirectoryExists(virtualPath))
             {
-                foreach (var item in CurrentIOProvider.GetDirectories(virtualPath, topDirectoryOnly))
+                foreach (var item in CurrentFileSystem.GetDirectories(virtualPath, topDirectoryOnly))
                 {
-                    var overlayPath = "/" + FileSystem.MakeRelativePath(item, VirtualPath);
+                    var overlayPath = "/" + SkyEditor.Core.Utilities.FileSystem.MakeRelativePath(item, VirtualPath);
                     if (!BlacklistedPaths.Contains(overlayPath) && !output.Contains(overlayPath, StringComparer.OrdinalIgnoreCase))
                     {
                         output.Add(overlayPath);
@@ -951,7 +958,7 @@ namespace DotNet3dsToolkit
             return output.ToArray();
         }
 
-        byte[] IIOProvider.ReadAllBytes(string filename)
+        byte[] IFileSystem.ReadAllBytes(string filename)
         {
             var fixedPath = FixPath(filename);
             if (BlacklistedPaths.Contains(fixedPath))
@@ -961,24 +968,24 @@ namespace DotNet3dsToolkit
             else
             {
                 var virtualPath = GetVirtualPath(fixedPath);
-                if (CurrentIOProvider != null && CurrentIOProvider.FileExists(virtualPath))
+                if (CurrentFileSystem != null && CurrentFileSystem.FileExists(virtualPath))
                 {
-                    return CurrentIOProvider.ReadAllBytes(virtualPath);
+                    return CurrentFileSystem.ReadAllBytes(virtualPath);
                 }
                 else
                 {
                     var data = GetDataReference(GetPathParts(filename));
-                    return data.Read();
+                    return data.ReadArray();
                 }
             }
         }
 
-        string IIOProvider.ReadAllText(string filename)
+        string IFileSystem.ReadAllText(string filename)
         {
-            return Encoding.UTF8.GetString((this as IIOProvider).ReadAllBytes(filename));
+            return Encoding.UTF8.GetString((this as IFileSystem).ReadAllBytes(filename));
         }
 
-        void IIOProvider.WriteAllBytes(string filename, byte[] data)
+        void IFileSystem.WriteAllBytes(string filename, byte[] data)
         {
             var fixedPath = FixPath(filename);
             if (BlacklistedPaths.Contains(fixedPath))
@@ -986,20 +993,20 @@ namespace DotNet3dsToolkit
                 BlacklistedPaths.Remove(fixedPath);
             }
 
-            CurrentIOProvider?.WriteAllBytes(GetVirtualPath(filename), data);
+            CurrentFileSystem?.WriteAllBytes(GetVirtualPath(filename), data);
         }
 
-        void IIOProvider.WriteAllText(string filename, string data)
+        void IFileSystem.WriteAllText(string filename, string data)
         {
-            (this as IIOProvider).WriteAllBytes(filename, Encoding.UTF8.GetBytes(data));
+            (this as IFileSystem).WriteAllBytes(filename, Encoding.UTF8.GetBytes(data));
         }
 
-        void IIOProvider.CopyFile(string sourceFilename, string destinationFilename)
+        void IFileSystem.CopyFile(string sourceFilename, string destinationFilename)
         {
-            (this as IIOProvider).WriteAllBytes(destinationFilename, (this as IIOProvider).ReadAllBytes(sourceFilename));
+            (this as IFileSystem).WriteAllBytes(destinationFilename, (this as IFileSystem).ReadAllBytes(sourceFilename));
         }
 
-        void IIOProvider.DeleteFile(string filename)
+        void IFileSystem.DeleteFile(string filename)
         {
             var fixedPath = FixPath(filename);
             if (!BlacklistedPaths.Contains(fixedPath))
@@ -1008,13 +1015,13 @@ namespace DotNet3dsToolkit
             }
 
             var virtualPath = GetVirtualPath(filename);
-            if (CurrentIOProvider != null && CurrentIOProvider.FileExists(virtualPath))
+            if (CurrentFileSystem != null && CurrentFileSystem.FileExists(virtualPath))
             {
-                CurrentIOProvider.DeleteFile(virtualPath);
+                CurrentFileSystem.DeleteFile(virtualPath);
             }
         }
 
-        void IIOProvider.DeleteDirectory(string path)
+        void IFileSystem.DeleteDirectory(string path)
         {
             var fixedPath = FixPath(path);
             if (!BlacklistedPaths.Contains(fixedPath))
@@ -1023,86 +1030,77 @@ namespace DotNet3dsToolkit
             }
 
             var virtualPath = GetVirtualPath(path);
-            if (CurrentIOProvider != null && CurrentIOProvider.FileExists(virtualPath))
+            if (CurrentFileSystem != null && CurrentFileSystem.FileExists(virtualPath))
             {
-                CurrentIOProvider.DeleteFile(virtualPath);
+                CurrentFileSystem.DeleteFile(virtualPath);
             }
         }
 
-        string IIOProvider.GetTempFilename()
+        string IFileSystem.GetTempFilename()
         {
             var path = "/temp/files/" + Guid.NewGuid().ToString();
-            (this as IIOProvider).WriteAllBytes(path, new byte[] { });
+            (this as IFileSystem).WriteAllBytes(path, new byte[] { });
             return path;
         }
 
-        string IIOProvider.GetTempDirectory()
+        string IFileSystem.GetTempDirectory()
         {
             var path = "/temp/dirs/" + Guid.NewGuid().ToString();
-            (this as IIOProvider).CreateDirectory(path);
+            (this as IFileSystem).CreateDirectory(path);
             return path;
         }
 
-        Stream IIOProvider.OpenFile(string filename)
+        Stream IFileSystem.OpenFile(string filename)
         {
-            if (CurrentIOProvider != null)
+            if (CurrentFileSystem != null)
             {
                 throw new NotSupportedException("Cannot open a file as a stream without an IO provider.");
             }
 
             var virtualPath = GetVirtualPath(filename);
-            if (!CurrentIOProvider.DirectoryExists(virtualPath))
+            if (!CurrentFileSystem.DirectoryExists(virtualPath))
             {
-                CurrentIOProvider.CreateDirectory(virtualPath);
+                CurrentFileSystem.CreateDirectory(virtualPath);
             }
-            CurrentIOProvider.WriteAllBytes(virtualPath, (this as IIOProvider).ReadAllBytes(filename));
+            CurrentFileSystem.WriteAllBytes(virtualPath, (this as IFileSystem).ReadAllBytes(filename));
 
-            return CurrentIOProvider.OpenFile(filename);
+            return CurrentFileSystem.OpenFile(filename);
         }
 
-        Stream IIOProvider.OpenFileReadOnly(string filename)
+        Stream IFileSystem.OpenFileReadOnly(string filename)
         {
-            if (CurrentIOProvider != null)
+            if (CurrentFileSystem != null)
             {
                 throw new NotSupportedException("Cannot open a file as a stream without an IO provider.");
             }
 
             var virtualPath = GetVirtualPath(filename);
-            if (!CurrentIOProvider.DirectoryExists(virtualPath))
+            if (!CurrentFileSystem.DirectoryExists(virtualPath))
             {
-                CurrentIOProvider.CreateDirectory(virtualPath);
+                CurrentFileSystem.CreateDirectory(virtualPath);
             }
-            CurrentIOProvider.WriteAllBytes(virtualPath, (this as IIOProvider).ReadAllBytes(filename));
+            CurrentFileSystem.WriteAllBytes(virtualPath, (this as IFileSystem).ReadAllBytes(filename));
 
-            return CurrentIOProvider.OpenFileReadOnly(filename);
+            return CurrentFileSystem.OpenFileReadOnly(filename);
         }
 
-        Stream IIOProvider.OpenFileWriteOnly(string filename)
+        Stream IFileSystem.OpenFileWriteOnly(string filename)
         {
-            if (CurrentIOProvider != null)
+            if (CurrentFileSystem != null)
             {
                 throw new NotSupportedException("Cannot open a file as a stream without an IO provider.");
             }
 
             var virtualPath = GetVirtualPath(filename);
-            if (!CurrentIOProvider.DirectoryExists(virtualPath))
+            if (!CurrentFileSystem.DirectoryExists(virtualPath))
             {
-                CurrentIOProvider.CreateDirectory(virtualPath);
+                CurrentFileSystem.CreateDirectory(virtualPath);
             }
-            CurrentIOProvider.WriteAllBytes(virtualPath, (this as IIOProvider).ReadAllBytes(filename));
+            CurrentFileSystem.WriteAllBytes(virtualPath, (this as IFileSystem).ReadAllBytes(filename));
 
-            return CurrentIOProvider.OpenFileWriteOnly(filename);
+            return CurrentFileSystem.OpenFileWriteOnly(filename);
         }
 
-        #endregion
-
-        #region IDetectableFileType Implementation
-
-        public async Task<bool> IsOfType(GenericFile file)
-        {
-            return await NcsdFile.IsNcsd(file) || await CiaFile.IsCia(file) || await NcchPartition.IsNcch(file) || await RomFs.IsRomFs(file) || await ExeFs.IsExeFs(file);
-        }
-
-        #endregion
+        #endregion     
     }
 }

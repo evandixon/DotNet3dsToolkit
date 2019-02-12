@@ -1,6 +1,7 @@
 using FluentAssertions;
 using SkyEditor.Core.IO;
 using SkyEditor.Core.Utilities;
+using SkyEditor.IO.FileSystem;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -41,7 +42,7 @@ namespace DotNet3dsToolkit.Tests
         {
             using (var rom = new ThreeDsRom())
             {
-                await rom.OpenFile(filename, new PhysicalIOProvider());
+                await rom.OpenFile(filename);
                 rom.Partitions.Should().NotBeNull();
 
                 foreach (var partition in rom.Partitions)
@@ -69,9 +70,8 @@ namespace DotNet3dsToolkit.Tests
 
             using (var rom = new ThreeDsRom())
             {
-                var provider = new PhysicalIOProvider();
-                await rom.OpenFile(filename, provider);
-                var extractionTask = rom.ExtractFiles("./extracted-" + Path.GetFileName(filename), provider, progressReportToken);
+                await rom.OpenFile(filename);
+                var extractionTask = rom.ExtractFiles("./extracted-" + Path.GetFileName(filename), progressReportToken);
 
                 //// Awaiting the task and handling the progressReportToken makes everything wait on Debug.WriteLine, slowing things down a lot
                 //// So we asynchronously poll
@@ -93,10 +93,9 @@ namespace DotNet3dsToolkit.Tests
         {
             using (var rom = new ThreeDsRom())
             {
-                var provider = new PhysicalIOProvider();
-                await rom.OpenFile(filename, provider);
+                await rom.OpenFile(filename);
 
-                var romAsProvider = rom as IIOProvider;
+                var romAsProvider = rom as IFileSystem;
                 var files = romAsProvider.GetFiles("/", "*", false);
                 foreach (var file in files)
                 {

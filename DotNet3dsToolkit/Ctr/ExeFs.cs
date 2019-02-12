@@ -1,5 +1,7 @@
-﻿using SkyEditor.Core.IO;
-using SkyEditor.Core.Utilities;
+﻿using SkyEditor.Core.Utilities;
+using SkyEditor.IO;
+using SkyEditor.IO.Binary;
+using SkyEditor.IO.FileSystem;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -50,12 +52,11 @@ namespace DotNet3dsToolkit.Ctr
         {
             Headers = new ExeFsHeader[10];
             Hashes = new byte[10][];
-            var a = new AsyncFor();
-            await a.RunFor(async (i) =>
+            await Task.WhenAll(Enumerable.Range(0, 10).Select(async i =>
             {
-                Headers[i] = new ExeFsHeader(await ExeFsData.ReadAsync(i * 16, 16));
-                Hashes[i] = await ExeFsData.ReadAsync(0xC0 + ((9-i) * 32), 32); // Hashes are stored in reverse order from headers
-            }, 0, 9);
+                Headers[i] = new ExeFsHeader(await ExeFsData.ReadArrayAsync(i * 16, 16));
+                Hashes[i] = await ExeFsData.ReadArrayAsync(0xC0 + ((9 - i) * 32), 32); // Hashes are stored in reverse order from headers
+            }));
         }
 
         private IBinaryDataAccessor ExeFsData { get; set; }
@@ -70,16 +71,16 @@ namespace DotNet3dsToolkit.Ctr
         /// </summary>
         public byte[][] Hashes { get; set; }
 
-        public async Task ExtractFiles(string directoryName, IIOProvider provider, ExtractionProgressedToken progressReportToken = null)
+        public async Task ExtractFiles(string directoryName, IFileSystem fileSystem, ExtractionProgressedToken progressReportToken = null)
         {
             if (progressReportToken != null)
             {
                 progressReportToken.TotalFileCount = Headers.Count(h => h != null && !string.IsNullOrEmpty(h.Filename));
             }
 
-            if (!provider.DirectoryExists(directoryName))
+            if (!fileSystem.DirectoryExists(directoryName))
             {
-                provider.CreateDirectory(directoryName);
+                fileSystem.CreateDirectory(directoryName);
             }
 
             var a = new AsyncFor();
@@ -90,7 +91,7 @@ namespace DotNet3dsToolkit.Ctr
                     return;
                 }
 
-                provider.WriteAllBytes(Path.Combine(directoryName, header.Filename), await ExeFsData.ReadAsync(0x200 + header.Offset, header.FileSize));
+                fileSystem.WriteAllBytes(Path.Combine(directoryName, header.Filename), await ExeFsData.ReadArrayAsync(0x200 + header.Offset, header.FileSize));
 
                 if (progressReportToken != null)
                 {

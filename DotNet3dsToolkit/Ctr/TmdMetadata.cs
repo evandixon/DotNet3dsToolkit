@@ -1,4 +1,4 @@
-﻿using SkyEditor.Core.IO;
+﻿using SkyEditor.IO;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -55,14 +55,14 @@ namespace DotNet3dsToolkit.Ctr
                     throw new NotSupportedException("Signature type " + SignatureType + " not supported");
             }
 
-            Signature = await TmdData.ReadAsync(4, signatureLength);
+            Signature = await TmdData.ReadArrayAsync(4, signatureLength);
 
             var afterSignatureOffset = signatureLength + signaturePadding + 4;
-            SignatureIssuer = await TmdData.ReadAsync(afterSignatureOffset + 0, 0x40);
-            Version = await TmdData.ReadAsync(afterSignatureOffset + 1);
-            CaCrlVersion = await TmdData.ReadAsync(afterSignatureOffset + 2);
-            SignerCrlVersion = await TmdData.ReadAsync(afterSignatureOffset + 3);
-            Reserved1 = await TmdData.ReadAsync(afterSignatureOffset + 4);
+            SignatureIssuer = await TmdData.ReadArrayAsync(afterSignatureOffset + 0, 0x40);
+            Version = await TmdData.ReadByteAsync(afterSignatureOffset + 1);
+            CaCrlVersion = await TmdData.ReadByteAsync(afterSignatureOffset + 2);
+            SignerCrlVersion = await TmdData.ReadByteAsync(afterSignatureOffset + 3);
+            Reserved1 = await TmdData.ReadByteAsync(afterSignatureOffset + 4);
             SystemVersion = await TmdData.ReadInt64BigEndianAsync(afterSignatureOffset + 0x44);
             TitleId = await TmdData.ReadInt64BigEndianAsync(afterSignatureOffset + 0x4C);
             TitleType = await TmdData.ReadInt32BigEndianAsync(afterSignatureOffset + 0x54);
@@ -72,14 +72,14 @@ namespace DotNet3dsToolkit.Ctr
 
             SrlPrivateSaveDataSize = await TmdData.ReadInt32BigEndianAsync(afterSignatureOffset + 0x5E);
             Reserved2 = await TmdData.ReadInt32BigEndianAsync(afterSignatureOffset + 0x62);
-            SrlFlag = await TmdData.ReadAsync(afterSignatureOffset + 0x66);
-            Reserved3 = await TmdData.ReadAsync(afterSignatureOffset + 0x67, 0x31);
+            SrlFlag = await TmdData.ReadByteAsync(afterSignatureOffset + 0x66);
+            Reserved3 = await TmdData.ReadArrayAsync(afterSignatureOffset + 0x67, 0x31);
             AccessRights = await TmdData.ReadInt32BigEndianAsync(afterSignatureOffset + 0x98);
             TitleVersion = await TmdData.ReadInt16BigEndianAsync(afterSignatureOffset + 0x9C);
             ContentCount = await TmdData.ReadInt16BigEndianAsync(afterSignatureOffset + 0x9E);
             BootContent = await TmdData.ReadInt16BigEndianAsync(afterSignatureOffset + 0xA0);
             Padding = await TmdData.ReadInt16BigEndianAsync(afterSignatureOffset + 0xA2);
-            ContentInfoRecordsHash = await TmdData.ReadAsync(afterSignatureOffset + 0xA4, 0x20);
+            ContentInfoRecordsHash = await TmdData.ReadArrayAsync(afterSignatureOffset + 0xA4, 0x20);
 
             var contentInfos = new List<ContentInfo>();
             for (int i = 0; i < 64; i++)
@@ -88,7 +88,7 @@ namespace DotNet3dsToolkit.Ctr
                 {
                     ContentIndexOffset = await TmdData.ReadInt16BigEndianAsync(afterSignatureOffset + 0xC4 + (i * 0x24) + 0),
                     ContentCommandCount = await TmdData.ReadInt16BigEndianAsync(afterSignatureOffset + 0xC4 + (i * 0x24) + 2),
-                    NextRecordsHash = await TmdData.ReadAsync(afterSignatureOffset + 0xC4 + (i * 0x24) + 4, 0x20)
+                    NextRecordsHash = await TmdData.ReadArrayAsync(afterSignatureOffset + 0xC4 + (i * 0x24) + 4, 0x20)
                 });
             }
             ContentInfoRecords = contentInfos.ToArray();
@@ -102,7 +102,7 @@ namespace DotNet3dsToolkit.Ctr
                     ContentIndex = await TmdData.ReadInt16BigEndianAsync(afterSignatureOffset + 0x9C4 + (i * 0x30) + 4),
                     ContentType = await TmdData.ReadInt16BigEndianAsync(afterSignatureOffset + 0x9C4 + (i * 0x30) + 6),
                     ContentSize = await TmdData.ReadInt64BigEndianAsync(afterSignatureOffset + 0x9C4 + (i * 0x30) + 8),
-                    Hash = await TmdData.ReadAsync(afterSignatureOffset + 0x9C4 + (i * 0x30) + 0x10, 0x20),
+                    Hash = await TmdData.ReadArrayAsync(afterSignatureOffset + 0x9C4 + (i * 0x30) + 0x10, 0x20),
                 });
             }
             ContentChunkRecords = contentChunks.ToArray();

@@ -16,3 +16,10 @@ Planned features:
 * GUI (using Avalonia for cross-platform support)
 * Build ROMs
 * Allow reading of individual partitions without extraction
+
+## Building
+
+Requires adding the following NuGet package:
+```
+https://www.myget.org/F/skyeditor/api/v3/index.json
+```

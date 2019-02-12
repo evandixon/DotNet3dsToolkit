@@ -1,7 +1,8 @@
-﻿using SkyEditor.Core.IO;
-using SkyEditor.Core.Utilities;
+﻿using SkyEditor.IO;
+using SkyEditor.IO.Binary;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -43,17 +44,16 @@ namespace DotNet3dsToolkit.Ctr
         public async Task Initalize()
         {
             // To-do: determine which NCSD header to use
-            Header = new CartridgeNcsdHeader(await NcsdData.ReadAsync(0, 0x1500));
+            Header = new CartridgeNcsdHeader(await NcsdData.ReadArrayAsync(0, 0x1500));
 
             Partitions = new NcchPartition[Header.Partitions.Length];
 
-            var a = new AsyncFor();
-            await a.RunFor(async i =>
+            await Task.WhenAll(Enumerable.Range(0, Header.Partitions.Length).Select(async i =>
             {
                 var partitionStart = (long)Header.Partitions[i].Offset * MediaUnitSize;
                 var partitionLength = (long)Header.Partitions[i].Length * MediaUnitSize;
                 Partitions[i] = await NcchPartition.Load(NcsdData.GetDataReference(partitionStart, partitionLength));
-            }, 0, Header.Partitions.Length - 1);
+            }));
         }
 
         private IBinaryDataAccessor NcsdData { get; set; }

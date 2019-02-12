@@ -1,5 +1,6 @@
-﻿using SkyEditor.Core.IO;
-using SkyEditor.Core.Utilities;
+﻿using SkyEditor.IO;
+using SkyEditor.IO.Binary;
+using SkyEditor.IO.FileSystem;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -35,7 +36,7 @@ namespace DotNet3dsToolkit.Ctr
 
         public static async Task<RomFs> Load(IBinaryDataAccessor data)
         {
-            var header = new RomFsHeader(await data.ReadAsync(0, 0x6B));
+            var header = new RomFsHeader(await data.ReadArrayAsync(0, 0x6B));
             var romfs = new RomFs(data, header);
             await romfs.Initialize();
             return romfs;
@@ -98,42 +99,38 @@ namespace DotNet3dsToolkit.Ctr
 
         private long BodySize { get; }
 
-        public async Task ExtractFiles(string directoryName, IIOProvider provider, ExtractionProgressedToken progressReportToken = null)
+        public async Task ExtractFiles(string directoryName, IFileSystem fileSystem, ExtractionProgressedToken progressReportToken = null)
         {
             if (progressReportToken != null)
             {
                 progressReportToken.TotalFileCount = Level3.RootFiles.Length + Level3.RootDirectoryMetadataTable.CountChildFiles();
             }
 
-            if (!provider.DirectoryExists(directoryName))
+            if (!fileSystem.DirectoryExists(directoryName))
             {
-                provider.CreateDirectory(directoryName);
+                fileSystem.CreateDirectory(directoryName);
             }
 
             async Task extractDirectory(DirectoryMetadata dir, string subDirectory)
             {
                 var destDirectory = Path.Combine(subDirectory, dir.Name);
-                if (!provider.DirectoryExists(destDirectory))
+                if (!fileSystem.DirectoryExists(destDirectory))
                 {
-                    provider.CreateDirectory(destDirectory);
+                    fileSystem.CreateDirectory(destDirectory);
                 }
-
-                var fileExtractor = new AsyncFor();
-                var directoryExtractor = new AsyncFor();
-
+                
                 await Task.WhenAll(
-                    fileExtractor.RunForEach(dir.ChildFiles, async f =>
+                    Task.WhenAll(dir.ChildFiles.Select(async f =>
                     {
-                        provider.WriteAllBytes(Path.Combine(destDirectory, f.Name), await f.GetDataReference().ReadAsync());
+                        fileSystem.WriteAllBytes(Path.Combine(destDirectory, f.Name), await f.GetDataReference().ReadArrayAsync());
                         if (progressReportToken != null)
                         {
                             progressReportToken.IncrementExtractedFileCount();
                         }
-                    }),
-                    directoryExtractor.RunForEach(dir.ChildDirectories, async d =>
-                    {
+                    })),
+                    Task.WhenAll(dir.ChildDirectories.Select(async d => {
                         await extractDirectory(d, destDirectory);
-                    })
+                    }))
                 );
             }
 
@@ -145,9 +142,9 @@ namespace DotNet3dsToolkit.Ctr
 
             var fileExtractTasks = Level3
                 .RootFiles
-                .Select(async f => provider.WriteAllBytes(
+                .Select(async f => fileSystem.WriteAllBytes(
                                         Path.Combine(directoryName, f.Name),
-                                        await f.GetDataReference().ReadAsync()))
+                                        await f.GetDataReference().ReadArrayAsync()))
                 .ToList();
 
             await Task.WhenAll(directoryExtractTasks);
@@ -252,7 +249,7 @@ namespace DotNet3dsToolkit.Ctr
                 metadata.NameLength = await data.ReadInt32Async(offset + 0x14);
                 if (metadata.NameLength > 0)
                 {
-                    metadata.Name = Encoding.Unicode.GetString(await data.ReadAsync(offset + 0x18, Math.Min(metadata.NameLength, MaxFilenameLength)));
+                    metadata.Name = Encoding.Unicode.GetString(await data.ReadArrayAsync(offset + 0x18, Math.Min(metadata.NameLength, MaxFilenameLength)));
                 }
                 
                 await Task.WhenAll(
@@ -367,7 +364,7 @@ namespace DotNet3dsToolkit.Ctr
                 metadata.NameLength = await data.ReadInt32Async(offset + 0x1C);
                 if (metadata.NameLength > 0)
                 {
-                    metadata.Name = Encoding.Unicode.GetString(await data.ReadAsync(offset + 0x20, Math.Min(metadata.NameLength, MaxFilenameLength)));
+                    metadata.Name = Encoding.Unicode.GetString(await data.ReadArrayAsync(offset + 0x20, Math.Min(metadata.NameLength, MaxFilenameLength)));
                 }
                 return metadata;
             }
@@ -489,7 +486,7 @@ namespace DotNet3dsToolkit.Ctr
         {
             public static async Task<IvfcLevel> Load(IBinaryDataAccessor romfsData, IvfcLevelLocation location)
             {
-                var header = new IvfcLevelHeader(await romfsData.ReadAsync(location.DataOffset, 0x28));
+                var header = new IvfcLevelHeader(await romfsData.ReadArrayAsync(location.DataOffset, 0x28));
                 var level = new IvfcLevel(romfsData.GetDataReference(location.DataOffset, location.DataSize), header);
                 await level.Initialize();
                 return level;
@@ -503,9 +500,9 @@ namespace DotNet3dsToolkit.Ctr
 
             public async Task Initialize()
             {
-                DirectoryHashKeyTable = await LevelData.ReadAsync(Header.DirectoryHashTableOffset, Header.DirectoryHashTableLength);
+                DirectoryHashKeyTable = await LevelData.ReadArrayAsync(Header.DirectoryHashTableOffset, Header.DirectoryHashTableLength);
                 RootDirectoryMetadataTable = await DirectoryMetadata.Load(LevelData, Header, 0);
-                FileHashKeyTable = await LevelData.ReadAsync(Header.FileHashTableOffset, Header.FileHashTableLength);
+                FileHashKeyTable = await LevelData.ReadArrayAsync(Header.FileHashTableOffset, Header.FileHashTableLength);
 
                 var rootFiles = new List<FileMetadata>();
                 var currentRootFile = await FileMetadata.Load(LevelData, Header, 0);

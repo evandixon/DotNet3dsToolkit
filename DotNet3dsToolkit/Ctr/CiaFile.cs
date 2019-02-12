@@ -1,5 +1,5 @@
-﻿using SkyEditor.Core.IO;
-using SkyEditor.Core.Utilities;
+﻿using SkyEditor.IO;
+using SkyEditor.IO.Binary;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,7 +9,7 @@ namespace DotNet3dsToolkit.Ctr
 {
     public class CiaFile : INcchPartitionContainer
     {
-        public static Task<bool> IsCia(GenericFile file)
+        public static Task<bool> IsCia(BinaryFile file)
         {
             // To-do: look at the actual data
             return Task.FromResult(file.Filename.ToLower().EndsWith(".cia"));
@@ -30,7 +30,7 @@ namespace DotNet3dsToolkit.Ctr
         public async Task Initalize()
         {
             var headerSize = await CiaData.ReadInt32Async(0);
-            CiaHeader = new CiaHeader(await CiaData.ReadAsync(0, headerSize));
+            CiaHeader = new CiaHeader(await CiaData.ReadArrayAsync(0, headerSize));
 
             var certOffset = Util.Align(headerSize, 64);
             var ticketOffset = Util.Align(certOffset + CiaHeader.CertificateChainSize, 64);
