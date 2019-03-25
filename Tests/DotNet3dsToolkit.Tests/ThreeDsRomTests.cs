@@ -1,6 +1,8 @@
+using DotNet3dsToolkit.Ctr;
 using FluentAssertions;
 using SkyEditor.Core.IO;
 using SkyEditor.Core.Utilities;
+using SkyEditor.IO.Binary;
 using SkyEditor.IO.FileSystem;
 using System;
 using System.Collections.Concurrent;
@@ -108,6 +110,43 @@ namespace DotNet3dsToolkit.Tests
                     romAsProvider.DirectoryExists(dir).Should().BeTrue("File '" + dir + "' should exist");
                 }
             }
+        }
+
+        [Theory]
+        [MemberData(nameof(NcsdTestData))]
+        [MemberData(nameof(CiaTestData))]
+        public async Task CanRebuildRomfs(string filename)
+        {
+            var romfsDirectory = "./CanRebuildRomfs-" + Path.GetFileName(filename);
+            var fs = new PhysicalFileSystem();
+
+            if (Directory.Exists(romfsDirectory))
+            {
+                Directory.Delete(romfsDirectory, true);
+            }
+
+            Directory.CreateDirectory(romfsDirectory);
+
+            using (var originalRom = new ThreeDsRom())
+            {
+                await originalRom.OpenFile(filename);
+
+                var newRomFs = await RomFs.Build("/RomFS", originalRom);
+                var newRomFsData = await (await newRomFs.GetRawData()).ReadArrayAsync();
+                using (var newBinaryFile = new BinaryFile(newRomFsData))
+                using (var newRom = new ThreeDsRom())
+                {
+                    await newRom.OpenFile(newBinaryFile);
+                    AreDirectoriesEqual("/RomFS", originalRom, "/RomFS", newRom).Should().BeTrue();
+                }
+            }
+
+            Directory.Delete(romfsDirectory, true);
+        }
+
+        private bool AreDirectoriesEqual(string directory1, IFileSystem fileSystem1, string directory2, IFileSystem filesystem2)
+        {
+            throw new NotImplementedException("Comparing directories is not implemented");
         }
     }
 }

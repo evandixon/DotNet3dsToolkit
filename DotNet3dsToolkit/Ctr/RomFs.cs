@@ -34,12 +34,28 @@ namespace DotNet3dsToolkit.Ctr
             }
         }
 
+        /// <summary>
+        /// Loads an existing ROM file system from the given data.
+        /// </summary>
+        /// <param name="data">Accessor to the raw data to load as a ROM file system</param>
+        /// <returns>The ROM file system the given data represents</returns>
         public static async Task<RomFs> Load(IBinaryDataAccessor data)
         {
             var header = new RomFsHeader(await data.ReadArrayAsync(0, 0x6B));
             var romfs = new RomFs(data, header);
             await romfs.Initialize();
             return romfs;
+        }
+
+        /// <summary>
+        /// Builds a new ROM file system from the given directory
+        /// </summary>
+        /// <param name="filename">Directory from which to load the files</param>
+        /// <param name="fileSystem">File system from which to load the files</param>
+        /// <returns>A newly built ROM file system</returns>
+        public static async Task<RomFs> Build(string filename, IFileSystem fileSystem)
+        {
+            throw new NotImplementedException("Building RomFs is not implemented");
         }
 
         public RomFs(IBinaryDataAccessor data, RomFsHeader header)
@@ -87,7 +103,7 @@ namespace DotNet3dsToolkit.Ctr
             Level3 = await IvfcLevel.Load(Data, LevelLocations[2]);
         }
 
-        public IBinaryDataAccessor Data { get; }
+        protected IBinaryDataAccessor Data { get; }
 
         public RomFsHeader Header { get; }
 
@@ -149,6 +165,14 @@ namespace DotNet3dsToolkit.Ctr
 
             await Task.WhenAll(directoryExtractTasks);
             await Task.WhenAll(fileExtractTasks);
+        }
+
+        /// <summary>
+        /// Gets the raw data for the ROM file system, building it if necessary
+        /// </summary>
+        public async Task<IBinaryDataAccessor> GetRawData()
+        {
+            throw new NotImplementedException("Building RomFs raw data is not implemented");
         }
 
         #region Child Classes
