@@ -14,15 +14,14 @@ namespace DotNet3dsToolkit.RomFsBuilder
     {
         private const int PADDING_ALIGN = 16;
 
-        private static void BuildRomFS(string rootDirectory, string outputFile, IFileSystem fileSystem)
+        public static void BuildRomFS(string rootDirectory, string outputFile, IFileSystem fileSystem)
         {
             var RomFiles = RomfsFile.LoadFromFileSystem(rootDirectory, fileSystem);
 
             using (MemoryStream memoryStream = new MemoryStream())
             {
-                MetadataBuilder mdb = new MetadataBuilder();
-                mdb.BuildRomFSHeader(memoryStream, RomFiles, rootDirectory);
-                MakeRomFSData(outputFile, RomFiles, memoryStream);
+                Romfs_MetaData.BuildRomFSHeader(memoryStream, RomFiles, rootDirectory, fileSystem);
+                MakeRomFSData(outputFile, fileSystem, RomFiles, memoryStream);
             }
         }
 
@@ -46,7 +45,7 @@ namespace DotNet3dsToolkit.RomFsBuilder
             return output;
         }
 
-        private static void MakeRomFSData(string outputFile, List<RomfsFile> RomFiles, MemoryStream metadata, ExtractionProgressedToken progressToken = null)
+        private static void MakeRomFSData(string outputFile, IFileSystem fileSystem, List<RomfsFile> RomFiles, MemoryStream metadata, ExtractionProgressedToken progressToken = null)
         {
             // Computing IVFC Header Data...
             var ivfcLevels = new IvfcLevelLocation[3];
@@ -72,7 +71,7 @@ namespace DotNet3dsToolkit.RomFsBuilder
             int HeaderLen = 0x5C;
             int MEDIA_UNIT_SIZE = 0x200;
             byte[] SuperBlockHash = new byte[0x20];
-            using (var OutFileStream = new FileStream(outputFile, FileMode.Create, FileAccess.ReadWrite))
+            using (var OutFileStream = fileSystem.OpenFile(outputFile))
             {
                 OutFileStream.Seek(0, SeekOrigin.Begin);
                 OutFileStream.Write(BitConverter.GetBytes(IVFC_MAGIC), 0, 0x4);
@@ -104,7 +103,7 @@ namespace DotNet3dsToolkit.RomFsBuilder
                 for (int i = 0; i < RomFiles.Count; i++)
                 {
                     OutFileStream.Seek((long)(baseOfs + (long)RomFiles[i].Offset), SeekOrigin.Begin);
-                    using (FileStream inStream = new FileStream(RomFiles[i].FullName, FileMode.Open, FileAccess.Read))
+                    using (var inStream = fileSystem.OpenFileReadOnly(RomFiles[i].FullName))
                     {
                         while (inStream.Position < inStream.Length)
                         {

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SkyEditor.IO.FileSystem;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -7,88 +8,89 @@ using System.Threading.Tasks;
 
 namespace DotNet3dsToolkit.RomFsBuilder
 {
-    public class MetadataBuilder
+    public class Romfs_MetaData
     {
-        public string ROOT_DIR;
         private const int PADDING_ALIGN = 16;
         private const int ROMFS_UNUSED_ENTRY = -1;
 
-        public void BuildRomFSHeader(MemoryStream romfs_stream, List<RomfsFile> Entries, string DIR)
+        public static void BuildRomFSHeader(MemoryStream romfs_stream, List<RomfsFile> Entries, string directory, IFileSystem fileSystem)
         {
-            ROOT_DIR = DIR;
-
-            Romfs_MetaData MetaData = new Romfs_MetaData();
-
-            InitializeMetaData(MetaData);
-
-            CalcRomfsSize(MetaData);
-
-            PopulateRomfs(MetaData, Entries);
-
-            WriteMetaDataToStream(MetaData, romfs_stream);
+            var metadata = new Romfs_MetaData();
+            metadata.CalcRomfsSize(directory, fileSystem);
+            metadata.PopulateRomfs(Entries, directory, fileSystem);
+            metadata.WriteMetaDataToStream(romfs_stream);
         }
 
-        private void InitializeMetaData(Romfs_MetaData MetaData)
+        public Romfs_MetaData()
         {
-            MetaData.InfoHeader = new Romfs_InfoHeader();
-            MetaData.DirTable = new Romfs_DirTable();
-            MetaData.DirTableLen = 0;
-            MetaData.M_DirTableLen = 0;
-            MetaData.FileTable = new Romfs_FileTable();
-            MetaData.FileTableLen = 0;
-            MetaData.DirTable.DirectoryTable = new List<Romfs_DirEntry>();
-            MetaData.FileTable.FileTable = new List<Romfs_FileEntry>();
-            MetaData.InfoHeader.HeaderLength = 0x28;
-            MetaData.InfoHeader.Sections = new Romfs_SectionHeader[4];
-            MetaData.DirHashTable = new List<int>();
-            MetaData.FileHashTable = new List<int>();
+            this.InfoHeader = new Romfs_InfoHeader();
+            this.DirTableLen = 0;
+            this.M_DirTableLen = 0;
+            this.FileTableLen = 0;
+            this.DirTable = new List<Romfs_DirEntry>();
+            this.FileTable = new List<Romfs_FileEntry>();
+            this.InfoHeader.HeaderLength = 0x28;
+            this.InfoHeader.Sections = new Romfs_SectionHeader[4];
+            this.DirHashTable = new List<int>();
+            this.FileHashTable = new List<int>();
         }
 
-        private void CalcRomfsSize(Romfs_MetaData MetaData)
+        public Romfs_InfoHeader InfoHeader { get; set; }
+        public int DirNum { get; set; }
+        public int FileNum { get; set; }
+        public List<int> DirHashTable { get; set; }
+        public int M_DirHashTableEntry { get; set; }
+        public List<Romfs_DirEntry> DirTable { get; set; }
+        public int DirTableLen { get; set; }
+        public int M_DirTableLen { get; set; }
+        public List<int> FileHashTable { get; set; }
+        public int M_FileHashTableEntry { get; set; }
+        public List<Romfs_FileEntry> FileTable { get; set; }
+        public int FileTableLen { get; set; }
+        public int M_FileTableLen { get; set; }        
+
+        private void CalcRomfsSize(string rootDirectory, IFileSystem fileSystem)
         {
-            MetaData.DirNum = 1;
-            DirectoryInfo Root_DI = new DirectoryInfo(ROOT_DIR);
-            CalcDirSize(MetaData, Root_DI);
+            this.DirNum = 1;
+            CalcDirSize(rootDirectory, fileSystem);
 
+            this.M_DirHashTableEntry = GetHashTableEntryCount(this.DirNum);
 
-            MetaData.M_DirHashTableEntry = GetHashTableEntryCount(MetaData.DirNum);
+            this.M_FileHashTableEntry = GetHashTableEntryCount(this.FileNum);
 
-            MetaData.M_FileHashTableEntry = GetHashTableEntryCount(MetaData.FileNum);
-
-
-            int MetaDataSize = Helpers.Align(0x28 + MetaData.M_DirHashTableEntry * 4 + MetaData.M_DirTableLen + MetaData.M_FileHashTableEntry * 4 + MetaData.M_FileTableLen, PADDING_ALIGN);
-            for (int i = 0; i < MetaData.M_DirHashTableEntry; i++)
+            int MetaDataSize = Helpers.Align(0x28 + this.M_DirHashTableEntry * 4 + this.M_DirTableLen + this.M_FileHashTableEntry * 4 + this.M_FileTableLen, PADDING_ALIGN);
+            for (int i = 0; i < this.M_DirHashTableEntry; i++)
             {
-                MetaData.DirHashTable.Add(ROMFS_UNUSED_ENTRY);
+                this.DirHashTable.Add(ROMFS_UNUSED_ENTRY);
             }
-            for (int i = 0; i < MetaData.M_FileHashTableEntry; i++)
+            for (int i = 0; i < this.M_FileHashTableEntry; i++)
             {
-                MetaData.FileHashTable.Add(ROMFS_UNUSED_ENTRY);
+                this.FileHashTable.Add(ROMFS_UNUSED_ENTRY);
             }
-            int Pos = MetaData.InfoHeader.HeaderLength;
+            int Pos = this.InfoHeader.HeaderLength;
             for (int i = 0; i < 4; i++)
             {
-                MetaData.InfoHeader.Sections[i].Offset = Pos;
+                this.InfoHeader.Sections[i].Offset = Pos;
                 int size = 0;
                 switch (i)
                 {
                     case 0:
-                        size = MetaData.M_DirHashTableEntry * 4;
+                        size = this.M_DirHashTableEntry * 4;
                         break;
                     case 1:
-                        size = MetaData.M_DirTableLen;
+                        size = this.M_DirTableLen;
                         break;
                     case 2:
-                        size = MetaData.M_FileHashTableEntry * 4;
+                        size = this.M_FileHashTableEntry * 4;
                         break;
                     case 3:
-                        size = MetaData.M_FileTableLen;
+                        size = this.M_FileTableLen;
                         break;
                 }
-                MetaData.InfoHeader.Sections[i].Size = size;
+                this.InfoHeader.Sections[i].Size = size;
                 Pos += size;
             }
-            MetaData.InfoHeader.DataOffset = MetaDataSize;
+            this.InfoHeader.DataOffset = MetaDataSize;
         }
 
         private int GetHashTableEntryCount(int Entries)
@@ -108,118 +110,114 @@ namespace DotNet3dsToolkit.RomFsBuilder
             return count;
         }
 
-        private void CalcDirSize(Romfs_MetaData MetaData, DirectoryInfo dir)
+        private void CalcDirSize(string rootDirectory, IFileSystem fileSystem)
         {
-            if (MetaData.M_DirTableLen == 0)
+            if (this.M_DirTableLen == 0)
             {
-                MetaData.M_DirTableLen = 0x18;
+                this.M_DirTableLen = 0x18;
             }
             else
             {
-                MetaData.M_DirTableLen += 0x18 + Helpers.Align(dir.Name.Length * 2, 4);
+                this.M_DirTableLen += 0x18 + Helpers.Align(Path.GetFileName(rootDirectory).Length * 2, 4);
             }
 
-            FileInfo[] files = dir.GetFiles();
-            for (int i = 0; i < files.Length; i++)
+            var filePaths = fileSystem.GetFiles(rootDirectory, "*", true);
+            foreach (var filePath in filePaths)
             {
-                MetaData.M_FileTableLen += 0x20 + Helpers.Align(files[i].Name.Length * 2, 4);
+                var filename = Path.GetFileName(filePath);
+                this.M_FileTableLen += 0x20 + Helpers.Align(filename.Length * 2, 4);
             }
 
-            DirectoryInfo[] SubDirectories = dir.GetDirectories();
-            for (int i = 0; i < SubDirectories.Length; i++)
+            var dirPaths = fileSystem.GetDirectories(rootDirectory, true);
+            foreach (var dirPath in dirPaths)
             {
-                CalcDirSize(MetaData, SubDirectories[i]);
+                CalcDirSize(dirPath, fileSystem);
             }
 
-            MetaData.FileNum += files.Length;
-            MetaData.DirNum += SubDirectories.Length;
+            this.FileNum += filePaths.Length;
+            this.DirNum += dirPaths.Length;
         }
 
-        private void PopulateRomfs(Romfs_MetaData MetaData, List<RomfsFile> Entries)
+        private void PopulateRomfs(List<RomfsFile> Entries, string directory, IFileSystem fileSystem)
         {
             //Recursively Add All Directories to DirectoryTable
-            AddDir(MetaData, new DirectoryInfo(ROOT_DIR), 0, ROMFS_UNUSED_ENTRY);
+            AddDir(directory, fileSystem, 0, ROMFS_UNUSED_ENTRY);
 
             //Iteratively Add All Files to FileTable
-            AddFiles(MetaData, Entries);
+            AddFiles(Entries);
 
             //Set HashKeyPointers, Build HashTables
-            PopulateHashTables(MetaData);
+            for (int i = 0; i < this.DirTable.Count; i++)
+            {
+                AddDirHashKey(i);
+            }
+            for (int i = 0; i < this.FileTable.Count; i++)
+            {
+                AddFileHashKey(i);
+            }
 
             //Thats it.
         }
 
-        private void PopulateHashTables(Romfs_MetaData MetaData)
+        private void AddDirHashKey(int index)
         {
-            for (int i = 0; i < MetaData.DirTable.DirectoryTable.Count; i++)
-            {
-                AddDirHashKey(MetaData, i);
-            }
-            for (int i = 0; i < MetaData.FileTable.FileTable.Count; i++)
-            {
-                AddFileHashKey(MetaData, i);
-            }
-        }
-
-        private void AddDirHashKey(Romfs_MetaData MetaData, int index)
-        {
-            int parent = MetaData.DirTable.DirectoryTable[index].ParentOffset;
-            string Name = MetaData.DirTable.DirectoryTable[index].Name;
+            int parent = this.DirTable[index].ParentOffset;
+            string Name = this.DirTable[index].Name;
             byte[] NArr = (index == 0) ? Encoding.Unicode.GetBytes("") : Encoding.Unicode.GetBytes(Name);
             int hash = CalcPathHash(parent, NArr, 0, NArr.Length);
-            int ind2 = (int)(hash % MetaData.M_DirHashTableEntry);
-            if (MetaData.DirHashTable[ind2] == ROMFS_UNUSED_ENTRY)
+            int ind2 = (int)(hash % this.M_DirHashTableEntry);
+            if (this.DirHashTable[ind2] == ROMFS_UNUSED_ENTRY)
             {
-                MetaData.DirHashTable[ind2] = MetaData.DirTable.DirectoryTable[index].Offset;
+                this.DirHashTable[ind2] = this.DirTable[index].Offset;
             }
             else
             {
-                int i = GetRomfsDirEntry(MetaData, MetaData.DirHashTable[ind2]);
+                int i = GetRomfsDirEntry(this.DirHashTable[ind2]);
                 int tempindex = index;
-                MetaData.DirHashTable[ind2] = MetaData.DirTable.DirectoryTable[index].Offset;
+                this.DirHashTable[ind2] = this.DirTable[index].Offset;
                 while (true)
                 {
-                    if (MetaData.DirTable.DirectoryTable[tempindex].HashKeyPointer == ROMFS_UNUSED_ENTRY)
+                    if (this.DirTable[tempindex].HashKeyPointer == ROMFS_UNUSED_ENTRY)
                     {
-                        MetaData.DirTable.DirectoryTable[tempindex].HashKeyPointer = MetaData.DirTable.DirectoryTable[i].Offset;
+                        this.DirTable[tempindex].HashKeyPointer = this.DirTable[i].Offset;
                         break;
                     }
                     else
                     {
                         i = tempindex;
-                        tempindex = GetRomfsDirEntry(MetaData, MetaData.DirTable.DirectoryTable[i].HashKeyPointer);
+                        tempindex = GetRomfsDirEntry(this.DirTable[i].HashKeyPointer);
                     }
                 }
             }
         }
 
-        private void AddFileHashKey(Romfs_MetaData MetaData, int index)
+        private void AddFileHashKey(int index)
         {
-            int parent = MetaData.FileTable.FileTable[index].ParentDirOffset;
-            string Name = MetaData.FileTable.FileTable[index].Name;
+            int parent = this.FileTable[index].ParentDirOffset;
+            string Name = this.FileTable[index].Name;
             byte[] NArr = Encoding.Unicode.GetBytes(Name);
             int hash = CalcPathHash(parent, NArr, 0, NArr.Length);
-            int ind2 = (int)(hash % MetaData.M_FileHashTableEntry);
-            if (MetaData.FileHashTable[ind2] == ROMFS_UNUSED_ENTRY)
+            int ind2 = (int)(hash % this.M_FileHashTableEntry);
+            if (this.FileHashTable[ind2] == ROMFS_UNUSED_ENTRY)
             {
-                MetaData.FileHashTable[ind2] = MetaData.FileTable.FileTable[index].Offset;
+                this.FileHashTable[ind2] = this.FileTable[index].Offset;
             }
             else
             {
-                int i = GetRomfsFileEntry(MetaData, MetaData.FileHashTable[ind2]);
+                int i = GetRomfsFileEntry(this.FileHashTable[ind2]);
                 int tempindex = index;
-                MetaData.FileHashTable[ind2] = MetaData.FileTable.FileTable[index].Offset;
+                this.FileHashTable[ind2] = this.FileTable[index].Offset;
                 while (true)
                 {
-                    if (MetaData.FileTable.FileTable[tempindex].HashKeyPointer == ROMFS_UNUSED_ENTRY)
+                    if (this.FileTable[tempindex].HashKeyPointer == ROMFS_UNUSED_ENTRY)
                     {
-                        MetaData.FileTable.FileTable[tempindex].HashKeyPointer = MetaData.FileTable.FileTable[i].Offset;
+                        this.FileTable[tempindex].HashKeyPointer = this.FileTable[i].Offset;
                         break;
                     }
                     else
                     {
                         i = tempindex;
-                        tempindex = GetRomfsFileEntry(MetaData, MetaData.FileTable.FileTable[i].HashKeyPointer);
+                        tempindex = GetRomfsFileEntry(this.FileTable[i].HashKeyPointer);
                     }
                 }
             }
@@ -236,111 +234,114 @@ namespace DotNet3dsToolkit.RomFsBuilder
             return hash;
         }
 
-        private void AddDir(Romfs_MetaData MetaData, DirectoryInfo Dir, int parent, int sibling)
+        private void AddDir(string directory, IFileSystem fileSystem, int parent, int sibling)
         {
-            AddDir(MetaData, Dir, parent, sibling, false);
-            AddDir(MetaData, Dir, parent, sibling, true);
+            AddDir(directory, fileSystem, parent, sibling, false);
+            AddDir(directory, fileSystem, parent, sibling, true);
         }
 
-        private void AddDir(Romfs_MetaData MetaData, DirectoryInfo Dir, int parent, int sibling, bool DoSubs)
+        private void AddDir(string directory, IFileSystem fileSystem, int parent, int sibling, bool DoSubs)
         {
-            DirectoryInfo[] SubDirectories = Dir.GetDirectories();
+            var dirName = Path.GetFileName(directory);
+            var SubDirectories = fileSystem.GetDirectories(directory, true);
             if (!DoSubs)
             {
-                int CurrentDir = MetaData.DirTableLen;
+                int CurrentDir = this.DirTableLen;
                 Romfs_DirEntry Entry = new Romfs_DirEntry();
                 Entry.ParentOffset = parent;
                 Entry.ChildOffset = Entry.HashKeyPointer = Entry.FileOffset = ROMFS_UNUSED_ENTRY;
                 Entry.SiblingOffset = sibling;
-                Entry.FullName = Dir.FullName;
-                Entry.Name = (Entry.FullName == ROOT_DIR) ? "" : Dir.Name;
+                Entry.FullName = directory;
+                Entry.Name = (Entry.FullName == directory) ? "" : dirName;
                 Entry.Offset = CurrentDir;
-                MetaData.DirTable.DirectoryTable.Add(Entry);
-                MetaData.DirTableLen += (CurrentDir == 0) ? 0x18 : 0x18 + Helpers.Align(Dir.Name.Length * 2, 4);
-                int ParentIndex = GetRomfsDirEntry(MetaData, Dir.FullName);
-                int poff = MetaData.DirTable.DirectoryTable[ParentIndex].Offset;
+                this.DirTable.Add(Entry);
+                this.DirTableLen += (CurrentDir == 0) ? 0x18 : 0x18 + Helpers.Align(dirName.Length * 2, 4);
+                int ParentIndex = GetRomfsDirEntry(directory);
+                int poff = this.DirTable[ParentIndex].Offset;
             }
             else
             {
-                int CurIndex = GetRomfsDirEntry(MetaData, Dir.FullName);
-                int CurrentDir = MetaData.DirTable.DirectoryTable[CurIndex].Offset;
+                int CurIndex = GetRomfsDirEntry(directory);
+                int CurrentDir = this.DirTable[CurIndex].Offset;
                 for (int i = 0; i < SubDirectories.Length; i++)
                 {
-                    AddDir(MetaData, SubDirectories[i], CurrentDir, sibling, false);
+                    AddDir(SubDirectories[i], fileSystem, CurrentDir, sibling, false);
                     if (i > 0)
                     {
-                        string PrevFullName = SubDirectories[i - 1].FullName;
-                        string ThisName = SubDirectories[i].FullName;
-                        int PrevIndex = GetRomfsDirEntry(MetaData, PrevFullName);
-                        int ThisIndex = GetRomfsDirEntry(MetaData, ThisName);
-                        MetaData.DirTable.DirectoryTable[PrevIndex].SiblingOffset = MetaData.DirTable.DirectoryTable[ThisIndex].Offset;
+                        string PrevFullName = SubDirectories[i - 1];
+                        string ThisName = SubDirectories[i];
+                        int PrevIndex = GetRomfsDirEntry(PrevFullName);
+                        int ThisIndex = GetRomfsDirEntry(ThisName);
+                        this.DirTable[PrevIndex].SiblingOffset = this.DirTable[ThisIndex].Offset;
                     }
                 }
                 for (int i = 0; i < SubDirectories.Length; i++)
                 {
-                    AddDir(MetaData, SubDirectories[i], CurrentDir, sibling, true);
+                    AddDir(SubDirectories[i], fileSystem, CurrentDir, sibling, true);
                 }
             }
             if (SubDirectories.Length > 0)
             {
-                int curindex = GetRomfsDirEntry(MetaData, Dir.FullName);
-                int childindex = GetRomfsDirEntry(MetaData, SubDirectories[0].FullName);
+                int curindex = GetRomfsDirEntry(directory);
+                int childindex = GetRomfsDirEntry(SubDirectories[0]);
                 if (curindex > -1 && childindex > -1)
-                    MetaData.DirTable.DirectoryTable[curindex].ChildOffset = MetaData.DirTable.DirectoryTable[childindex].Offset;
+                {
+                    this.DirTable[curindex].ChildOffset = this.DirTable[childindex].Offset;
+                }
             }
         }
 
-        private void AddFiles(Romfs_MetaData MetaData, List<RomfsFile> Entries)
+        private void AddFiles(List<RomfsFile> Entries)
         {
             string PrevDirPath = "";
             for (int i = 0; i < Entries.Count; i++)
             {
-                FileInfo file = new FileInfo(Entries[i].FullName);
+                var fileName = Path.GetFileName(Entries[i].FullName);
                 Romfs_FileEntry Entry = new Romfs_FileEntry();
                 string DirPath = Path.GetDirectoryName(Entries[i].FullName);
-                int ParentIndex = GetRomfsDirEntry(MetaData, DirPath);
+                int ParentIndex = GetRomfsDirEntry(DirPath);
                 Entry.FullName = Entries[i].FullName;
-                Entry.Offset = MetaData.FileTableLen;
-                Entry.ParentDirOffset = MetaData.DirTable.DirectoryTable[ParentIndex].Offset;
+                Entry.Offset = this.FileTableLen;
+                Entry.ParentDirOffset = this.DirTable[ParentIndex].Offset;
                 Entry.SiblingOffset = ROMFS_UNUSED_ENTRY;
                 if (DirPath == PrevDirPath)
                 {
-                    MetaData.FileTable.FileTable[i - 1].SiblingOffset = Entry.Offset;
+                    this.FileTable[i - 1].SiblingOffset = Entry.Offset;
                 }
-                if (MetaData.DirTable.DirectoryTable[ParentIndex].FileOffset == ROMFS_UNUSED_ENTRY)
+                if (this.DirTable[ParentIndex].FileOffset == ROMFS_UNUSED_ENTRY)
                 {
-                    MetaData.DirTable.DirectoryTable[ParentIndex].FileOffset = Entry.Offset;
+                    this.DirTable[ParentIndex].FileOffset = Entry.Offset;
                 }
                 Entry.HashKeyPointer = ROMFS_UNUSED_ENTRY;
-                Entry.NameSize = file.Name.Length * 2;
-                Entry.Name = file.Name;
+                Entry.NameSize = fileName.Length * 2;
+                Entry.Name = fileName;
                 Entry.DataOffset = Entries[i].Offset;
                 Entry.DataSize = Entries[i].Size;
-                MetaData.FileTable.FileTable.Add(Entry);
-                MetaData.FileTableLen += 0x20 + Helpers.Align(file.Name.Length * 2, 4);
+                this.FileTable.Add(Entry);
+                this.FileTableLen += 0x20 + Helpers.Align(fileName.Length * 2, 4);
                 PrevDirPath = DirPath;
             }
         }
 
-        private void WriteMetaDataToStream(Romfs_MetaData MetaData, MemoryStream stream)
+        private void WriteMetaDataToStream(MemoryStream stream)
         {
             //First, InfoHeader.
-            stream.Write(BitConverter.GetBytes(MetaData.InfoHeader.HeaderLength), 0, 4);
-            foreach (Romfs_SectionHeader SH in MetaData.InfoHeader.Sections)
+            stream.Write(BitConverter.GetBytes(this.InfoHeader.HeaderLength), 0, 4);
+            foreach (Romfs_SectionHeader SH in this.InfoHeader.Sections)
             {
                 stream.Write(BitConverter.GetBytes(SH.Offset), 0, 4);
                 stream.Write(BitConverter.GetBytes(SH.Size), 0, 4);
             }
-            stream.Write(BitConverter.GetBytes(MetaData.InfoHeader.DataOffset), 0, 4);
+            stream.Write(BitConverter.GetBytes(this.InfoHeader.DataOffset), 0, 4);
 
             //DirHashTable
-            foreach (uint u in MetaData.DirHashTable)
+            foreach (uint u in this.DirHashTable)
             {
                 stream.Write(BitConverter.GetBytes(u), 0, 4);
             }
 
             //DirTable
-            foreach (Romfs_DirEntry dir in MetaData.DirTable.DirectoryTable)
+            foreach (Romfs_DirEntry dir in this.DirTable)
             {
                 stream.Write(BitConverter.GetBytes(dir.ParentOffset), 0, 4);
                 stream.Write(BitConverter.GetBytes(dir.SiblingOffset), 0, 4);
@@ -355,13 +356,13 @@ namespace DotNet3dsToolkit.RomFsBuilder
             }
 
             //FileHashTable
-            foreach (uint u in MetaData.FileHashTable)
+            foreach (uint u in this.FileHashTable)
             {
                 stream.Write(BitConverter.GetBytes(u), 0, 4);
             }
 
             //FileTable
-            foreach (Romfs_FileEntry file in MetaData.FileTable.FileTable)
+            foreach (Romfs_FileEntry file in this.FileTable)
             {
                 stream.Write(BitConverter.GetBytes(file.ParentDirOffset), 0, 4);
                 stream.Write(BitConverter.GetBytes(file.SiblingOffset), 0, 4);
@@ -383,11 +384,11 @@ namespace DotNet3dsToolkit.RomFsBuilder
 
         //GetRomfs[...]Entry Functions are all O(n)
 
-        private int GetRomfsDirEntry(Romfs_MetaData MetaData, string FullName)
+        private int GetRomfsDirEntry(string FullName)
         {
-            for (int i = 0; i < MetaData.DirTable.DirectoryTable.Count; i++)
+            for (int i = 0; i < this.DirTable.Count; i++)
             {
-                if (MetaData.DirTable.DirectoryTable[i].FullName == FullName)
+                if (this.DirTable[i].FullName == FullName)
                 {
                     return i;
                 }
@@ -395,11 +396,11 @@ namespace DotNet3dsToolkit.RomFsBuilder
             return -1;
         }
 
-        private int GetRomfsDirEntry(Romfs_MetaData MetaData, int Offset)
+        private int GetRomfsDirEntry(int Offset)
         {
-            for (int i = 0; i < MetaData.DirTable.DirectoryTable.Count; i++)
+            for (int i = 0; i < this.DirTable.Count; i++)
             {
-                if (MetaData.DirTable.DirectoryTable[i].Offset == Offset)
+                if (this.DirTable[i].Offset == Offset)
                 {
                     return i;
                 }
@@ -407,11 +408,11 @@ namespace DotNet3dsToolkit.RomFsBuilder
             return -1;
         }
 
-        private int GetRomfsFileEntry(Romfs_MetaData MetaData, int Offset)
+        private int GetRomfsFileEntry(int Offset)
         {
-            for (int i = 0; i < MetaData.FileTable.FileTable.Count; i++)
+            for (int i = 0; i < this.FileTable.Count; i++)
             {
-                if (MetaData.FileTable.FileTable[i].Offset == Offset)
+                if (this.FileTable[i].Offset == Offset)
                 {
                     return i;
                 }
@@ -419,69 +420,42 @@ namespace DotNet3dsToolkit.RomFsBuilder
             return -1;
         }
 
-        public class Romfs_MetaData
+        public class Romfs_SectionHeader
         {
-            public Romfs_InfoHeader InfoHeader;
-            public int DirNum;
-            public int FileNum;
-            public List<int> DirHashTable;
-            public int M_DirHashTableEntry;
-            public Romfs_DirTable DirTable;
-            public int DirTableLen;
-            public int M_DirTableLen;
-            public List<int> FileHashTable;
-            public int M_FileHashTableEntry;
-            public Romfs_FileTable FileTable;
-            public int FileTableLen;
-            public int M_FileTableLen;
+            public int Offset { get; set; }
+            public int Size { get; set; }
         }
 
-        public struct Romfs_SectionHeader
+        public class Romfs_InfoHeader
         {
-            public int Offset;
-            public int Size;
-        }
-
-        public struct Romfs_InfoHeader
-        {
-            public int HeaderLength;
-            public Romfs_SectionHeader[] Sections;
-            public int DataOffset;
-        }
-
-        public class Romfs_DirTable
-        {
-            public List<Romfs_DirEntry> DirectoryTable;
-        }
-
-        public class Romfs_FileTable
-        {
-            public List<Romfs_FileEntry> FileTable;
+            public int HeaderLength { get; set; }
+            public Romfs_SectionHeader[] Sections { get; set; }
+            public int DataOffset { get; set; }
         }
 
         public class Romfs_DirEntry
         {
-            public int ParentOffset;
-            public int SiblingOffset;
-            public int ChildOffset;
-            public int FileOffset;
-            public int HashKeyPointer;
-            public string Name;
-            public string FullName;
-            public int Offset;
+            public int ParentOffset { get; set; }
+            public int SiblingOffset { get; set; }
+            public int ChildOffset { get; set; }
+            public int FileOffset { get; set; }
+            public int HashKeyPointer { get; set; }
+            public string Name { get; set; }
+            public string FullName { get; set; }
+            public int Offset { get; set; }
         }
 
         public class Romfs_FileEntry
         {
-            public int ParentDirOffset;
-            public int SiblingOffset;
-            public long DataOffset;
-            public long DataSize;
-            public int HashKeyPointer;
-            public int NameSize;
-            public string Name;
-            public string FullName;
-            public int Offset;
+            public int ParentDirOffset { get; set; }
+            public int SiblingOffset { get; set; }
+            public long DataOffset { get; set; }
+            public long DataSize { get; set; }
+            public int HashKeyPointer { get; set; }
+            public int NameSize { get; set; }
+            public string Name { get; set; }
+            public string FullName { get; set; }
+            public int Offset { get; set; }
         }
     }
 }
