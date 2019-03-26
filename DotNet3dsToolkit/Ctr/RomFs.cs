@@ -80,20 +80,20 @@ namespace DotNet3dsToolkit.Ctr
                 }
             };
 
-            BodyOffset = Util.Align64(LevelLocations[0].HashOffset + header.MasterHashSize, LevelLocations[2].HashBlockSize);
+            BodyOffset = BitMath.Align(LevelLocations[0].HashOffset + header.MasterHashSize, LevelLocations[2].HashBlockSize);
             BodySize = header.Level3HashDataSize;
 
             LevelLocations[2].DataOffset = BodyOffset;
-            LevelLocations[2].DataSize = Util.Align64(BodySize, LevelLocations[2].HashBlockSize);
+            LevelLocations[2].DataSize = BitMath.Align(BodySize, LevelLocations[2].HashBlockSize);
 
-            LevelLocations[1].HashOffset = Util.Align64(BodyOffset + BodySize, LevelLocations[2].HashBlockSize);
+            LevelLocations[1].HashOffset = BitMath.Align(BodyOffset + BodySize, LevelLocations[2].HashBlockSize);
             LevelLocations[2].HashOffset = LevelLocations[1].HashOffset + header.Level2LogicalOffset - header.Level1LogicalOffset;
 
             LevelLocations[1].DataOffset = LevelLocations[2].HashOffset;
-            LevelLocations[1].DataSize = Util.Align64(header.Level2HashDataSize, LevelLocations[1].HashBlockSize);
+            LevelLocations[1].DataSize = BitMath.Align(header.Level2HashDataSize, LevelLocations[1].HashBlockSize);
 
             LevelLocations[0].DataOffset = LevelLocations[2].HashOffset;
-            LevelLocations[0].DataSize = Util.Align64(header.Level1HashDataSize, LevelLocations[0].HashBlockSize);
+            LevelLocations[0].DataSize = BitMath.Align(header.Level1HashDataSize, LevelLocations[0].HashBlockSize);
 
             // To-do: verify hashes
         }

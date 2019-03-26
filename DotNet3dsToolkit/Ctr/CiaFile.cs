@@ -32,11 +32,11 @@ namespace DotNet3dsToolkit.Ctr
             var headerSize = await CiaData.ReadInt32Async(0);
             CiaHeader = new CiaHeader(await CiaData.ReadArrayAsync(0, headerSize));
 
-            var certOffset = Util.Align(headerSize, 64);
-            var ticketOffset = Util.Align(certOffset + CiaHeader.CertificateChainSize, 64);
-            var tmdOffset = Util.Align(ticketOffset + CiaHeader.TicketSize, 64);
-            var contentOffset = Util.Align(tmdOffset + CiaHeader.TmdFileSize, 64);
-            var metaOffset = Util.Align64(contentOffset + CiaHeader.ContentSize, 64);
+            var certOffset = BitMath.Align(headerSize, 64);
+            var ticketOffset = BitMath.Align(certOffset + CiaHeader.CertificateChainSize, 64);
+            var tmdOffset = BitMath.Align(ticketOffset + CiaHeader.TicketSize, 64);
+            var contentOffset = BitMath.Align(tmdOffset + CiaHeader.TmdFileSize, 64);
+            var metaOffset = BitMath.Align(contentOffset + CiaHeader.ContentSize, 64);
 
             TmdMetadata = await TmdMetadata.Load(CiaData.GetDataReference(tmdOffset, CiaHeader.TmdFileSize));
 

@@ -58,7 +58,7 @@ namespace DotNet3dsToolkit.RomFsBuilder
 
             this.M_FileHashTableEntry = GetHashTableEntryCount(this.FileNum);
 
-            int MetaDataSize = Helpers.Align(0x28 + this.M_DirHashTableEntry * 4 + this.M_DirTableLen + this.M_FileHashTableEntry * 4 + this.M_FileTableLen, PADDING_ALIGN);
+            int MetaDataSize = BitMath.Align(0x28 + this.M_DirHashTableEntry * 4 + this.M_DirTableLen + this.M_FileHashTableEntry * 4 + this.M_FileTableLen, PADDING_ALIGN);
             for (int i = 0; i < this.M_DirHashTableEntry; i++)
             {
                 this.DirHashTable.Add(ROMFS_UNUSED_ENTRY);
@@ -118,14 +118,14 @@ namespace DotNet3dsToolkit.RomFsBuilder
             }
             else
             {
-                this.M_DirTableLen += 0x18 + Helpers.Align(Path.GetFileName(rootDirectory).Length * 2, 4);
+                this.M_DirTableLen += 0x18 + BitMath.Align(Path.GetFileName(rootDirectory).Length * 2, 4);
             }
 
             var filePaths = fileSystem.GetFiles(rootDirectory, "*", true);
             foreach (var filePath in filePaths)
             {
                 var filename = Path.GetFileName(filePath);
-                this.M_FileTableLen += 0x20 + Helpers.Align(filename.Length * 2, 4);
+                this.M_FileTableLen += 0x20 + BitMath.Align(filename.Length * 2, 4);
             }
 
             var dirPaths = fileSystem.GetDirectories(rootDirectory, true);
@@ -138,10 +138,15 @@ namespace DotNet3dsToolkit.RomFsBuilder
             this.DirNum += dirPaths.Length;
         }
 
-        private void PopulateRomfs(List<RomfsFile> Entries, string directory, IFileSystem fileSystem)
+        private void PopulateRomfs(List<RomfsFile> Entries, string root, IFileSystem fileSystem)
+        {
+            PopulateRomfs(Entries, root, root, fileSystem);
+        }
+
+        private void PopulateRomfs(List<RomfsFile> Entries, string root, string directory, IFileSystem fileSystem)
         {
             //Recursively Add All Directories to DirectoryTable
-            AddDir(directory, fileSystem, 0, ROMFS_UNUSED_ENTRY);
+            AddDir(root, directory, fileSystem, 0, ROMFS_UNUSED_ENTRY);
 
             //Iteratively Add All Files to FileTable
             AddFiles(Entries);
@@ -234,28 +239,32 @@ namespace DotNet3dsToolkit.RomFsBuilder
             return hash;
         }
 
-        private void AddDir(string directory, IFileSystem fileSystem, int parent, int sibling)
+        private void AddDir(string root, string directory, IFileSystem fileSystem, int parent, int sibling)
         {
-            AddDir(directory, fileSystem, parent, sibling, false);
-            AddDir(directory, fileSystem, parent, sibling, true);
+            AddDir(root, directory, fileSystem, parent, sibling, false);
+            AddDir(root, directory, fileSystem, parent, sibling, true);
         }
 
-        private void AddDir(string directory, IFileSystem fileSystem, int parent, int sibling, bool DoSubs)
+        private void AddDir(string root, string directory, IFileSystem fileSystem, int parent, int sibling, bool DoSubs)
         {
             var dirName = Path.GetFileName(directory);
             var SubDirectories = fileSystem.GetDirectories(directory, true);
             if (!DoSubs)
             {
                 int CurrentDir = this.DirTableLen;
-                Romfs_DirEntry Entry = new Romfs_DirEntry();
-                Entry.ParentOffset = parent;
-                Entry.ChildOffset = Entry.HashKeyPointer = Entry.FileOffset = ROMFS_UNUSED_ENTRY;
-                Entry.SiblingOffset = sibling;
-                Entry.FullName = directory;
-                Entry.Name = (Entry.FullName == directory) ? "" : dirName;
-                Entry.Offset = CurrentDir;
+                Romfs_DirEntry Entry = new Romfs_DirEntry
+                {
+                    ParentOffset = parent,
+                    ChildOffset = ROMFS_UNUSED_ENTRY,
+                    HashKeyPointer = ROMFS_UNUSED_ENTRY,
+                    FileOffset = ROMFS_UNUSED_ENTRY,
+                    SiblingOffset = sibling,
+                    FullName = directory,
+                    Name = (directory == root) ? "" : dirName,
+                    Offset = CurrentDir
+                };
                 this.DirTable.Add(Entry);
-                this.DirTableLen += (CurrentDir == 0) ? 0x18 : 0x18 + Helpers.Align(dirName.Length * 2, 4);
+                this.DirTableLen += (CurrentDir == 0) ? 0x18 : 0x18 + BitMath.Align(dirName.Length * 2, 4);
                 int ParentIndex = GetRomfsDirEntry(directory);
                 int poff = this.DirTable[ParentIndex].Offset;
             }
@@ -265,7 +274,7 @@ namespace DotNet3dsToolkit.RomFsBuilder
                 int CurrentDir = this.DirTable[CurIndex].Offset;
                 for (int i = 0; i < SubDirectories.Length; i++)
                 {
-                    AddDir(SubDirectories[i], fileSystem, CurrentDir, sibling, false);
+                    AddDir(root, SubDirectories[i], fileSystem, CurrentDir, sibling, false);
                     if (i > 0)
                     {
                         string PrevFullName = SubDirectories[i - 1];
@@ -277,7 +286,7 @@ namespace DotNet3dsToolkit.RomFsBuilder
                 }
                 for (int i = 0; i < SubDirectories.Length; i++)
                 {
-                    AddDir(SubDirectories[i], fileSystem, CurrentDir, sibling, true);
+                    AddDir(root, SubDirectories[i], fileSystem, CurrentDir, sibling, true);
                 }
             }
             if (SubDirectories.Length > 0)
@@ -318,7 +327,7 @@ namespace DotNet3dsToolkit.RomFsBuilder
                 Entry.DataOffset = Entries[i].Offset;
                 Entry.DataSize = Entries[i].Size;
                 this.FileTable.Add(Entry);
-                this.FileTableLen += 0x20 + Helpers.Align(fileName.Length * 2, 4);
+                this.FileTableLen += 0x20 + BitMath.Align(fileName.Length * 2, 4);
                 PrevDirPath = DirPath;
             }
         }
@@ -350,7 +359,7 @@ namespace DotNet3dsToolkit.RomFsBuilder
                 stream.Write(BitConverter.GetBytes(dir.HashKeyPointer), 0, 4);
                 uint nlen = (uint)dir.Name.Length * 2;
                 stream.Write(BitConverter.GetBytes(nlen), 0, 4);
-                byte[] NameArray = new byte[Helpers.Align(nlen, 4)];
+                byte[] NameArray = new byte[BitMath.Align(nlen, 4)];
                 Array.Copy(Encoding.Unicode.GetBytes(dir.Name), 0, NameArray, 0, nlen);
                 stream.Write(NameArray, 0, NameArray.Length);
             }
@@ -371,7 +380,7 @@ namespace DotNet3dsToolkit.RomFsBuilder
                 stream.Write(BitConverter.GetBytes(file.HashKeyPointer), 0, 4);
                 uint nlen = (uint)file.Name.Length * 2;
                 stream.Write(BitConverter.GetBytes(nlen), 0, 4);
-                byte[] NameArray = new byte[Helpers.Align(nlen, 4)];
+                byte[] NameArray = new byte[BitMath.Align(nlen, 4)];
                 Array.Copy(Encoding.Unicode.GetBytes(file.Name), 0, NameArray, 0, nlen);
                 stream.Write(NameArray, 0, NameArray.Length);
             }

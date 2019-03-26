@@ -25,26 +25,6 @@ namespace DotNet3dsToolkit.RomFsBuilder
             }
         }
 
-        public static int Align(int input, int alignsize)
-        {
-            int output = input;
-            if (output % alignsize != 0)
-            {
-                output += (alignsize - (output % alignsize));
-            }
-            return output;
-        }
-
-        public static long Align(long input, long alignsize)
-        {
-            long output = input;
-            if (output % alignsize != 0)
-            {
-                output += (alignsize - (output % alignsize));
-            }
-            return output;
-        }
-
         private static void MakeRomFSData(string outputFile, IFileSystem fileSystem, List<RomfsFile> RomFiles, MemoryStream metadata, ExtractionProgressedToken progressToken = null)
         {
             // Computing IVFC Header Data...
@@ -57,14 +37,14 @@ namespace DotNet3dsToolkit.RomFsBuilder
                 };
             }
             ivfcLevels[2].DataSize = RomfsFile.GetDataBlockLength(RomFiles, metadata.Length);
-            ivfcLevels[1].DataSize = (Align(ivfcLevels[2].DataSize, ivfcLevels[2].HashBlockSize) / ivfcLevels[2].HashBlockSize) * 0x20; //0x20 per SHA256 hash
-            ivfcLevels[0].DataSize = (Align(ivfcLevels[1].DataSize, ivfcLevels[1].HashBlockSize) / ivfcLevels[1].HashBlockSize) * 0x20; //0x20 per SHA256 hash
-            long MasterHashLen = (Align(ivfcLevels[0].DataSize, ivfcLevels[0].HashBlockSize) / ivfcLevels[0].HashBlockSize) * 0x20;
+            ivfcLevels[1].DataSize = (BitMath.Align(ivfcLevels[2].DataSize, ivfcLevels[2].HashBlockSize) / ivfcLevels[2].HashBlockSize) * 0x20; //0x20 per SHA256 hash
+            ivfcLevels[0].DataSize = (BitMath.Align(ivfcLevels[1].DataSize, ivfcLevels[1].HashBlockSize) / ivfcLevels[1].HashBlockSize) * 0x20; //0x20 per SHA256 hash
+            long MasterHashLen = (BitMath.Align(ivfcLevels[0].DataSize, ivfcLevels[0].HashBlockSize) / ivfcLevels[0].HashBlockSize) * 0x20;
             long lofs = 0;
             for (int i = 0; i < ivfcLevels.Length; i++)
             {
                 ivfcLevels[i].HashOffset = lofs;
-                lofs += Align(ivfcLevels[i].DataSize, ivfcLevels[i].HashBlockSize);
+                lofs += BitMath.Align(ivfcLevels[i].DataSize, ivfcLevels[i].HashBlockSize);
             }
             int IVFC_MAGIC = 0x43465649; //IVFC
             int RESERVED = 0x0;
@@ -86,7 +66,7 @@ namespace DotNet3dsToolkit.RomFsBuilder
                 }
                 OutFileStream.Write(BitConverter.GetBytes(HeaderLen), 0, 0x4);
                 //IVFC Header is Written.
-                OutFileStream.Seek((long)Align(MasterHashLen + 0x60, ivfcLevels[0].HashBlockSize), SeekOrigin.Begin);
+                OutFileStream.Seek(BitMath.Align(MasterHashLen + 0x60, ivfcLevels[0].HashBlockSize), SeekOrigin.Begin);
                 byte[] metadataArray = metadata.ToArray();
                 OutFileStream.Write(metadataArray, 0, metadataArray.Length);
                 long baseOfs = OutFileStream.Position;
@@ -119,8 +99,8 @@ namespace DotNet3dsToolkit.RomFsBuilder
                     }
                 }
 
-                long hashBaseOfs = Align(OutFileStream.Position, ivfcLevels[2].HashBlockSize);
-                long hOfs = Align(MasterHashLen, ivfcLevels[0].HashBlockSize);
+                long hashBaseOfs = BitMath.Align(OutFileStream.Position, ivfcLevels[2].HashBlockSize);
+                long hOfs = BitMath.Align(MasterHashLen, ivfcLevels[0].HashBlockSize);
                 long cOfs = hashBaseOfs + ivfcLevels[1].HashOffset;
                 SHA256Managed sha = new SHA256Managed();
                 for (int i = ivfcLevels.Length - 1; i >= 0; i--)
@@ -152,7 +132,7 @@ namespace DotNet3dsToolkit.RomFsBuilder
                         long len = OutFileStream.Position;
                         if (len % 0x1000 != 0)
                         {
-                            len = Align(len, 0x1000);
+                            len = BitMath.Align(len, 0x1000);
                             byte[] buf = new byte[len - OutFileStream.Position];
                             OutFileStream.Write(buf, 0, buf.Length);
                         }
@@ -166,12 +146,12 @@ namespace DotNet3dsToolkit.RomFsBuilder
                         }
                         else
                         {
-                            cOfs = (long)Align(HeaderLen, PADDING_ALIGN);
+                            cOfs = BitMath.Align(HeaderLen, PADDING_ALIGN);
                         }
                     }
                 }
                 OutFileStream.Seek(0, SeekOrigin.Begin);
-                uint SuperBlockLen = (uint)Align(MasterHashLen + 0x60, MEDIA_UNIT_SIZE);
+                var SuperBlockLen = BitMath.Align(MasterHashLen + 0x60, MEDIA_UNIT_SIZE);
                 byte[] MasterHashes = new byte[SuperBlockLen];
                 OutFileStream.Read(MasterHashes, 0, (int)SuperBlockLen);
                 SuperBlockHash = sha.ComputeHash(MasterHashes);
@@ -187,7 +167,7 @@ namespace DotNet3dsToolkit.RomFsBuilder
             long Len = 0;
             foreach (var filePath in fileSystem.GetFiles(rootDirectory, "*", false))
             {
-                Len = Helpers.Align(Len, 0x10);
+                Len = BitMath.Align(Len, 0x10);
 
                 var output = new RomfsFile
                 {
