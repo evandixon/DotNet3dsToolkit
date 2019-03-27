@@ -4,7 +4,7 @@ using System.Text;
 
 namespace DotNet3dsToolkit.Ctr
 {
-    public class SingleNcchPartitionContainer : INcchPartitionContainer
+    public class SingleNcchPartitionContainer : INcchPartitionContainer, IDisposable
     {
         public SingleNcchPartitionContainer(NcchPartition partition, int partitionIndex = 0)
         {
@@ -20,5 +20,16 @@ namespace DotNet3dsToolkit.Ctr
         public NcchPartition[] Partitions { get; }
 
         public bool IsDlcContainer => false;
+
+        public void Dispose()
+        {
+            if (Partitions != null)
+            {
+                foreach (var partition in Partitions)
+                {
+                    partition?.Dispose();
+                }
+            }
+        }
     }
 }

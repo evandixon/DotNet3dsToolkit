@@ -1,4 +1,5 @@
-﻿using SkyEditor.IO;
+﻿using DotNet3dsToolkit.Extensions;
+using SkyEditor.IO;
 using SkyEditor.IO.Binary;
 using SkyEditor.IO.FileSystem;
 using System;
@@ -10,14 +11,14 @@ using System.Threading.Tasks;
 
 namespace DotNet3dsToolkit.Ctr
 {
-    public class RomFs
+    public class RomFs : IDisposable
     {
         /// <summary>
         /// Arbitrary upper bound of a filename that DotNet3dsToolkit will attempt to read, to prevent hogging all memory if there's a problem
         /// </summary>
         const int MaxFilenameLength = 1000;
 
-        public static async Task<bool> IsRomFs(IBinaryDataAccessor file)
+        public static async Task<bool> IsRomFs(IReadOnlyBinaryDataAccessor file)
         {
             try
             {
@@ -39,7 +40,7 @@ namespace DotNet3dsToolkit.Ctr
         /// </summary>
         /// <param name="data">Accessor to the raw data to load as a ROM file system</param>
         /// <returns>The ROM file system the given data represents</returns>
-        public static async Task<RomFs> Load(IBinaryDataAccessor data)
+        public static async Task<RomFs> Load(IReadOnlyBinaryDataAccessor data)
         {
             var header = new RomFsHeader(await data.ReadArrayAsync(0, 0x6B));
             var romfs = new RomFs(data, header);
@@ -50,15 +51,68 @@ namespace DotNet3dsToolkit.Ctr
         /// <summary>
         /// Builds a new ROM file system from the given directory
         /// </summary>
-        /// <param name="filename">Directory from which to load the files</param>
+        /// <param name="directory">Directory from which to load the files</param>
         /// <param name="fileSystem">File system from which to load the files</param>
         /// <returns>A newly built ROM file system</returns>
-        public static async Task<RomFs> Build(string filename, IFileSystem fileSystem)
+        public static async Task<RomFs> Build(string directory, IFileSystem fileSystem, ExtractionProgressedToken progressToken = null)
         {
-            throw new NotImplementedException("Building RomFs is not implemented");
+            Stream stream = null;
+            string tempFilename = null;
+            try
+            {
+                // A memory stream is faster, but an internal limitation means it's unsuitable for files larger than 2GB
+                // We'll fall back to a file stream if our raw data won't fit within 2GB minus 400 MB (for safety, since there's still metadata, hashes, and other partitions)
+                if (fileSystem.GetDirectoryLength(directory) < (int.MaxValue - (400 * Math.Pow(1024, 2))))
+                {
+                    stream = new MemoryStream();
+                }
+                else
+                {
+                    // Do not use IFileSystem; this is for temporary storage since RAM isn't an option
+                    tempFilename = Path.GetTempFileName();
+                    stream = File.Open(tempFilename, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+                }
+
+                RomFsBuilder.RomFsBuilder.BuildRomFS(directory, fileSystem, stream, progressToken);
+
+                BinaryFile data;
+                if (stream is FileStream)
+                {
+                    // We want the BinaryFile class to own the file so it will dispose of it properly
+                    // So let's dispose our copy and let it re-open it however it sees fit
+                    stream.Dispose();
+                    stream = null;
+
+                    if (string.IsNullOrEmpty(tempFilename))
+                    {
+                        // The developer (probably me) made a mistake
+                        throw new Exception("Temporary file not found");
+                    }
+
+                    data = new BinaryFile(tempFilename);
+                }
+                else if (stream is MemoryStream memoryStream)
+                {
+                    data = new BinaryFile(memoryStream.ToArray());
+                }
+                else
+                {
+                    // The developer (probably me) made a mistake
+                    throw new Exception("Unexpected type of stream in RomFs.Build");
+                }                
+                
+                var header = new RomFsHeader(await data.ReadArrayAsync(0, 0x6B));
+                var romFs = new RomFs(data, header);
+                await romFs.Initialize();
+                return romFs;
+            }
+            finally
+            {
+                stream?.Dispose();
+            }
         }
 
-        public RomFs(IBinaryDataAccessor data, RomFsHeader header)
+        public RomFs(IReadOnlyBinaryDataAccessor data, RomFsHeader header)
         {
             Data = data ?? throw new ArgumentNullException(nameof(data));
             Header = header ?? throw new ArgumentNullException(nameof(header));
@@ -103,7 +157,7 @@ namespace DotNet3dsToolkit.Ctr
             Level3 = await IvfcLevel.Load(Data, LevelLocations[2]);
         }
 
-        protected IBinaryDataAccessor Data { get; }
+        public IReadOnlyBinaryDataAccessor Data { get; }
 
         public RomFsHeader Header { get; }
 
@@ -167,12 +221,12 @@ namespace DotNet3dsToolkit.Ctr
             await Task.WhenAll(fileExtractTasks);
         }
 
-        /// <summary>
-        /// Gets the raw data for the ROM file system, building it if necessary
-        /// </summary>
-        public async Task<IBinaryDataAccessor> GetRawData()
+        public void Dispose()
         {
-            throw new NotImplementedException("Building RomFs raw data is not implemented");
+            if (Data is IDisposable disposableData)
+            {
+                disposableData.Dispose();
+            }   
         }
 
         #region Child Classes
@@ -261,7 +315,7 @@ namespace DotNet3dsToolkit.Ctr
 
         public class DirectoryMetadata
         {
-            public static async Task<DirectoryMetadata> Load(IBinaryDataAccessor data, IvfcLevelHeader header, int offsetOffDirTable)
+            public static async Task<DirectoryMetadata> Load(IReadOnlyBinaryDataAccessor data, IvfcLevelHeader header, int offsetOffDirTable)
             {
                 var offset = header.DirectoryMetadataTableOffset + offsetOffDirTable;
                 var metadata = new DirectoryMetadata(data, header);
@@ -284,13 +338,13 @@ namespace DotNet3dsToolkit.Ctr
                 return metadata;
             }
 
-            public DirectoryMetadata(IBinaryDataAccessor data, IvfcLevelHeader header)
+            public DirectoryMetadata(IReadOnlyBinaryDataAccessor data, IvfcLevelHeader header)
             {
                 LevelData = data ?? throw new ArgumentNullException(nameof(data));
                 IvfcLevelHeader = header ?? throw new ArgumentNullException(nameof(data));
             }
 
-            private IBinaryDataAccessor LevelData { get; }
+            private IReadOnlyBinaryDataAccessor LevelData { get; }
             private IvfcLevelHeader IvfcLevelHeader { get; }
 
             /// <summary>
@@ -376,7 +430,7 @@ namespace DotNet3dsToolkit.Ctr
 
         public class FileMetadata
         {
-            public static async Task<FileMetadata> Load(IBinaryDataAccessor data, IvfcLevelHeader header, long offsetFromMetadataTable)
+            public static async Task<FileMetadata> Load(IReadOnlyBinaryDataAccessor data, IvfcLevelHeader header, long offsetFromMetadataTable)
             {
                 var offset = header.FileMetadataTableOffset + offsetFromMetadataTable;
                 var metadata = new FileMetadata(data, header);
@@ -393,13 +447,13 @@ namespace DotNet3dsToolkit.Ctr
                 return metadata;
             }
 
-            public FileMetadata(IBinaryDataAccessor data, IvfcLevelHeader header)
+            public FileMetadata(IReadOnlyBinaryDataAccessor data, IvfcLevelHeader header)
             {
                 LevelData = data ?? throw new ArgumentNullException(nameof(data));
                 Header = header ?? throw new ArgumentNullException(nameof(header));
             }
 
-            private IBinaryDataAccessor LevelData { get; }
+            private IReadOnlyBinaryDataAccessor LevelData { get; }
 
             public IvfcLevelHeader Header { get; }
 
@@ -438,9 +492,9 @@ namespace DotNet3dsToolkit.Ctr
             /// </summary>
             public string Name { get; set; } // Offset: 0x20
 
-            public IBinaryDataAccessor GetDataReference()
+            public IReadOnlyBinaryDataAccessor GetDataReference()
             {
-                return LevelData.GetDataReference(Header.FileDataOffset + FileDataOffset, FileDataLength);
+                return LevelData.GetReadOnlyDataReference(Header.FileDataOffset + FileDataOffset, FileDataLength);
             }
 
             public override string ToString()
@@ -508,15 +562,15 @@ namespace DotNet3dsToolkit.Ctr
 
         public class IvfcLevel
         {
-            public static async Task<IvfcLevel> Load(IBinaryDataAccessor romfsData, IvfcLevelLocation location)
+            public static async Task<IvfcLevel> Load(IReadOnlyBinaryDataAccessor romfsData, IvfcLevelLocation location)
             {
                 var header = new IvfcLevelHeader(await romfsData.ReadArrayAsync(location.DataOffset, 0x28));
-                var level = new IvfcLevel(romfsData.GetDataReference(location.DataOffset, location.DataSize), header);
+                var level = new IvfcLevel(romfsData.GetReadOnlyDataReference(location.DataOffset, location.DataSize), header);
                 await level.Initialize();
                 return level;
             }
 
-            public IvfcLevel(IBinaryDataAccessor data, IvfcLevelHeader header)
+            public IvfcLevel(IReadOnlyBinaryDataAccessor data, IvfcLevelHeader header)
             {
                 LevelData = data ?? throw new ArgumentNullException(nameof(data));
                 Header = header ?? throw new ArgumentNullException(nameof(header));
@@ -542,7 +596,7 @@ namespace DotNet3dsToolkit.Ctr
                 RootFiles = rootFiles.ToArray();
             }
 
-            private IBinaryDataAccessor LevelData { get; }
+            private IReadOnlyBinaryDataAccessor LevelData { get; }
 
             public IvfcLevelHeader Header { get; } // Offset: 0, size: 0x28
 

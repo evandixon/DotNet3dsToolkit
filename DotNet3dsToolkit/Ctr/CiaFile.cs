@@ -7,22 +7,22 @@ using System.Threading.Tasks;
 
 namespace DotNet3dsToolkit.Ctr
 {
-    public class CiaFile : INcchPartitionContainer
+    public class CiaFile : INcchPartitionContainer, IDisposable
     {
         public static Task<bool> IsCia(BinaryFile file)
         {
             // To-do: look at the actual data
-            return Task.FromResult(file.Filename.ToLower().EndsWith(".cia"));
+            return Task.FromResult(file.Filename?.ToLower()?.EndsWith(".cia") ?? false);
         }
 
-        public static async Task<CiaFile> Load(IBinaryDataAccessor data)
+        public static async Task<CiaFile> Load(IReadOnlyBinaryDataAccessor data)
         {
             var file = new CiaFile(data);
             await file.Initalize();
             return file;
         }
 
-        public CiaFile(IBinaryDataAccessor data)
+        public CiaFile(IReadOnlyBinaryDataAccessor data)
         {
             CiaData = data ?? throw new ArgumentNullException(nameof(data));
         }
@@ -38,7 +38,7 @@ namespace DotNet3dsToolkit.Ctr
             var contentOffset = BitMath.Align(tmdOffset + CiaHeader.TmdFileSize, 64);
             var metaOffset = BitMath.Align(contentOffset + CiaHeader.ContentSize, 64);
 
-            TmdMetadata = await TmdMetadata.Load(CiaData.GetDataReference(tmdOffset, CiaHeader.TmdFileSize));
+            TmdMetadata = await TmdMetadata.Load(CiaData.GetReadOnlyDataReference(tmdOffset, CiaHeader.TmdFileSize));
 
             Partitions = new NcchPartition[TmdMetadata.ContentChunkRecords.Length];
             long partitionStart = contentOffset;
@@ -48,7 +48,7 @@ namespace DotNet3dsToolkit.Ctr
                 var partitionLength = chunkRecord.ContentSize;
                 int contentIndex = chunkRecord.ContentIndex;
 
-                Partitions[i] = await NcchPartition.Load(CiaData.GetDataReference(partitionStart, partitionLength));
+                Partitions[i] = await NcchPartition.Load(CiaData.GetReadOnlyDataReference(partitionStart, partitionLength));
 
                 partitionStart += partitionLength;
             }
@@ -56,7 +56,7 @@ namespace DotNet3dsToolkit.Ctr
             IsDlcContainer = TmdMetadata.TitleId >> 32 == 0x0004008C;
         }
 
-        private IBinaryDataAccessor CiaData { get; set; }
+        private IReadOnlyBinaryDataAccessor CiaData { get; set; }
 
         public CiaHeader CiaHeader { get; private set; }
 
@@ -65,5 +65,16 @@ namespace DotNet3dsToolkit.Ctr
         public NcchPartition[] Partitions { get; private set; }
 
         public bool IsDlcContainer { get; private set; }
+
+        public void Dispose()
+        {
+            if (Partitions != null)
+            {
+                foreach (var partition in Partitions)
+                {
+                    partition?.Dispose();
+                }
+            }
+        }
     }
 }

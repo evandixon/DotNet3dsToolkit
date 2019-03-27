@@ -76,7 +76,7 @@ namespace DotNet3dsToolkit
             }
         }
 
-        public async Task OpenFile(BinaryFile file)
+        public async Task OpenFile(IReadOnlyBinaryDataAccessor file)
         {
             // Clear virtual path if it exists
             if (!string.IsNullOrEmpty(VirtualPath) && CurrentFileSystem.DirectoryExists(VirtualPath))
@@ -90,7 +90,7 @@ namespace DotNet3dsToolkit
             {
                 Container = await NcsdFile.Load(file);
             }
-            else if (await CiaFile.IsCia(file))
+            else if (file is BinaryFile binaryFile && await CiaFile.IsCia(binaryFile))
             {
                 Container = await CiaFile.Load(file);
             }
@@ -277,6 +277,11 @@ namespace DotNet3dsToolkit
                 if (disposing)
                 {
                     RawData?.Dispose();
+
+                    if (Container is IDisposable disposableContainer)
+                    {
+                        disposableContainer.Dispose();
+                    }
                 }
 
                 // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.
@@ -443,9 +448,9 @@ namespace DotNet3dsToolkit
             return Path.Combine(VirtualPath, path.TrimStart('/'));
         }
 
-        private IBinaryDataAccessor GetDataReference(string[] parts, bool throwIfNotFound = true)
+        private IReadOnlyBinaryDataAccessor GetDataReference(string[] parts, bool throwIfNotFound = true)
         {
-            IBinaryDataAccessor getExeFsDataReference(string[] pathParts, int partitionId)
+            IReadOnlyBinaryDataAccessor getExeFsDataReference(string[] pathParts, int partitionId)
             {
                 if (pathParts.Length == 2)
                 {
@@ -455,7 +460,7 @@ namespace DotNet3dsToolkit
                 return null;
             }
 
-            IBinaryDataAccessor getRomFsDataReference(string[] pathParts, int partitionId)
+            IReadOnlyBinaryDataAccessor getRomFsDataReference(string[] pathParts, int partitionId)
             {
                 var currentDirectory = Partitions[partitionId]?.RomFs?.Level3.RootDirectoryMetadataTable;
                 for (int i = 1; i < pathParts.Length - 1; i += 1)
@@ -479,7 +484,7 @@ namespace DotNet3dsToolkit
                 return null;
             }
 
-            IBinaryDataAccessor dataReference = null;
+            IReadOnlyBinaryDataAccessor dataReference = null;
 
             var firstDirectory = parts[0].ToLower();
             switch (firstDirectory)
@@ -980,6 +985,27 @@ namespace DotNet3dsToolkit
             }
         }
 
+        public IReadOnlyBinaryDataAccessor GetFileReference(string filename)
+        {
+            var fixedPath = FixPath(filename);
+            if (BlacklistedPaths.Contains(fixedPath))
+            {
+                throw new FileNotFoundException(string.Format(Properties.Resources.ThreeDsRom_ErrorRomFileNotFound, filename), filename);
+            }
+            else
+            {
+                var virtualPath = GetVirtualPath(fixedPath);
+                if (CurrentFileSystem != null && CurrentFileSystem.FileExists(virtualPath))
+                {
+                    return new BinaryFile(CurrentFileSystem.ReadAllBytes(virtualPath));
+                }
+                else
+                {
+                    return GetDataReference(GetPathParts(filename));
+                }
+            }
+        }
+
         string IFileSystem.ReadAllText(string filename)
         {
             return Encoding.UTF8.GetString((this as IFileSystem).ReadAllBytes(filename));
@@ -987,13 +1013,24 @@ namespace DotNet3dsToolkit
 
         void IFileSystem.WriteAllBytes(string filename, byte[] data)
         {
+            if (CurrentFileSystem == null)
+            {
+                throw new NotSupportedException("Cannot open a file as a stream without an IO provider.");
+            }
+
             var fixedPath = FixPath(filename);
             if (BlacklistedPaths.Contains(fixedPath))
             {
                 BlacklistedPaths.Remove(fixedPath);
             }
 
-            CurrentFileSystem?.WriteAllBytes(GetVirtualPath(filename), data);
+            var virtualPath = GetVirtualPath(filename);
+            if (!CurrentFileSystem.DirectoryExists(Path.GetDirectoryName(virtualPath)))
+            {
+                CurrentFileSystem.CreateDirectory(Path.GetDirectoryName(virtualPath));
+            }
+
+            CurrentFileSystem.WriteAllBytes(virtualPath, data);
         }
 
         void IFileSystem.WriteAllText(string filename, string data)
@@ -1038,6 +1075,9 @@ namespace DotNet3dsToolkit
 
         string IFileSystem.GetTempFilename()
         {
+            // The class can't map temp files to the underlying file system yet
+            throw new NotImplementedException();
+
             var path = "/temp/files/" + Guid.NewGuid().ToString();
             (this as IFileSystem).WriteAllBytes(path, new byte[] { });
             return path;
@@ -1045,6 +1085,9 @@ namespace DotNet3dsToolkit
 
         string IFileSystem.GetTempDirectory()
         {
+            // The class can't map temp files to the underlying file system yet
+            throw new NotImplementedException();
+
             var path = "/temp/dirs/" + Guid.NewGuid().ToString();
             (this as IFileSystem).CreateDirectory(path);
             return path;
@@ -1071,7 +1114,15 @@ namespace DotNet3dsToolkit
         {
             if (CurrentFileSystem != null)
             {
-                throw new NotSupportedException("Cannot open a file as a stream without an IO provider.");
+                if ((this as IFileSystem).FileExists(filename))
+                {
+                    var data = (this as IFileSystem).ReadAllBytes(filename);
+                    return new MemoryStream(data);
+                }
+                else
+                {
+                    throw new NotSupportedException("Cannot open a file as a stream without an IO provider.");
+                }                
             }
 
             var virtualPath = GetVirtualPath(filename);

@@ -7,11 +7,11 @@ using System.Threading.Tasks;
 
 namespace DotNet3dsToolkit.Ctr
 {
-    public class NcchPartition
+    public class NcchPartition : IDisposable
     {
         private const int MediaUnitSize = 0x200;
 
-        public static async Task<bool> IsNcch(IBinaryDataAccessor file)
+        public static async Task<bool> IsNcch(IReadOnlyBinaryDataAccessor file)
         {
             try
             {
@@ -28,7 +28,7 @@ namespace DotNet3dsToolkit.Ctr
             }
         }
 
-        public static async Task<NcchPartition> Load(IBinaryDataAccessor data)
+        public static async Task<NcchPartition> Load(IReadOnlyBinaryDataAccessor data)
         {
             NcchHeader header = null;
             if (data.Length > 0)
@@ -46,28 +46,28 @@ namespace DotNet3dsToolkit.Ctr
             Header = header;
         }
 
-        public NcchPartition(RomFs romfs = null, ExeFs exefs = null, IBinaryDataAccessor exheader = null)
+        public NcchPartition(RomFs romfs = null, ExeFs exefs = null, IReadOnlyBinaryDataAccessor exheader = null)
         {
             RomFs = romfs;
             ExeFs = exefs;
             ExHeader = exheader;
         }
 
-        public async Task Initialize(IBinaryDataAccessor data)
+        public async Task Initialize(IReadOnlyBinaryDataAccessor data)
         {
             if (Header != null && Header.RomFsSize > 0)
             {
                 if (Header.ExeFsOffset > 0 && Header.ExeFsSize > 0)
                 {
-                    ExeFs = await ExeFs.Load(data.GetDataReference((long)Header.ExeFsOffset * MediaUnitSize, (long)Header.ExeFsSize * MediaUnitSize));
+                    ExeFs = await ExeFs.Load(data.GetReadOnlyDataReference((long)Header.ExeFsOffset * MediaUnitSize, (long)Header.ExeFsSize * MediaUnitSize));
                 }
                 if (Header.RomFsOffset > 0 && Header.RomFsOffset > 0)
                 {
-                    RomFs = await RomFs.Load(data.GetDataReference((long)Header.RomFsOffset * MediaUnitSize, (long)Header.RomFsSize * MediaUnitSize));
+                    RomFs = await RomFs.Load(data.GetReadOnlyDataReference((long)Header.RomFsOffset * MediaUnitSize, (long)Header.RomFsSize * MediaUnitSize));
                 }                    
                 if (Header.ExHeaderSize > 0)
                 {
-                    ExHeader = data.GetDataReference(0x200, Header.ExHeaderSize);
+                    ExHeader = data.GetReadOnlyDataReference(0x200, Header.ExHeaderSize);
                 }
             }
         }
@@ -76,7 +76,13 @@ namespace DotNet3dsToolkit.Ctr
 
         public ExeFs ExeFs { get; private set; } // Could be null if not applicable
         public RomFs RomFs { get; private set; } // Could be null if not applicable
-        public IBinaryDataAccessor ExHeader { get; private set; } // Could be null if not applicable
+        public IReadOnlyBinaryDataAccessor ExHeader { get; private set; } // Could be null if not applicable
+
+
+        public void Dispose()
+        {
+            RomFs?.Dispose();
+        }
 
         #region Child Classes
         public class NcchHeader

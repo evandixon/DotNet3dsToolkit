@@ -8,20 +8,20 @@ using System.Threading.Tasks;
 
 namespace DotNet3dsToolkit.RomFsBuilder
 {
-    public class Romfs_MetaData
+    public class RomFsMetadataBuilder
     {
         private const int PADDING_ALIGN = 16;
         private const int ROMFS_UNUSED_ENTRY = -1;
 
-        public static void BuildRomFSHeader(MemoryStream romfs_stream, List<RomfsFile> Entries, string directory, IFileSystem fileSystem)
+        public static byte[] BuildRomFSHeader(List<RomfsFile> Entries, string directory, IFileSystem fileSystem)
         {
-            var metadata = new Romfs_MetaData();
+            var metadata = new RomFsMetadataBuilder();
             metadata.CalcRomfsSize(directory, fileSystem);
             metadata.PopulateRomfs(Entries, directory, fileSystem);
-            metadata.WriteMetaDataToStream(romfs_stream);
+            return metadata.WriteMetaDataToStream();
         }
 
-        public Romfs_MetaData()
+        public RomFsMetadataBuilder()
         {
             this.InfoHeader = new Romfs_InfoHeader();
             this.DirTableLen = 0;
@@ -30,7 +30,14 @@ namespace DotNet3dsToolkit.RomFsBuilder
             this.DirTable = new List<Romfs_DirEntry>();
             this.FileTable = new List<Romfs_FileEntry>();
             this.InfoHeader.HeaderLength = 0x28;
-            this.InfoHeader.Sections = new Romfs_SectionHeader[4];
+            this.InfoHeader.Sections = new Romfs_SectionHeader[]
+            {
+                new Romfs_SectionHeader(),
+                new Romfs_SectionHeader(),
+                new Romfs_SectionHeader(),
+                new Romfs_SectionHeader()
+            };
+
             this.DirHashTable = new List<int>();
             this.FileHashTable = new List<int>();
         }
@@ -118,7 +125,7 @@ namespace DotNet3dsToolkit.RomFsBuilder
             }
             else
             {
-                this.M_DirTableLen += 0x18 + BitMath.Align(Path.GetFileName(rootDirectory).Length * 2, 4);
+                this.M_DirTableLen += 0x18 + BitMath.Align(Path.GetFileName(rootDirectory.TrimEnd('/')).Length * 2, 4);
             }
 
             var filePaths = fileSystem.GetFiles(rootDirectory, "*", true);
@@ -169,7 +176,7 @@ namespace DotNet3dsToolkit.RomFsBuilder
             int parent = this.DirTable[index].ParentOffset;
             string Name = this.DirTable[index].Name;
             byte[] NArr = (index == 0) ? Encoding.Unicode.GetBytes("") : Encoding.Unicode.GetBytes(Name);
-            int hash = CalcPathHash(parent, NArr, 0, NArr.Length);
+            uint hash = CalcPathHash(parent, NArr, 0, NArr.Length);
             int ind2 = (int)(hash % this.M_DirHashTableEntry);
             if (this.DirHashTable[ind2] == ROMFS_UNUSED_ENTRY)
             {
@@ -201,7 +208,7 @@ namespace DotNet3dsToolkit.RomFsBuilder
             int parent = this.FileTable[index].ParentDirOffset;
             string Name = this.FileTable[index].Name;
             byte[] NArr = Encoding.Unicode.GetBytes(Name);
-            int hash = CalcPathHash(parent, NArr, 0, NArr.Length);
+            uint hash = CalcPathHash(parent, NArr, 0, NArr.Length);
             int ind2 = (int)(hash % this.M_FileHashTableEntry);
             if (this.FileHashTable[ind2] == ROMFS_UNUSED_ENTRY)
             {
@@ -228,12 +235,12 @@ namespace DotNet3dsToolkit.RomFsBuilder
             }
         }
 
-        private int CalcPathHash(int ParentOffset, byte[] NameArray, int start, int len)
+        private uint CalcPathHash(int ParentOffset, byte[] NameArray, int start, int len)
         {
-            int hash = ParentOffset ^ 123456789;
+            uint hash = (uint)ParentOffset ^ 123456789;
             for (int i = 0; i < NameArray.Length; i += 2)
             {
-                hash = (int)((hash >> 5) | (hash << 27));
+                hash = (uint)((hash >> 5) | (hash << 27));
                 hash ^= (ushort)((NameArray[start + i]) | (NameArray[start + i + 1] << 8));
             }
             return hash;
@@ -247,7 +254,7 @@ namespace DotNet3dsToolkit.RomFsBuilder
 
         private void AddDir(string root, string directory, IFileSystem fileSystem, int parent, int sibling, bool DoSubs)
         {
-            var dirName = Path.GetFileName(directory);
+            var dirName = Path.GetFileName(directory.TrimEnd('/'));
             var SubDirectories = fileSystem.GetDirectories(directory, true);
             if (!DoSubs)
             {
@@ -332,63 +339,68 @@ namespace DotNet3dsToolkit.RomFsBuilder
             }
         }
 
-        private void WriteMetaDataToStream(MemoryStream stream)
+        private byte[] WriteMetaDataToStream()
         {
-            //First, InfoHeader.
-            stream.Write(BitConverter.GetBytes(this.InfoHeader.HeaderLength), 0, 4);
-            foreach (Romfs_SectionHeader SH in this.InfoHeader.Sections)
+            using (var stream = new MemoryStream())
             {
-                stream.Write(BitConverter.GetBytes(SH.Offset), 0, 4);
-                stream.Write(BitConverter.GetBytes(SH.Size), 0, 4);
-            }
-            stream.Write(BitConverter.GetBytes(this.InfoHeader.DataOffset), 0, 4);
+                //First, InfoHeader.
+                stream.Write(BitConverter.GetBytes(this.InfoHeader.HeaderLength), 0, 4);
+                foreach (Romfs_SectionHeader SH in this.InfoHeader.Sections)
+                {
+                    stream.Write(BitConverter.GetBytes(SH.Offset), 0, 4);
+                    stream.Write(BitConverter.GetBytes(SH.Size), 0, 4);
+                }
+                stream.Write(BitConverter.GetBytes(this.InfoHeader.DataOffset), 0, 4);
 
-            //DirHashTable
-            foreach (uint u in this.DirHashTable)
-            {
-                stream.Write(BitConverter.GetBytes(u), 0, 4);
-            }
+                //DirHashTable
+                foreach (uint u in this.DirHashTable)
+                {
+                    stream.Write(BitConverter.GetBytes(u), 0, 4);
+                }
 
-            //DirTable
-            foreach (Romfs_DirEntry dir in this.DirTable)
-            {
-                stream.Write(BitConverter.GetBytes(dir.ParentOffset), 0, 4);
-                stream.Write(BitConverter.GetBytes(dir.SiblingOffset), 0, 4);
-                stream.Write(BitConverter.GetBytes(dir.ChildOffset), 0, 4);
-                stream.Write(BitConverter.GetBytes(dir.FileOffset), 0, 4);
-                stream.Write(BitConverter.GetBytes(dir.HashKeyPointer), 0, 4);
-                uint nlen = (uint)dir.Name.Length * 2;
-                stream.Write(BitConverter.GetBytes(nlen), 0, 4);
-                byte[] NameArray = new byte[BitMath.Align(nlen, 4)];
-                Array.Copy(Encoding.Unicode.GetBytes(dir.Name), 0, NameArray, 0, nlen);
-                stream.Write(NameArray, 0, NameArray.Length);
-            }
+                //DirTable
+                foreach (Romfs_DirEntry dir in this.DirTable)
+                {
+                    stream.Write(BitConverter.GetBytes(dir.ParentOffset), 0, 4);
+                    stream.Write(BitConverter.GetBytes(dir.SiblingOffset), 0, 4);
+                    stream.Write(BitConverter.GetBytes(dir.ChildOffset), 0, 4);
+                    stream.Write(BitConverter.GetBytes(dir.FileOffset), 0, 4);
+                    stream.Write(BitConverter.GetBytes(dir.HashKeyPointer), 0, 4);
+                    uint nlen = (uint)dir.Name.Length * 2;
+                    stream.Write(BitConverter.GetBytes(nlen), 0, 4);
+                    byte[] NameArray = new byte[BitMath.Align(nlen, 4)];
+                    Array.Copy(Encoding.Unicode.GetBytes(dir.Name), 0, NameArray, 0, nlen);
+                    stream.Write(NameArray, 0, NameArray.Length);
+                }
 
-            //FileHashTable
-            foreach (uint u in this.FileHashTable)
-            {
-                stream.Write(BitConverter.GetBytes(u), 0, 4);
-            }
+                //FileHashTable
+                foreach (uint u in this.FileHashTable)
+                {
+                    stream.Write(BitConverter.GetBytes(u), 0, 4);
+                }
 
-            //FileTable
-            foreach (Romfs_FileEntry file in this.FileTable)
-            {
-                stream.Write(BitConverter.GetBytes(file.ParentDirOffset), 0, 4);
-                stream.Write(BitConverter.GetBytes(file.SiblingOffset), 0, 4);
-                stream.Write(BitConverter.GetBytes(file.DataOffset), 0, 8);
-                stream.Write(BitConverter.GetBytes(file.DataSize), 0, 8);
-                stream.Write(BitConverter.GetBytes(file.HashKeyPointer), 0, 4);
-                uint nlen = (uint)file.Name.Length * 2;
-                stream.Write(BitConverter.GetBytes(nlen), 0, 4);
-                byte[] NameArray = new byte[BitMath.Align(nlen, 4)];
-                Array.Copy(Encoding.Unicode.GetBytes(file.Name), 0, NameArray, 0, nlen);
-                stream.Write(NameArray, 0, NameArray.Length);
-            }
+                //FileTable
+                foreach (Romfs_FileEntry file in this.FileTable)
+                {
+                    stream.Write(BitConverter.GetBytes(file.ParentDirOffset), 0, 4);
+                    stream.Write(BitConverter.GetBytes(file.SiblingOffset), 0, 4);
+                    stream.Write(BitConverter.GetBytes(file.DataOffset), 0, 8);
+                    stream.Write(BitConverter.GetBytes(file.DataSize), 0, 8);
+                    stream.Write(BitConverter.GetBytes(file.HashKeyPointer), 0, 4);
+                    uint nlen = (uint)file.Name.Length * 2;
+                    stream.Write(BitConverter.GetBytes(nlen), 0, 4);
+                    byte[] NameArray = new byte[BitMath.Align(nlen, 4)];
+                    Array.Copy(Encoding.Unicode.GetBytes(file.Name), 0, NameArray, 0, nlen);
+                    stream.Write(NameArray, 0, NameArray.Length);
+                }
 
-            //Padding
-            while (stream.Position % PADDING_ALIGN != 0)
-                stream.Write(new byte[PADDING_ALIGN - (stream.Position % 0x10)], 0, (int)(PADDING_ALIGN - (stream.Position % 0x10)));
-            //All Done.
+                //Padding
+                while (stream.Position % PADDING_ALIGN != 0)
+                    stream.Write(new byte[PADDING_ALIGN - (stream.Position % 0x10)], 0, (int)(PADDING_ALIGN - (stream.Position % 0x10)));
+                //All Done.
+
+                return stream.ToArray();
+            }
         }
 
         //GetRomfs[...]Entry Functions are all O(n)
@@ -397,7 +409,7 @@ namespace DotNet3dsToolkit.RomFsBuilder
         {
             for (int i = 0; i < this.DirTable.Count; i++)
             {
-                if (this.DirTable[i].FullName == FullName)
+                if (this.DirTable[i].FullName.TrimEnd('/') == FullName.Replace("\\", "/").TrimEnd('/'))
                 {
                     return i;
                 }

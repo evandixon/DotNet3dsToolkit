@@ -13,7 +13,7 @@ namespace DotNet3dsToolkit.Ctr
 {
     public class ExeFs
     {
-        public static async Task<bool> IsExeFs(IBinaryDataAccessor file)
+        public static async Task<bool> IsExeFs(IReadOnlyBinaryDataAccessor file)
         {
             try
             {
@@ -36,14 +36,14 @@ namespace DotNet3dsToolkit.Ctr
             }
         }
 
-        public static async Task<ExeFs> Load(IBinaryDataAccessor exeFsData)
+        public static async Task<ExeFs> Load(IReadOnlyBinaryDataAccessor exeFsData)
         {
             var exefs = new ExeFs(exeFsData);
             await exefs.Initialize();
             return exefs;
         }
 
-        public ExeFs(IBinaryDataAccessor exeFsData)
+        public ExeFs(IReadOnlyBinaryDataAccessor exeFsData)
         {
             ExeFsData = exeFsData ?? throw new ArgumentNullException(nameof(exeFsData));
         }
@@ -59,7 +59,7 @@ namespace DotNet3dsToolkit.Ctr
             }));
         }
 
-        private IBinaryDataAccessor ExeFsData { get; set; }
+        private IReadOnlyBinaryDataAccessor ExeFsData { get; set; }
 
         /// <summary>
         /// Headers of the file data
@@ -100,7 +100,7 @@ namespace DotNet3dsToolkit.Ctr
             });            
         }
 
-        public IBinaryDataAccessor GetDataReference(string filename)
+        public IReadOnlyBinaryDataAccessor GetDataReference(string filename)
         {
             var file = Headers?.FirstOrDefault(h => string.Compare(h.Filename, filename, false) == 0);
 
@@ -109,7 +109,7 @@ namespace DotNet3dsToolkit.Ctr
                 return null;
             }
 
-            return ExeFsData.GetDataReference(file.Offset, file.FileSize);
+            return ExeFsData.GetReadOnlyDataReference(file.Offset, file.FileSize);
         }
 
         public class ExeFsHeader

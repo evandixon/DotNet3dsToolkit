@@ -16,7 +16,7 @@ namespace DotNet3dsToolkit.Tests
 {
     [Collection("3DS ROM Tests")] // Required to run tests synchronously (can't open multiple memory mapped file instances with the current implementation)
     public class ThreeDsRomTests
-    {        
+    {
         public static IEnumerable<object[]> NcsdTestData()
         {
             // Assume we're in DotNet3dsToolkit/Tests/DotNet3dsToolkit.Tests/bin/Debug/netcoreapp2.0
@@ -117,36 +117,38 @@ namespace DotNet3dsToolkit.Tests
         [MemberData(nameof(CiaTestData))]
         public async Task CanRebuildRomfs(string filename)
         {
-            var romfsDirectory = "./CanRebuildRomfs-" + Path.GetFileName(filename);
             var fs = new PhysicalFileSystem();
-
-            if (Directory.Exists(romfsDirectory))
-            {
-                Directory.Delete(romfsDirectory, true);
-            }
-
-            Directory.CreateDirectory(romfsDirectory);
 
             using (var originalRom = new ThreeDsRom())
             {
                 await originalRom.OpenFile(filename);
 
                 var newRomFs = await RomFs.Build("/RomFS", originalRom);
-                var newRomFsData = await (await newRomFs.GetRawData()).ReadArrayAsync();
-                using (var newBinaryFile = new BinaryFile(newRomFsData))
                 using (var newRom = new ThreeDsRom())
                 {
-                    await newRom.OpenFile(newBinaryFile);
-                    AreDirectoriesEqual("/RomFS", originalRom, "/RomFS", newRom).Should().BeTrue();
+                    await newRom.OpenFile(newRomFs.Data);
+                    await AssertDirectoriesEqual("/RomFS", originalRom, "/RomFS", newRom);
                 }
             }
-
-            Directory.Delete(romfsDirectory, true);
         }
 
-        private bool AreDirectoriesEqual(string directory1, IFileSystem fileSystem1, string directory2, IFileSystem filesystem2)
+        private async Task AssertDirectoriesEqual(string directory1, ThreeDsRom fileSystem1, string directory2, ThreeDsRom filesystem2)
         {
-            throw new NotImplementedException("Comparing directories is not implemented");
+            // Assume directory1 is good. It's sourced by a regular, non-rebuilt ROM, which should be covered by its own tests.
+            await (fileSystem1 as IFileSystem).GetFiles(directory1, "*", false).RunAsyncForEach(file =>
+            {
+                var otherFile = Path.Combine(directory2, file.Replace(directory1, "").TrimStart('/'));
+
+                var data1 = fileSystem1.GetFileReference(file);
+                var data2 = filesystem2.GetFileReference(otherFile);
+
+                data1.Length.Should().Be(data2.Length, $"because file '{file}' should have the same size as file '{otherFile}' in both directories");
+
+                for (int i = 0; i < data1.Length; i++)
+                {
+                    data1.ReadByte(i).Should().Be(data2.ReadByte(i), $"because file '{file}' should have the same data as '{otherFile}' in both directories, at index {i}");
+                }
+            });
         }
     }
 }

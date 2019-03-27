@@ -8,14 +8,14 @@ namespace DotNet3dsToolkit.Ctr
 {
     public class TmdMetadata
     {
-        public static async Task<TmdMetadata> Load(IBinaryDataAccessor data)
+        public static async Task<TmdMetadata> Load(IReadOnlyBinaryDataAccessor data)
         {
             var tmd = new TmdMetadata(data);
             await tmd.Initalize();
             return tmd;
         }
 
-        public TmdMetadata(IBinaryDataAccessor tmdData)
+        public TmdMetadata(IReadOnlyBinaryDataAccessor tmdData)
         {
             TmdData = tmdData ?? throw new ArgumentNullException(nameof(tmdData));
         }
@@ -108,7 +108,7 @@ namespace DotNet3dsToolkit.Ctr
             ContentChunkRecords = contentChunks.ToArray();
         }
 
-        private IBinaryDataAccessor TmdData { get; set; }
+        private IReadOnlyBinaryDataAccessor TmdData { get; set; }
 
         public int SignatureType { get; set; } // index: 0, size: 4
 

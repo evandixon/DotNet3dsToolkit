@@ -8,11 +8,11 @@ using System.Threading.Tasks;
 
 namespace DotNet3dsToolkit.Ctr
 {
-    public class NcsdFile : INcchPartitionContainer
+    public class NcsdFile : INcchPartitionContainer, IDisposable
     {
         private const int MediaUnitSize = 0x200;
 
-        public static async Task<bool> IsNcsd(IBinaryDataAccessor file)
+        public static async Task<bool> IsNcsd(IReadOnlyBinaryDataAccessor file)
         {
             try
             {
@@ -29,14 +29,14 @@ namespace DotNet3dsToolkit.Ctr
             }
         }
 
-        public static async Task<NcsdFile> Load(IBinaryDataAccessor data)
+        public static async Task<NcsdFile> Load(IReadOnlyBinaryDataAccessor data)
         {
             var file = new NcsdFile(data);
             await file.Initalize();
             return file;
         }
 
-        public NcsdFile(IBinaryDataAccessor data)
+        public NcsdFile(IReadOnlyBinaryDataAccessor data)
         {
             NcsdData = data ?? throw new ArgumentNullException(nameof(data));
         }
@@ -52,16 +52,27 @@ namespace DotNet3dsToolkit.Ctr
             {
                 var partitionStart = (long)Header.Partitions[i].Offset * MediaUnitSize;
                 var partitionLength = (long)Header.Partitions[i].Length * MediaUnitSize;
-                Partitions[i] = await NcchPartition.Load(NcsdData.GetDataReference(partitionStart, partitionLength));
+                Partitions[i] = await NcchPartition.Load(NcsdData.GetReadOnlyDataReference(partitionStart, partitionLength));
             }));
         }
 
-        private IBinaryDataAccessor NcsdData { get; set; }
+        private IReadOnlyBinaryDataAccessor NcsdData { get; set; }
 
         public NcsdHeader Header { get; set; }
 
         public NcchPartition[] Partitions { get; set; }
 
         public bool IsDlcContainer => false;
+
+        public void Dispose()
+        {
+            if (Partitions != null)
+            {
+                foreach (var partition in Partitions)
+                {
+                    partition?.Dispose();
+                }
+            }
+        }
     }
 }
