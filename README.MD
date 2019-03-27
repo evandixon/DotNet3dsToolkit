@@ -28,3 +28,6 @@ https://www.myget.org/F/skyeditor/api/v3/index.json
 
 * 3dbrew.org for documentation
 * SciresM for [RomFS-Builder](https://github.com/SciresM/RomFS-Builder), which was adapted for use in this project
+
+## To-Do
+* Delete the temporary file in RomFs.Build

@@ -80,6 +80,7 @@ namespace DotNet3dsToolkit.Ctr
                 {
                     // We want the BinaryFile class to own the file so it will dispose of it properly
                     // So let's dispose our copy and let it re-open it however it sees fit
+                    // TODO: delete the file somehow
                     stream.Dispose();
                     stream = null;
 

@@ -144,10 +144,13 @@ namespace DotNet3dsToolkit.Tests
 
                 data1.Length.Should().Be(data2.Length, $"because file '{file}' should have the same size as file '{otherFile}' in both directories");
 
+                // To-do: compare hashes instead of raw data
                 for (int i = 0; i < data1.Length; i++)
                 {
                     data1.ReadByte(i).Should().Be(data2.ReadByte(i), $"because file '{file}' should have the same data as '{otherFile}' in both directories, at index {i}");
                 }
+
+                Debug.WriteLine("Compared " + file);
             });
         }
     }
