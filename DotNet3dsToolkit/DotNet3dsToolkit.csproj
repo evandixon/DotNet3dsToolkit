@@ -6,7 +6,7 @@
 
   <ItemGroup>
     <PackageReference Include="SkyEditor.Core" Version="4.2.6" />
-    <PackageReference Include="SkyEditor.IO" Version="5.0.5" />
+    <PackageReference Include="SkyEditor.IO" Version="5.0.6" />
   </ItemGroup>
 
   <ItemGroup>

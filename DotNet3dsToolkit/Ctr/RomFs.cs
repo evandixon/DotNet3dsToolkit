@@ -1,4 +1,5 @@
 ﻿using DotNet3dsToolkit.Extensions;
+using DotNet3dsToolkit.Infrastructure;
 using SkyEditor.IO;
 using SkyEditor.IO.Binary;
 using SkyEditor.IO.FileSystem;
@@ -80,7 +81,8 @@ namespace DotNet3dsToolkit.Ctr
                 {
                     // We want the BinaryFile class to own the file so it will dispose of it properly
                     // So let's dispose our copy and let it re-open it however it sees fit
-                    // TODO: delete the file somehow
+                    // And instead of a BinaryFile, use a FileDeletingBinaryFile to delete the file on dispose
+
                     stream.Dispose();
                     stream = null;
 
@@ -90,7 +92,7 @@ namespace DotNet3dsToolkit.Ctr
                         throw new Exception("Temporary file not found");
                     }
 
-                    data = new BinaryFile(tempFilename);
+                    data = new FileDeletingBinaryFile(tempFilename);
                 }
                 else if (stream is MemoryStream memoryStream)
                 {
