@@ -96,7 +96,17 @@ namespace DotNet3dsToolkit.Ctr
                 }
                 else if (stream is MemoryStream memoryStream)
                 {
-                    data = new BinaryFile(memoryStream.ToArray());
+                    try
+                    {
+                        // Faster but maybe more memory-intensive
+                        var memoryStreamArray = memoryStream.ToArray();
+                        data = new BinaryFile(memoryStreamArray);
+                    }
+                    catch (OutOfMemoryException)
+                    {
+                        // Slower but more reliable
+                        data = new BinaryFile(memoryStream);
+                    }                    
                 }
                 else
                 {
@@ -115,6 +125,7 @@ namespace DotNet3dsToolkit.Ctr
             }
         }
 
+        /// <param name="data">The raw data. Note: This will be disposed when RomFs is disposed</param>
         public RomFs(IReadOnlyBinaryDataAccessor data, RomFsHeader header)
         {
             Data = data ?? throw new ArgumentNullException(nameof(data));
@@ -229,6 +240,7 @@ namespace DotNet3dsToolkit.Ctr
             if (Data is IDisposable disposableData)
             {
                 disposableData.Dispose();
+                disposableData = null;
             }   
         }
 

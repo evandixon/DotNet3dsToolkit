@@ -6,10 +6,12 @@ using SkyEditor.IO;
 using SkyEditor.IO.Binary;
 using SkyEditor.IO.FileSystem;
 using System;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -124,10 +126,8 @@ namespace DotNet3dsToolkit.Tests
             {
                 await originalRom.OpenFile(filename);
 
-                var newRomFs = await RomFs.Build("/RomFS", originalRom);
-                using (var newRom = new ThreeDsRom())
+                using (var newRom = new ThreeDsRom(await RomFs.Build("/RomFS", originalRom)))
                 {
-                    await newRom.OpenFile(newRomFs.Data);
                     await AssertDirectoriesEqual("/RomFS", originalRom, "/RomFS", newRom);
                 }
             }
@@ -135,23 +135,74 @@ namespace DotNet3dsToolkit.Tests
 
         private async Task AssertDirectoriesEqual(string directory1, ThreeDsRom fileSystem1, string directory2, ThreeDsRom filesystem2)
         {
+            var totalDone = 0;
             // Assume directory1 is good. It's sourced by a regular, non-rebuilt ROM, which should be covered by its own tests.
-            await (fileSystem1 as IFileSystem).GetFiles(directory1, "*", false).RunAsyncForEach(file =>
+            await (fileSystem1 as IFileSystem).GetFiles(directory1, "*", false).RunAsyncForEach(async file =>
             {
                 var otherFile = Path.Combine(directory2, file.Replace(directory1, "").TrimStart('/'));
 
-                var data1 = fileSystem1.GetFileReference(file);
-                var data2 = filesystem2.GetFileReference(otherFile);
+                var data1 = await fileSystem1.GetFileReference(file).ReadArrayAsync();
+                var data2 = await filesystem2.GetFileReference(otherFile).ReadArrayAsync();
 
                 data1.Length.Should().Be(data2.Length, $"because file '{file}' should have the same size as file '{otherFile}' in both directories");
 
-                for (int i = 0; i < data1.Length - 4; i += 4)
-                {
-                    data1.ReadInt32(i).Should().Be(data2.ReadInt32(i), $"because file '{file}' should have the same data as '{otherFile}' in both directories, at index {i}");
-                }
+                UnsafeCompare(data1, data2).Should().BeTrue();
 
-                Debug.WriteLine("Compared " + file);
+                System.Threading.Interlocked.Increment(ref totalDone);
+                var done = totalDone;
+                Console.WriteLine("Compared " + file + ". Total done: " + done.ToString());
+                Debug.WriteLine("Compared " + file + ". Total done: " + done.ToString());
             });
+        }
+
+        // Source: https://stackoverflow.com/a/8808245
+        static unsafe bool UnsafeCompare(byte[] a1, byte[] a2)
+        {
+            if (a1 == a2)
+            {
+                return true;
+            }
+
+            if (a1 == null || a2 == null || a1.Length != a2.Length)
+            {
+                return false;
+            }
+
+            fixed (byte* p1 = a1, p2 = a2)
+            {
+                byte* x1 = p1, x2 = p2;
+                int l = a1.Length;
+                for (int i = 0; i < l / 8; i++, x1 += 8, x2 += 8)
+                {
+                    if (*((long*)x1) != *((long*)x2))
+                    {
+                        return false;
+                    }
+                }
+                if ((l & 4) != 0)
+                {
+                    if (*((int*)x1) != *((int*)x2))
+                    {
+                        return false;
+                    }
+                    x1 += 4;
+                    x2 += 4;
+                }
+                if ((l & 2) != 0)
+                {
+                    if (*((short*)x1) != *((short*)x2))
+                    {
+                        return false;
+                    }
+                    x1 += 2;
+                    x2 += 2;
+                }
+                if ((l & 1) != 0)
+                {
+                    if (*((byte*)x1) != *((byte*)x2)) return false;
+                }
+                return true;
+            }
         }
     }
 }

@@ -47,6 +47,11 @@ namespace DotNet3dsToolkit
             CurrentFileSystem = fileSystem;
         }
 
+        public ThreeDsRom(RomFs romFs)
+        {
+            Container = new SingleNcchPartitionContainer(new NcchPartition(romFs));
+        }
+
         private INcchPartitionContainer Container { get; set; }
 
         public NcchPartition[] Partitions => Container.Partitions;
@@ -445,6 +450,10 @@ namespace DotNet3dsToolkit
 
         private string GetVirtualPath(string path)
         {
+            if (VirtualPath == null)
+            {
+                return null;
+            }
             return Path.Combine(VirtualPath, path.TrimStart('/'));
         }
 
@@ -583,7 +592,8 @@ namespace DotNet3dsToolkit
 
         bool IFileSystem.FileExists(string filename)
         {
-            return (CurrentFileSystem != null && CurrentFileSystem.FileExists(GetVirtualPath(filename)))
+            var virtualPath = GetVirtualPath(filename);
+            return (CurrentFileSystem != null && !string.IsNullOrEmpty(virtualPath) && CurrentFileSystem.FileExists(virtualPath))
                 || GetDataReference(GetPathParts(filename), false) != null;
         }
 
@@ -691,9 +701,10 @@ namespace DotNet3dsToolkit
 
         bool IFileSystem.DirectoryExists(string path)
         {
+            var virtualPath = GetVirtualPath(path);
             return !BlacklistedPaths.Contains(FixPath(path))
                     &&
-                    ((CurrentFileSystem != null && CurrentFileSystem.DirectoryExists(GetVirtualPath(path)))
+                    ((CurrentFileSystem != null && !string.IsNullOrEmpty(virtualPath) && CurrentFileSystem.DirectoryExists(virtualPath))
                         || DirectoryExists(GetPathParts(path))
                     );
         }
@@ -708,7 +719,11 @@ namespace DotNet3dsToolkit
 
             if (!(this as IFileSystem).DirectoryExists(fixedPath))
             {
-                CurrentFileSystem?.CreateDirectory(GetVirtualPath(fixedPath));
+                var virtualPath = GetVirtualPath(fixedPath);
+                if (!string.IsNullOrEmpty(virtualPath))
+                {
+                    CurrentFileSystem?.CreateDirectory(virtualPath);
+                }
             }
         }
 
@@ -841,7 +856,7 @@ namespace DotNet3dsToolkit
 
             // Apply shadowed files
             var virtualPath = GetVirtualPath(path);
-            if (CurrentFileSystem != null && CurrentFileSystem.DirectoryExists(virtualPath))
+            if (CurrentFileSystem != null && !string.IsNullOrEmpty(virtualPath) && CurrentFileSystem.DirectoryExists(virtualPath))
             {
                 foreach (var item in CurrentFileSystem.GetFiles(virtualPath, searchPattern, topDirectoryOnly))
                 {
@@ -903,7 +918,7 @@ namespace DotNet3dsToolkit
                         }
                         if (Partitions[i].RomFs != null)
                         {
-                            output.Add("/" + GetRomFsDirectoryName(i)  + "/");
+                            output.Add("/" + GetRomFsDirectoryName(i) + "/");
                             if (!topDirectoryOnly)
                             {
                                 output.AddRange((this as IFileSystem).GetDirectories("/" + GetRomFsDirectoryName(i), topDirectoryOnly));
@@ -948,7 +963,7 @@ namespace DotNet3dsToolkit
 
             // Apply shadowed files
             var virtualPath = GetVirtualPath(path);
-            if (CurrentFileSystem != null && CurrentFileSystem.DirectoryExists(virtualPath))
+            if (CurrentFileSystem != null && !string.IsNullOrEmpty(virtualPath) && CurrentFileSystem.DirectoryExists(virtualPath))
             {
                 foreach (var item in CurrentFileSystem.GetDirectories(virtualPath, topDirectoryOnly))
                 {
@@ -973,7 +988,7 @@ namespace DotNet3dsToolkit
             else
             {
                 var virtualPath = GetVirtualPath(fixedPath);
-                if (CurrentFileSystem != null && CurrentFileSystem.FileExists(virtualPath))
+                if (CurrentFileSystem != null && !string.IsNullOrEmpty(virtualPath) && CurrentFileSystem.FileExists(virtualPath))
                 {
                     return CurrentFileSystem.ReadAllBytes(virtualPath);
                 }
@@ -995,7 +1010,7 @@ namespace DotNet3dsToolkit
             else
             {
                 var virtualPath = GetVirtualPath(fixedPath);
-                if (CurrentFileSystem != null && CurrentFileSystem.FileExists(virtualPath))
+                if (CurrentFileSystem != null && !string.IsNullOrEmpty(virtualPath) && CurrentFileSystem.FileExists(virtualPath))
                 {
                     return new BinaryFile(CurrentFileSystem.ReadAllBytes(virtualPath));
                 }
@@ -1025,12 +1040,15 @@ namespace DotNet3dsToolkit
             }
 
             var virtualPath = GetVirtualPath(filename);
-            if (!CurrentFileSystem.DirectoryExists(Path.GetDirectoryName(virtualPath)))
+            if (!string.IsNullOrEmpty(virtualPath))
             {
-                CurrentFileSystem.CreateDirectory(Path.GetDirectoryName(virtualPath));
-            }
+                if (!CurrentFileSystem.DirectoryExists(Path.GetDirectoryName(virtualPath)))
+                {
+                    CurrentFileSystem.CreateDirectory(Path.GetDirectoryName(virtualPath));
+                }
 
-            CurrentFileSystem.WriteAllBytes(virtualPath, data);
+                CurrentFileSystem.WriteAllBytes(virtualPath, data);
+            }
         }
 
         void IFileSystem.WriteAllText(string filename, string data)
@@ -1067,7 +1085,7 @@ namespace DotNet3dsToolkit
             }
 
             var virtualPath = GetVirtualPath(path);
-            if (CurrentFileSystem != null && CurrentFileSystem.FileExists(virtualPath))
+            if (CurrentFileSystem != null && !string.IsNullOrEmpty(virtualPath) && CurrentFileSystem.FileExists(virtualPath))
             {
                 CurrentFileSystem.DeleteFile(virtualPath);
             }
@@ -1101,11 +1119,14 @@ namespace DotNet3dsToolkit
             }
 
             var virtualPath = GetVirtualPath(filename);
-            if (!CurrentFileSystem.DirectoryExists(virtualPath))
+            if (!string.IsNullOrEmpty(virtualPath))
             {
-                CurrentFileSystem.CreateDirectory(virtualPath);
+                if (!CurrentFileSystem.DirectoryExists(virtualPath))
+                {
+                    CurrentFileSystem.CreateDirectory(virtualPath);
+                }
+                CurrentFileSystem.WriteAllBytes(virtualPath, (this as IFileSystem).ReadAllBytes(filename));
             }
-            CurrentFileSystem.WriteAllBytes(virtualPath, (this as IFileSystem).ReadAllBytes(filename));
 
             return CurrentFileSystem.OpenFile(filename);
         }
@@ -1122,15 +1143,18 @@ namespace DotNet3dsToolkit
                 else
                 {
                     throw new NotSupportedException("Cannot open a file as a stream without an IO provider.");
-                }                
+                }
             }
 
             var virtualPath = GetVirtualPath(filename);
-            if (!CurrentFileSystem.DirectoryExists(virtualPath))
+            if (!string.IsNullOrEmpty(virtualPath))
             {
-                CurrentFileSystem.CreateDirectory(virtualPath);
+                if (!CurrentFileSystem.DirectoryExists(virtualPath))
+                {
+                    CurrentFileSystem.CreateDirectory(virtualPath);
+                }
+                CurrentFileSystem.WriteAllBytes(virtualPath, (this as IFileSystem).ReadAllBytes(filename));
             }
-            CurrentFileSystem.WriteAllBytes(virtualPath, (this as IFileSystem).ReadAllBytes(filename));
 
             return CurrentFileSystem.OpenFileReadOnly(filename);
         }
@@ -1143,11 +1167,14 @@ namespace DotNet3dsToolkit
             }
 
             var virtualPath = GetVirtualPath(filename);
-            if (!CurrentFileSystem.DirectoryExists(virtualPath))
+            if (!string.IsNullOrEmpty(virtualPath))
             {
-                CurrentFileSystem.CreateDirectory(virtualPath);
+                if (!CurrentFileSystem.DirectoryExists(virtualPath))
+                {
+                    CurrentFileSystem.CreateDirectory(virtualPath);
+                }
+                CurrentFileSystem.WriteAllBytes(virtualPath, (this as IFileSystem).ReadAllBytes(filename));
             }
-            CurrentFileSystem.WriteAllBytes(virtualPath, (this as IFileSystem).ReadAllBytes(filename));
 
             return CurrentFileSystem.OpenFileWriteOnly(filename);
         }

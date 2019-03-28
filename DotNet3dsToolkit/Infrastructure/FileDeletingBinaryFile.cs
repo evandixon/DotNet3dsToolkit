@@ -22,7 +22,7 @@ namespace DotNet3dsToolkit.Infrastructure
             base.Dispose();
             if (File.Exists(Filename))
             {
-                File.Delete(Filename);
+                File.Delete(Filename);             
             }
         }
     }
