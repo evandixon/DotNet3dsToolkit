@@ -135,7 +135,6 @@ namespace DotNet3dsToolkit.Tests
 
         private async Task AssertDirectoriesEqual(string directory1, ThreeDsRom fileSystem1, string directory2, ThreeDsRom filesystem2)
         {
-            var totalDone = 0;
             // Assume directory1 is good. It's sourced by a regular, non-rebuilt ROM, which should be covered by its own tests.
             await (fileSystem1 as IFileSystem).GetFiles(directory1, "*", false).RunAsyncForEach(async file =>
             {
@@ -147,11 +146,6 @@ namespace DotNet3dsToolkit.Tests
                 data1.Length.Should().Be(data2.Length, $"because file '{file}' should have the same size as file '{otherFile}' in both directories");
 
                 UnsafeCompare(data1, data2).Should().BeTrue();
-
-                System.Threading.Interlocked.Increment(ref totalDone);
-                var done = totalDone;
-                Console.WriteLine("Compared " + file + ". Total done: " + done.ToString());
-                Debug.WriteLine("Compared " + file + ". Total done: " + done.ToString());
             });
         }
 
