@@ -1,8 +1,9 @@
 ﻿using DotNet3dsToolkit.Ctr;
-using SkyEditor.Core.Utilities;
+using DotNet3dsToolkit.Infrastructure;
 using SkyEditor.IO;
 using SkyEditor.IO.Binary;
 using SkyEditor.IO.FileSystem;
+using SkyEditor.Utilities.AsyncFor;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -860,7 +861,7 @@ namespace DotNet3dsToolkit
             {
                 foreach (var item in CurrentFileSystem.GetFiles(virtualPath, searchPattern, topDirectoryOnly))
                 {
-                    var overlayPath = "/" + SkyEditor.Core.Utilities.FileSystem.MakeRelativePath(item, VirtualPath);
+                    var overlayPath = "/" + PathUtilities.MakeRelativePath(item, VirtualPath);
                     if (!BlacklistedPaths.Contains(overlayPath) && !output.Contains(overlayPath, StringComparer.OrdinalIgnoreCase))
                     {
                         output.Add(overlayPath);
@@ -967,7 +968,7 @@ namespace DotNet3dsToolkit
             {
                 foreach (var item in CurrentFileSystem.GetDirectories(virtualPath, topDirectoryOnly))
                 {
-                    var overlayPath = "/" + SkyEditor.Core.Utilities.FileSystem.MakeRelativePath(item, VirtualPath);
+                    var overlayPath = "/" + PathUtilities.MakeRelativePath(item, VirtualPath);
                     if (!BlacklistedPaths.Contains(overlayPath) && !output.Contains(overlayPath, StringComparer.OrdinalIgnoreCase))
                     {
                         output.Add(overlayPath);

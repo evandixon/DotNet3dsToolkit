@@ -5,8 +5,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="SkyEditor.Core" Version="4.2.6" />
     <PackageReference Include="SkyEditor.IO" Version="5.0.8" />
+    <PackageReference Include="SkyEditor.Utilities.AsyncFor" Version="5.0.0" />
   </ItemGroup>
 
   <ItemGroup>

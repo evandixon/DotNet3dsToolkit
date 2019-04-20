@@ -1,7 +1,7 @@
-﻿using SkyEditor.Core.Utilities;
-using SkyEditor.IO;
+﻿using SkyEditor.IO;
 using SkyEditor.IO.Binary;
 using SkyEditor.IO.FileSystem;
+using SkyEditor.Utilities.AsyncFor;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -83,8 +83,7 @@ namespace DotNet3dsToolkit.Ctr
                 fileSystem.CreateDirectory(directoryName);
             }
 
-            var a = new AsyncFor();
-            await a.RunForEach(Headers, async (header) =>
+            await Headers.RunAsyncForEach(async (header) =>
             {
                 if (string.IsNullOrEmpty(header.Filename))
                 {
