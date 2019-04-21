@@ -68,6 +68,26 @@ namespace DotNet3dsToolkit.Tests
         [Theory]
         [MemberData(nameof(NcsdTestData))]
         [MemberData(nameof(CiaTestData))]
+        public async void ExeFsHashesValid(string filename)
+        {
+            using (var rom = new ThreeDsRom())
+            {
+                await rom.OpenFile(filename);
+                rom.Partitions.Should().NotBeNull();
+
+                foreach (var partition in rom.Partitions)
+                {
+                    if (partition.ExeFs != null)
+                    {
+                        (await partition.ExeFs.AreAllHashesValid()).Should().Be(true);
+                    }
+                }
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(NcsdTestData))]
+        [MemberData(nameof(CiaTestData))]
         public async Task ExtractRomFsFiles(string filename)
         {
             var progressReportToken = new ProgressReportToken();
