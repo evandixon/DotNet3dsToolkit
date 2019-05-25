@@ -4,6 +4,8 @@ Imports System.Text.RegularExpressions
 Imports DotNetNdsToolkit
 Imports SkyEditor.Core.IO
 Imports SkyEditor.Core.Utilities
+Imports SkyEditor.IO.FileSystem
+Imports SkyEditor.Utilities.AsyncFor
 
 Public Class Converter
     Implements IDisposable
@@ -656,7 +658,7 @@ Public Class Converter
         End If
 
         Dim r As New NdsRom
-        Dim p As New PhysicalIOProvider
+        Dim p As New PhysicalFileSystem
 
         AddHandler r.ProgressChanged, reportProgress
 
@@ -685,7 +687,7 @@ Public Class Converter
                 Using file As New GenericFile
                     file.EnableInMemoryLoad = False
                     file.IsReadOnly = True
-                    Await file.OpenFile(filename, New PhysicalIOProvider)
+                    Await file.OpenFile(filename, New PhysicalFileSystem)
                     If file.Length > 104 AndAlso e.GetString(Await file.ReadAsync(&H100, 4)) = "NCSD" Then
                         'CCI
                         Await ExtractCCI(filename, outputDirectory)

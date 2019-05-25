@@ -2,6 +2,7 @@
 Imports System.IO
 Imports DotNet3dsToolkit
 Imports SkyEditor.Core.Utilities
+Imports SkyEditor.Utilities.AsyncFor
 
 Public Class Form1
 
@@ -89,7 +90,7 @@ Public Class Form1
             pbProgress.Style = ProgressBarStyle.Continuous
         End If
 
-        If Not SIngle.IsNaN(e.Progress) Then
+        If Not Single.IsNaN(e.Progress) Then
             pbProgress.Value = e.Progress * pbProgress.Maximum
         End If
 

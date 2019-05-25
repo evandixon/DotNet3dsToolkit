@@ -2,6 +2,7 @@
 Imports System.Text
 Imports DotNetNdsToolkit
 Imports SkyEditor.Core.IO
+Imports SkyEditor.IO.FileSystem
 
 ''' <summary>
 ''' Reads metadata from packed or unpacked ROMs.
@@ -82,7 +83,7 @@ Public Class MetadataReader
         Using file As New GenericFile
             file.EnableInMemoryLoad = False
             file.IsReadOnly = True
-            Await file.OpenFile(path, New PhysicalIOProvider)
+            Await file.OpenFile(path, New PhysicalFileSystem)
 
             Dim n As New NdsRom
 
@@ -115,9 +116,7 @@ Public Class MetadataReader
                 Dim code As String
 
                 Using n As New NdsRom
-                    n.EnableInMemoryLoad = False 'In-memory load would be overkill for simply reading the game code
-                    n.IsReadOnly = True
-                    Await n.OpenFile(path, New PhysicalIOProvider)
+                    Await n.OpenFile(path, New PhysicalFileSystem)
                     code = n.Header.GameCode
                 End Using
 
@@ -127,7 +126,7 @@ Public Class MetadataReader
                 Using file As New GenericFile
                     file.EnableInMemoryLoad = False
                     file.IsReadOnly = True
-                    Await file.OpenFile(path, New PhysicalIOProvider)
+                    Await file.OpenFile(path, New PhysicalFileSystem)
 
                     If file.Length > 104 AndAlso e.GetString(Await file.ReadAsync(&H100, 4)) = "NCSD" Then
                         'CCI
