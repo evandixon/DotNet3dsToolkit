@@ -157,7 +157,7 @@ namespace DotNet3dsToolkit.Ctr
         /// <summary>
         /// Turns the executable file system into its binary representation
         /// </summary>
-        public byte[] GetRawData()
+        public byte[] ToByteArray()
         {
             var header = new byte[0x200];
             var data = new List<byte>();
