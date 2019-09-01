@@ -79,7 +79,7 @@ namespace DotNet3dsToolkit.Tests
                 {
                     if (partition.ExeFs != null)
                     {
-                        (await partition.ExeFs.AreAllHashesValid()).Should().Be(true);
+                        partition.ExeFs.AreAllHashesValid().Should().Be(true);
                     }
                 }
             }
@@ -139,8 +139,6 @@ namespace DotNet3dsToolkit.Tests
         [MemberData(nameof(CiaTestData))]
         public async Task CanRebuildRomfs(string filename)
         {
-            var fs = new PhysicalFileSystem();
-
             using (var originalRom = new ThreeDsRom())
             {
                 await originalRom.OpenFile(filename);
@@ -148,6 +146,22 @@ namespace DotNet3dsToolkit.Tests
                 using (var newRom = new ThreeDsRom(await RomFs.Build("/RomFS", originalRom)))
                 {
                     await AssertDirectoriesEqual("/RomFS", originalRom, "/RomFS", newRom);
+                }
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(NcsdTestData))]
+        [MemberData(nameof(CiaTestData))]
+        public async Task CanRebuildExefs(string filename)
+        {
+            using (var originalRom = new ThreeDsRom())
+            {
+                await originalRom.OpenFile(filename);
+
+                using (var newRom = new ThreeDsRom(await ExeFs.Build("/ExeFS", originalRom)))
+                {
+                    await AssertDirectoriesEqual("/ExeFS", originalRom, "/ExeFS", newRom);
                 }
             }
         }

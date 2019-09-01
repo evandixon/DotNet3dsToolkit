@@ -23,13 +23,8 @@ namespace DotNet3dsToolkit.Ctr
                     return false;
                 }
 
-                var exefsHeaders = (await ExeFs.Load(file).ConfigureAwait(false)).Headers.Where(h => !string.IsNullOrEmpty(h.Filename));
-                if (!exefsHeaders.Any())
-                {
-                    return false;
-                }
-
-                return exefsHeaders.All(h => h.Offset >= 0x200 && (h.Offset + h.FileSize) < file.Length);
+                var exefs = await ExeFs.Load(file).ConfigureAwait(false);
+                return exefs.Files.Any() && exefs.AreAllHashesValid();
             }
             catch (Exception)
             {
@@ -37,6 +32,11 @@ namespace DotNet3dsToolkit.Ctr
             }
         }
 
+        /// <summary>
+        /// Loads an existing executable file system from the given data.
+        /// </summary>
+        /// <param name="data">Accessor to the raw data to load as a executable file system</param>
+        /// <returns>The executable file system the given data represents</returns>
         public static async Task<ExeFs> Load(IReadOnlyBinaryDataAccessor exeFsData)
         {
             var exefs = new ExeFs(exeFsData);
@@ -44,52 +44,98 @@ namespace DotNet3dsToolkit.Ctr
             return exefs;
         }
 
-        public ExeFs(IReadOnlyBinaryDataAccessor exeFsData)
+        /// <summary>
+        /// Builds a new executable file system from the given directory
+        /// </summary>
+        /// <param name="directory">Directory from which to load the files</param>
+        /// <param name="fileSystem">File system from which to load the files</param>
+        /// <returns>A newly built executable file system</returns>
+        public static async Task<ExeFs> Build(string directory, IFileSystem fileSystem, ExtractionProgressedToken progressReportToken = null)
+        {
+            var files = fileSystem.GetFiles(directory, "*", true).ToList();
+            if (files.Count > 10)
+            {
+                throw new ArgumentException(Properties.Resources.ExeFs_ExceededMaximumFileCount, nameof(directory));
+            }
+
+            if (progressReportToken != null)
+            {
+                progressReportToken.TotalFileCount = files.Count;
+            }
+
+            var exefs = new ExeFs();
+            foreach (var file in files)
+            {
+                exefs.Files.Add(Path.GetFileName(file), null);
+            }
+            await files.RunAsyncForEach(file =>
+            {
+                exefs.Files[Path.GetFileName(file)] = new ExeFsEntry(fileSystem.ReadAllBytes(file));
+                if (progressReportToken != null)
+                {
+                    progressReportToken.IncrementExtractedFileCount();
+                }
+            }).ConfigureAwait(false);
+
+            return exefs;
+        }
+
+        public ExeFs()
+        {
+            Files = new Dictionary<string, ExeFsEntry>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        public ExeFs(IReadOnlyBinaryDataAccessor exeFsData) : this()
         {
             ExeFsData = exeFsData ?? throw new ArgumentNullException(nameof(exeFsData));
         }
 
-        public async Task Initialize()
+        protected async Task Initialize()
         {
             var headers = new ExeFsHeader[10];
+            var fileData = new byte[10][];
             var hashes = new byte[10][];
             await Task.WhenAll(Enumerable.Range(0, 10).Select(async i =>
             {
                 headers[i] = new ExeFsHeader(await ExeFsData.ReadArrayAsync(i * 16, 16).ConfigureAwait(false));
                 hashes[i] = await ExeFsData.ReadArrayAsync(0xC0 + ((9 - i) * 32), 32).ConfigureAwait(false); // Hashes are stored in reverse order from headers
+                if (headers[i].FileSize > 0)
+                {
+                    fileData[i] = await ExeFsData.GetReadOnlyDataReference(headers[i].Offset + 0x200, headers[i].FileSize).ReadArrayAsync().ConfigureAwait(false);
+                }
             })).ConfigureAwait(false);
 
-            this.Headers = new List<ExeFsHeader>(10);
-            this.Hashes = new List<byte[]>(10);
             for (int i = 0; i < headers.Length; i++)
             {
                 var header = headers[i];
+                var data = fileData[i];
                 var hash = hashes[i];
                 if (header.FileSize > 0)
                 {
-                    this.Headers.Add(header);
-                    this.Hashes.Add(hash);
+                    Files.Add(header.Filename, new ExeFsEntry
+                    {
+                        RawData = data,
+                        Hash = hash
+                    });
                 }
             }
         }
 
-        private IReadOnlyBinaryDataAccessor ExeFsData { get; set; }
+        protected IReadOnlyBinaryDataAccessor ExeFsData { get; set; }
+
+        public Dictionary<string, ExeFsEntry> Files { get; set; }
 
         /// <summary>
-        /// Headers of the file data
+        /// Saves all files in the executable file system to the specified file system
         /// </summary>
-        public List<ExeFsHeader> Headers { get; private set; }
-
-        /// <summary>
-        /// SHA256 hashes of the file data
-        /// </summary>
-        public List<byte[]> Hashes { get; set; }
-
+        /// <param name="directoryName">Directory on the specified file system to which the files should be saved.</param>
+        /// <param name="fileSystem">File system to which the files should be saved.</param>
+        /// <param name="progressReportToken">Optional token to be used to track the progress of the extraction.</param>
         public async Task ExtractFiles(string directoryName, IFileSystem fileSystem, ExtractionProgressedToken progressReportToken = null)
         {
             if (progressReportToken != null)
             {
-                progressReportToken.TotalFileCount = Headers.Count(h => h != null && !string.IsNullOrEmpty(h.Filename));
+                progressReportToken.TotalFileCount = Files.Count;
             }
 
             if (!fileSystem.DirectoryExists(directoryName))
@@ -97,14 +143,9 @@ namespace DotNet3dsToolkit.Ctr
                 fileSystem.CreateDirectory(directoryName);
             }
 
-            await Headers.RunAsyncForEach(async (header) =>
+            await Files.RunAsyncForEach((KeyValuePair<string, ExeFsEntry> file) =>
             {
-                if (string.IsNullOrEmpty(header.Filename))
-                {
-                    return;
-                }
-
-                fileSystem.WriteAllBytes(Path.Combine(directoryName, header.Filename), await ExeFsData.ReadArrayAsync(0x200 + header.Offset, header.FileSize).ConfigureAwait(false));
+                fileSystem.WriteAllBytes(Path.Combine(directoryName, file.Key), file.Value.RawData);
 
                 if (progressReportToken != null)
                 {
@@ -113,82 +154,48 @@ namespace DotNet3dsToolkit.Ctr
             }).ConfigureAwait(false);
         }
 
-        public IReadOnlyBinaryDataAccessor GetDataReference(ExeFsHeader header)
+        /// <summary>
+        /// Turns the executable file system into its binary representation
+        /// </summary>
+        public byte[] GetRawData()
         {
-            return ExeFsData.GetReadOnlyDataReference(header.Offset + 0x200, header.FileSize);
-        }
-
-        public IReadOnlyBinaryDataAccessor GetDataReference(string filename)
-        {
-            var file = Headers?.FirstOrDefault(h => string.Compare(h.Filename, filename, false) == 0);
-
-            if (file == null)
+            var header = new byte[0x200];
+            var data = new List<byte>();
+            var fileIndex = 0;
+            foreach (var file in Files.OrderBy(kv => kv.Key, StringComparer.Ordinal))
             {
-                return null;
+                // Header
+                var nameBytes = Encoding.ASCII.GetBytes(file.Key);
+                Array.Copy(nameBytes, 0, header, 0x10 * fileIndex, Math.Min(nameBytes.Length, 8));
+                Array.Copy(BitConverter.GetBytes(data.Count), 0, header, 0x10 * fileIndex + 8, 4);
+                Array.Copy(BitConverter.GetBytes(file.Value.RawData.Length), 0, header, 0x10 * fileIndex + 0xC, 4);
+
+                // Hash
+                // Note: Hashes are stored in reverse order from headers
+                Array.Copy(file.Value.Hash, 0, header, 0xC0 + ((9 - fileIndex) * 32), Math.Min(file.Value.Hash.Length, 32));
+
+                // Data
+                data.AddRange(file.Value.RawData);
+                while (data.Count % 0x200 != 0)
+                {
+                    data.Add(0);
+                }
+
+                fileIndex += 1;
             }
 
-            return GetDataReference(file);
+            data.InsertRange(0, data);
+            return data.ToArray();
         }
 
-        public async Task<byte[]> CalculateFileHash(ExeFsHeader header)
+        public bool AreAllHashesValid()
         {
-            var data = await GetDataReference(header).ReadArrayAsync().ConfigureAwait(false);
-            using (var sha = SHA256.Create())
-            {
-                return sha.ComputeHash(data);
-            }
-        }
-
-        public async Task<byte[]> CalculateFileHash(int fileIndex)
-        {
-            return await CalculateFileHash(Headers[fileIndex]);
-        }
-
-        public async Task<byte[]> CalculateFileHash(string filename)
-        {
-            var file = Headers?.FirstOrDefault(h => string.Compare(h.Filename, filename, false) == 0);
-
-            if (file == null)
-            {
-                return null;
-            }
-
-            return await CalculateFileHash(file);
-        }
-
-        public async Task<bool> IsFileHashValid(int fileIndex)
-        {
-            var hash = Hashes[fileIndex];
-            var calculatedHash = await CalculateFileHash(fileIndex).ConfigureAwait(false);
-            return hash.SequenceEqual(calculatedHash);
-        }
-
-        public async Task<bool> IsFileHashValid(ExeFsHeader header)
-        {
-            return await IsFileHashValid(Headers.IndexOf(header));
-        }
-
-
-        public async Task<bool> IsFileHashValid(string filename)
-        {
-            var file = Headers?.FirstOrDefault(h => string.Compare(h.Filename, filename, false) == 0);
-
-            if (file == null)
-            {
-                return false;
-            }
-
-            return await IsFileHashValid(file);
-        }
-
-        public async Task<bool> AreAllHashesValid()
-        {
-            return (await Task.WhenAll(Headers
-                .Select(h => IsFileHashValid(h))))
+            return Files.Values
+                .Select(f => f.IsFileHashValid())
                 .All(valid => valid);
         }
 
-        public class ExeFsHeader
+        protected class ExeFsHeader
         {
             public ExeFsHeader(byte[] data)
             {
@@ -205,6 +212,35 @@ namespace DotNet3dsToolkit.Ctr
             public string Filename { get; private set; }
             public int Offset { get; private set; }
             public int FileSize { get; private set; }
+        }
+
+        public class ExeFsEntry
+        {
+            public ExeFsEntry()
+            {
+            }
+
+            public ExeFsEntry(byte[] rawData)
+            {
+                RawData = rawData ?? throw new ArgumentNullException(nameof(rawData));
+                Hash = ComputeHash();
+            }
+
+            public byte[] RawData { get; set; }
+            public byte[] Hash { get; set; }
+
+            private byte[] ComputeHash()
+            {
+                using (var sha = SHA256.Create())
+                {
+                    return sha.ComputeHash(RawData);
+                }
+            }
+
+            public bool IsFileHashValid()
+            {
+                return ComputeHash().SequenceEqual(Hash);
+            }
         }
     }
 }

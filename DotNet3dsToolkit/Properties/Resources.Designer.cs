@@ -19,7 +19,7 @@ namespace DotNet3dsToolkit.Properties {
     // class via a tool like ResGen or Visual Studio.
     // To add or remove a member, edit your .ResX file then rerun ResGen
     // with the /str option, or rebuild your VS project.
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "15.0.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "16.0.0.0")]
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     public class Resources {
@@ -75,6 +75,15 @@ namespace DotNet3dsToolkit.Properties {
         public static string BufferUnderflow {
             get {
                 return ResourceManager.GetString("BufferUnderflow", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Cannot create an ExeFS from more than 10 files. Please specify a directory with 10 files or fewer..
+        /// </summary>
+        public static string ExeFs_ExceededMaximumFileCount {
+            get {
+                return ResourceManager.GetString("ExeFs_ExceededMaximumFileCount", resourceCulture);
             }
         }
         
