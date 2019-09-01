@@ -15,7 +15,6 @@ Planned features:
 * Console interface
 * GUI
 * Build ROMs
-* Allow reading of individual partitions without extraction
 
 ## Building
 
