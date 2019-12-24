@@ -196,7 +196,7 @@ namespace DotNet3dsToolkit
                     }
                     tasks.Add(Task.Run(async () =>
                     {
-                        File.WriteAllBytes(Path.Combine(directoryName, GetExHeaderFileName(i)), await partition.ExHeader.ReadArrayAsync());
+                        File.WriteAllBytes(Path.Combine(directoryName, GetExHeaderFileName(i)), partition.ExHeader.ToByteArray());
                         exefsExtractionProgressedToken?.IncrementExtractedFileCount();
                     }));
                 }
@@ -528,8 +528,8 @@ namespace DotNet3dsToolkit
                 case "o3dsupdate":
                     dataReference = getRomFsDataReference(parts, 7);
                     break;
-                case "exheader.bin":
-                    dataReference = GetPartitionOrDefault(0)?.ExHeader;
+                case "exheader.bin":                    
+                    dataReference = GetPartitionOrDefault(0)?.ExHeader != null ? new BinaryFile(GetPartitionOrDefault(0)?.ExHeader.ToByteArray()) : null;
                     break;
                 default:
                     if (firstDirectory.StartsWith("romfs-partition-"))
@@ -569,7 +569,7 @@ namespace DotNet3dsToolkit
                         var partitionNumRaw = firstDirectory.Split("-".ToCharArray(), 2)[1].Split(".".ToCharArray(), 2)[0];
                         if (int.TryParse(partitionNumRaw, out var partitionNum))
                         {
-                            dataReference = GetPartitionOrDefault(partitionNum)?.ExHeader;
+                            dataReference = GetPartitionOrDefault(partitionNum)?.ExHeader != null ? new BinaryFile(GetPartitionOrDefault(partitionNum)?.ExHeader.ToByteArray()) : null;
                         }
                     }
                     break;

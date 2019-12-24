@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <TargetFrameworks>net462;netcoreapp2.2</TargetFrameworks>
+    <LangVersion>8</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>

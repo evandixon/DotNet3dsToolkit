@@ -166,6 +166,31 @@ namespace DotNet3dsToolkit.Tests
             }
         }
 
+        [Theory]
+        [MemberData(nameof(NcsdTestData))]
+        [MemberData(nameof(CiaTestData))]
+        public async Task CanRebuildExheader(string filename)
+        {
+            using (var originalRom = new ThreeDsRom())
+            {
+                await originalRom.OpenFile(filename);
+
+                for (int i = 0; i < originalRom.Partitions.Length; i++)
+                {
+                    if (originalRom.Partitions[i]?.ExHeader != null)
+                    {
+                        var exheader = originalRom.Partitions[i].ExHeader;
+                        var exheaderData = exheader.ToByteArray();
+                        using var exheaderBinary = new BinaryFile(exheaderData);
+                        var newExheader = await NcchExtendedHeader.Load(exheaderBinary);
+
+                        newExheader.Should().NotBeNull();
+                        newExheader.Should().BeEquivalentTo(exheader, $"because the exheader in partition {i} should have been rebuilt correctly");
+                    }
+                }
+            }
+        }
+
         private async Task AssertDirectoriesEqual(string directory1, ThreeDsRom fileSystem1, string directory2, ThreeDsRom filesystem2)
         {
             // Assume directory1 is good. It's sourced by a regular, non-rebuilt ROM, which should be covered by its own tests.

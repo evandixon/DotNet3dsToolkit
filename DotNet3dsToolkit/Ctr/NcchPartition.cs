@@ -46,7 +46,7 @@ namespace DotNet3dsToolkit.Ctr
             Header = header;
         }
 
-        public NcchPartition(RomFs romfs = null, ExeFs exefs = null, IReadOnlyBinaryDataAccessor exheader = null)
+        public NcchPartition(RomFs romfs = null, ExeFs exefs = null, NcchExtendedHeader exheader = null)
         {
             RomFs = romfs;
             ExeFs = exefs;
@@ -67,7 +67,7 @@ namespace DotNet3dsToolkit.Ctr
                 }                    
                 if (Header.ExHeaderSize > 0)
                 {
-                    ExHeader = data.GetReadOnlyDataReference(0x200, Header.ExHeaderSize);
+                    ExHeader = await NcchExtendedHeader.Load(data.GetReadOnlyDataReference(0x200, Header.ExHeaderSize));
                 }
             }
         }
@@ -76,7 +76,7 @@ namespace DotNet3dsToolkit.Ctr
 
         public ExeFs ExeFs { get; private set; } // Could be null if not applicable
         public RomFs RomFs { get; private set; } // Could be null if not applicable
-        public IReadOnlyBinaryDataAccessor ExHeader { get; private set; } // Could be null if not applicable
+        public NcchExtendedHeader ExHeader { get; private set; } // Could be null if not applicable
 
 
         public void Dispose()
