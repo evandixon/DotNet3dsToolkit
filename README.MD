@@ -7,15 +7,14 @@ Current features:
 * Extract decrypted CCI files
 * Extract decrypted CIA files
 * Extract decrypted CXI files
-* Extract decrypted RomFS files
-* Extract decrypted ExeFS files
+* Extract & Rebuild decrypted RomFS files
+* Extract & Rebuild decrypted ExeFS files
 * Allow reading data of individual files for all above formats without extraction
 
 Planned features:
 * Console interface
-* GUI (using Avalonia for cross-platform support)
+* GUI
 * Build ROMs
-* Allow reading of individual partitions without extraction
 
 ## Building
 

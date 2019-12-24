@@ -104,7 +104,7 @@ namespace DotNet3dsToolkit.Ctr
 
                 Magic = Encoding.ASCII.GetString(header, 0x100, 4);
                 ContentSize = BitConverter.ToInt32(header, 0x104);
-                PartitionId = BitConverter.ToInt32(header, 0x108);
+                PartitionId = BitConverter.ToInt64(header, 0x108);
                 MakerCode = BitConverter.ToInt16(header, 0x110);
                 Version = BitConverter.ToInt16(header, 0x112);
                 ContentLockSeedHash = BitConverter.ToInt32(header, 0x114);
@@ -145,6 +145,41 @@ namespace DotNet3dsToolkit.Ctr
 
                 RomFsSuperblockHash = new byte[0x20];
                 Array.Copy(header, 0x1E0, RomFsSuperblockHash, 0, 0x20);
+            }
+
+            public BinaryFile ToBinary()
+            {
+                var binary = new BinaryFile(new byte[0x200]);
+                binary.Write(0, 0x100, Signature);
+                binary.WriteString(0x100, Encoding.ASCII, Magic);
+                binary.WriteInt32(0x104, ContentSize);
+                binary.WriteInt64(0x108, PartitionId);
+                binary.WriteInt16(0x110, MakerCode);
+                binary.WriteInt16(0x112, Version);
+                binary.WriteInt32(0x114, ContentLockSeedHash);
+                binary.WriteInt64(0x118, ProgramId);
+                binary.Write(0x120, 0x10, Reserved1);
+                binary.Write(0x130, 0x20, LogoRegionHash);
+                binary.WriteString(0x150, Encoding.ASCII, ProductCode);
+                binary.Write(0x160, 0x20, ExHeaderHash);
+                binary.WriteInt32(0x180, ExHeaderSize);
+                binary.WriteInt32(0x184, Reserved2);
+                binary.Write(0x188, 0x8, Flags);
+                binary.WriteInt32(0x190, PlainRegionOffset);
+                binary.WriteInt32(0x194, PlainRegionSize);
+                binary.WriteInt32(0x198, LogoRegionOffset);
+                binary.WriteInt32(0x19C, LogoRegionSize);
+                binary.WriteInt32(0x1A0, ExeFsOffset);
+                binary.WriteInt32(0x1A4, ExeFsSize);
+                binary.WriteInt32(0x1A8, ExeFsHashRegionSize);
+                binary.WriteInt32(0x1AC, Reserved3);
+                binary.WriteInt32(0x1B0, RomFsOffset);
+                binary.WriteInt32(0x1B4, RomFsSize);
+                binary.WriteInt32(0x1B8, RomFsHashRegionSize);
+                binary.WriteInt32(0x1BC, Reserved4);
+                binary.Write(0x1C0, 0x20, ExeFsSuperblockHash);
+                binary.Write(0x1E0, 0x20, RomFsSuperblockHash);
+                return binary;
             }
 
             /// <summary>

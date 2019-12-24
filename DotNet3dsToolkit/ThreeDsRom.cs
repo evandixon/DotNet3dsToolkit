@@ -53,6 +53,11 @@ namespace DotNet3dsToolkit
             Container = new SingleNcchPartitionContainer(new NcchPartition(romFs));
         }
 
+        public ThreeDsRom(ExeFs exefs)
+        {
+            Container = new SingleNcchPartitionContainer(new NcchPartition(exefs: exefs));
+        }
+
         private INcchPartitionContainer Container { get; set; }
 
         public NcchPartition[] Partitions => Container.Partitions;
@@ -464,7 +469,7 @@ namespace DotNet3dsToolkit
             {
                 if (pathParts.Length == 2)
                 {
-                    return GetPartitionOrDefault(partitionId)?.ExeFs?.GetDataReference(pathParts.Last());
+                    return new BinaryFile(GetPartitionOrDefault(partitionId)?.ExeFs?.Files[pathParts.Last()].RawData);
                 }
 
                 return null;
@@ -803,9 +808,8 @@ namespace DotNet3dsToolkit
                     break;
                 case "exefs" when parts.Length == 1:
                 case "exefs-partition-0" when parts.Length == 1:
-                    foreach (var file in GetPartitionOrDefault(0)?.ExeFs?.Headers
-                        ?.Where(h => searchPatternRegex.IsMatch(h.Filename) && !string.IsNullOrWhiteSpace(h.Filename))
-                        ?.Select(h => h.Filename))
+                    foreach (var file in GetPartitionOrDefault(0)?.ExeFs?.Files.Keys
+                        ?.Where(f => searchPatternRegex.IsMatch(f) && !string.IsNullOrWhiteSpace(f)))
                     {
                         output.Add("/ExeFS/" + file);
                     }
@@ -844,9 +848,8 @@ namespace DotNet3dsToolkit
                         var partitionNumRaw = dirName.Split("-".ToCharArray(), 3)[2];
                         if (int.TryParse(partitionNumRaw, out var partitionNum))
                         {
-                            foreach (var file in GetPartitionOrDefault(partitionNum)?.ExeFs?.Headers
-                             ?.Where(h => searchPatternRegex.IsMatch(h.Filename) && !string.IsNullOrWhiteSpace(h.Filename))
-                             ?.Select(h => h.Filename))
+                            foreach (var file in GetPartitionOrDefault(partitionNum)?.ExeFs?.Files.Keys
+                             ?.Where(f => searchPatternRegex.IsMatch(f) && !string.IsNullOrWhiteSpace(f)))
                             {
                                 output.Add("/ExeFS/" + file);
                             }
