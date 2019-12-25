@@ -228,7 +228,7 @@ namespace DotNet3dsToolkit.Ctr
                 const int bufferSize = 1024 * 1024;
                 for (int i = 0; i < romFs.Length; i += bufferSize)
                 {
-                    int length = (int)Math.Min(bufferSize, romFs.Length - offset);
+                    int length = (int)Math.Min(bufferSize, romFs.Length - i);
                     var block = await romFs.ReadArrayAsync(i, length);
                     await data.WriteAsync(offset, block);
                     offset += length;
