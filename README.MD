@@ -6,7 +6,7 @@ It is currently being rewritten in .Net Core 2.2 (and .Net Standard 2.1 once it'
 Current features:
 * Extract decrypted CCI files
 * Extract decrypted CIA files
-* Extract decrypted CXI files
+* Extract & Rebuild decrypted CXI files
 * Extract & Rebuild decrypted RomFS files
 * Extract & Rebuild decrypted ExeFS files
 * Allow reading data of individual files for all above formats without extraction
@@ -15,13 +15,6 @@ Planned features:
 * Console interface
 * GUI
 * Build ROMs
-
-## Building
-
-Requires adding the following NuGet package:
-```
-https://www.myget.org/F/skyeditor/api/v3/index.json
-```
 
 ## Credits
 

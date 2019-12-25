@@ -184,8 +184,17 @@ namespace DotNet3dsToolkit.Ctr
                 fileIndex += 1;
             }
 
-            data.InsertRange(0, data);
+            data.InsertRange(0, header);
             return data.ToArray();
+        }
+
+        public long GetBinaryLength()
+        {
+            return 0x200 // Header
+                + Files.Values
+                .Where(f => f != null)
+                .Select(f => f.RawData.Length + (0x200 - f.RawData.Length % 0x200))
+                .Sum();
         }
 
         public bool AreAllHashesValid()
@@ -193,6 +202,23 @@ namespace DotNet3dsToolkit.Ctr
             return Files.Values
                 .Select(f => f.IsFileHashValid())
                 .All(valid => valid);
+        }
+
+        public static byte[] GetSuperblockHash(SHA256 sha, byte[] data)
+        {
+            return sha.ComputeHash(data, 0, 0x200);
+        }
+
+        public byte[] GetSuperblockHash(SHA256 sha)
+        {
+            var data = ToByteArray();
+            return GetSuperblockHash(sha, data);
+        }
+
+        public byte[] GetSuperblockHash()
+        {
+            using var sha = SHA256.Create();
+            return GetSuperblockHash(sha);
         }
 
         protected class ExeFsHeader

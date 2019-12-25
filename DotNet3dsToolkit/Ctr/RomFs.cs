@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -233,6 +234,12 @@ namespace DotNet3dsToolkit.Ctr
 
             await Task.WhenAll(directoryExtractTasks);
             await Task.WhenAll(fileExtractTasks);
+        }
+
+        public static async Task<byte[]> GetSuperblockHash(SHA256 sha, IReadOnlyBinaryDataAccessor data, RomFsHeader header)
+        {
+            var buffer = await data.ReadArrayAsync(0, header.MasterHashSize);
+            return sha.ComputeHash(buffer);
         }
 
         public void Dispose()
