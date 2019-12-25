@@ -16,13 +16,6 @@ Planned features:
 * GUI
 * Build ROMs
 
-## Building
-
-Requires adding the following NuGet package:
-```
-https://www.myget.org/F/skyeditor/api/v3/index.json
-```
-
 ## Credits
 
 * 3dbrew.org for documentation

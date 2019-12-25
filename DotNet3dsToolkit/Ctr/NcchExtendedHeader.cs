@@ -4,6 +4,7 @@ using SkyEditor.Utilities.AsyncFor;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -11,6 +12,11 @@ namespace DotNet3dsToolkit.Ctr
 {
     public class NcchExtendedHeader
     {
+        /// <summary>
+        /// Size of the data being hashed
+        /// </summary>
+        public static readonly int ExHeaderDataSize = 0x400;
+
         public static async Task<NcchExtendedHeader> Load(IReadOnlyBinaryDataAccessor data)
         {
             var header = new NcchExtendedHeader
@@ -114,6 +120,22 @@ namespace DotNet3dsToolkit.Ctr
             return buffer;
         }
 
+        public static byte[] GetSuperblockHash(SHA256 sha, byte[] data)
+        {
+            return sha.ComputeHash(data, 0, ExHeaderDataSize);
+        }
+
+        public byte[] GetSuperblockHash(SHA256 sha)
+        {
+            var data = ToByteArray();
+            return GetSuperblockHash(sha, data);
+        }
+
+        public byte[] GetSuperblockHash()
+        {
+            using var sha = SHA256.Create();
+            return GetSuperblockHash(sha);
+        }
 
         #region Child Classes
         public class CodeSetInfo
