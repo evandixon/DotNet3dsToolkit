@@ -13,6 +13,11 @@ namespace DotNet3dsToolkit.Ctr
     /// </remarks>
     public abstract class NcsdHeader
     {
+        public NcsdHeader()
+        {
+            Magic = "NCSD";
+        }
+
         public NcsdHeader(byte[] header)
         {
             if (header == null)
@@ -49,29 +54,43 @@ namespace DotNet3dsToolkit.Ctr
         /// <summary>
         /// RSA-2048 SHA-256 signature of the NCSD header
         /// </summary>
-        public byte[] Signature { get; private set; } // Offset: 0, Size: 0x100
+        public byte[] Signature { get; set; } // Offset: 0, Size: 0x100
 
         /// <summary>
         /// Magic Number 'NCSD'
         /// </summary>
-        public string Magic { get; private set; } // Offset: 0x100, Size: 0x4
+        public string Magic { get; set; } // Offset: 0x100, Size: 0x4
 
         /// <summary>
         /// Size of the NCSD image, in media units (1 media unit = 0x200 bytes)
         /// </summary>
-        public int ImageSize { get; private set; } // Offset: 0x104, Size: 0x4
+        public int ImageSize { get; set; } // Offset: 0x104, Size: 0x4
 
-        public long MediaId { get; private set; } // Offset: 0x108, Size: 0x8
+        public long MediaId { get; set; } // Offset: 0x108, Size: 0x8
 
         /// <summary>
         /// Partitions FS type (0=None, 1=Normal, 3=FIRM, 4=AGB_FIRM save)
         /// </summary>
-        public long PartitionsFsType { get; private set; } // Offset: 0x110, Size: 0x8
+        public long PartitionsFsType { get; set; } // Offset: 0x110, Size: 0x8
 
         // Crypt type offset 0x118, size of each entry: 1 byte
         // Offset and length in media units offset: 0x120, length 4 bytes each
 
-        public NcsdPartitionInfo[] Partitions { get; private set; }
+        public NcsdPartitionInfo[] Partitions { get; set; }
 
+        public virtual byte[] ToByteArray()
+        {
+            var buffer = new byte[0x200];
+            Signature.CopyTo(buffer, 0);
+            Encoding.ASCII.GetBytes(Magic).CopyTo(buffer, 0x100);
+            BitConverter.GetBytes(ImageSize).CopyTo(buffer, 0x104);
+            BitConverter.GetBytes(MediaId).CopyTo(buffer, 0x108);
+            BitConverter.GetBytes(PartitionsFsType).CopyTo(buffer, 0x110);
+            for (int i = 0; i < Partitions.Length; i++)
+            {
+                Partitions[i].ToByteArray().CopyTo(buffer, 0x118);
+            }
+            return buffer;
+        }
     }
 }

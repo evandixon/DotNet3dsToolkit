@@ -31,38 +31,60 @@ namespace DotNet3dsToolkit.Ctr
 
         public static async Task<NcsdFile> Load(IReadOnlyBinaryDataAccessor data)
         {
-            var file = new NcsdFile(data);
-            await file.Initalize();
-            return file;
-        }
+            var header = new CartridgeNcsdHeader(await data.ReadArrayAsync(0, 0x1500));
+            var partitions = new NcchPartition[header.Partitions.Length];
 
-        public NcsdFile(IReadOnlyBinaryDataAccessor data)
-        {
-            NcsdData = data ?? throw new ArgumentNullException(nameof(data));
-        }
-
-        public async Task Initalize()
-        {
-            // To-do: determine which NCSD header to use
-            Header = new CartridgeNcsdHeader(await NcsdData.ReadArrayAsync(0, 0x1500));
-
-            Partitions = new NcchPartition[Header.Partitions.Length];
-
-            await Task.WhenAll(Enumerable.Range(0, Header.Partitions.Length).Select(async i =>
+            await Task.WhenAll(Enumerable.Range(0, header.Partitions.Length).Select(async i =>
             {
-                var partitionStart = (long)Header.Partitions[i].Offset * MediaUnitSize;
-                var partitionLength = (long)Header.Partitions[i].Length * MediaUnitSize;
-                Partitions[i] = await NcchPartition.Load(NcsdData.GetReadOnlyDataReference(partitionStart, partitionLength));
+                var partitionStart = (long)header.Partitions[i].Offset * MediaUnitSize;
+                var partitionLength = (long)header.Partitions[i].Length * MediaUnitSize;
+                partitions[i] = await NcchPartition.Load(data.GetReadOnlyDataReference(partitionStart, partitionLength));
             }));
+
+            return new NcsdFile(header, partitions);
         }
 
-        private IReadOnlyBinaryDataAccessor NcsdData { get; set; }
+        public NcsdFile(NcsdHeader header, params NcchPartition[] partitions)
+        {
+            Header = header ?? throw new ArgumentNullException(nameof(partitions));
+
+            if ((partitions?.Length ?? 0) == 0)
+            {
+                throw new ArgumentException("Must provider at least one partition", nameof(partitions));
+            }
+
+            if (partitions.Length > 8)
+            {
+                throw new ArgumentException("NCSD files cannot have more than 8 partitions", nameof(partitions));
+            }
+
+            Partitions = partitions;
+        }
 
         public NcsdHeader Header { get; set; }
 
         public NcchPartition[] Partitions { get; set; }
 
         public bool IsDlcContainer => false;
+
+        public void RecalculateCartridgeSize()
+        {
+            var romFsFileSizes = Partitions.Where(p => p.RomFs != null).Select(p => p.RomFs.GetTotalFileSize()).Sum();
+            var exeFsFileSizes = Partitions.Where(P => P.ExeFs != null).Select(p => p.ExeFs.Files.Values.Select(f => f.RawData.Length).Sum()).Sum();
+            var totalSize = romFsFileSizes + exeFsFileSizes;
+            long cartridgeSize = (long)Math.Pow(2, Math.Ceiling(Math.Log(totalSize * 0x200) / Math.Log(2)));
+            var cartridgeSizeInMediaUnits = (cartridgeSize + 0x200 - 1) / 0x200;
+            Header.ImageSize = (int)cartridgeSizeInMediaUnits;
+        }
+
+        /// <summary>
+        /// Writes the current state of the NCSD partition to the given binary data accessor
+        /// </summary>
+        /// <param name="data">Data accessor to receive the binary data</param>
+        public async Task WriteBinary(IWriteOnlyBinaryDataAccessor data)
+        {
+            throw new NotImplementedException();
+        }
 
         public void Dispose()
         {

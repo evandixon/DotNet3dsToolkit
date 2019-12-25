@@ -559,6 +559,12 @@ namespace DotNet3dsToolkit
             var firstDirectory = parts[0].ToLower();
             switch (firstDirectory)
             {
+                case "ncsdheader.bin":
+                    if (Container is NcsdFile ncsd)
+                    {
+                        dataReference = new BinaryFile(ncsd.Header.ToByteArray());
+                    }
+                    break;
                 case "exefs-0":
                 case "exefs":
                     dataReference = getExeFsDataReference(parts, 0);
@@ -859,6 +865,10 @@ namespace DotNet3dsToolkit
                     {
                         for (int i = 0; i < Partitions.Length; i++)
                         {
+                            if (Container is NcsdFile ncsd)
+                            {
+                                output.Add("NcsdHeader.bin");
+                            }
                             if (Partitions[i].Header != null)
                             {
                                 var headerName = GetHeaderFileName(i);
