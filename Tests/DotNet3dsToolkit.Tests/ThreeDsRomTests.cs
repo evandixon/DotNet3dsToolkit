@@ -159,11 +159,12 @@ namespace DotNet3dsToolkit.Tests
 
             for (int i = 0; i < originalRom.Partitions.Length; i++)
             {
-                var partition = originalRom.Partitions[i]?.ExeFs;
-                if (partition != null)
+                var exefs = originalRom.Partitions[i]?.ExeFs;
+                if (exefs != null)
                 {
                     var exeFsDirName = "/" + ThreeDsRom.GetExeFsDirectoryName(i);
-                    using var newRom = new ThreeDsRom(await ExeFs.Build(exeFsDirName, originalRom), i);
+                    using var data = new BinaryFile(exefs.ToByteArray());
+                    using var newRom = new ThreeDsRom(await ExeFs.Load(data), i);
                     await AssertDirectoriesEqual(exeFsDirName, originalRom, exeFsDirName, newRom);
                 }
             }
@@ -210,6 +211,8 @@ namespace DotNet3dsToolkit.Tests
                     var exeFsDirName = "/" + ThreeDsRom.GetExeFsDirectoryName(i);
                     var headerFilename = "/" + ThreeDsRom.GetHeaderFileName(i);
                     var exHeaderFilename = "/" + ThreeDsRom.GetExHeaderFileName(i);
+                    var plainRegionFilename = "/" + ThreeDsRom.GetPlainRegionFileName(i);
+                    var logoFilename = "/" + ThreeDsRom.GetLogoFileName(i);
                     if (!originalRomFs.FileExists(exHeaderFilename))
                     {
                         exHeaderFilename = null;
@@ -222,28 +225,64 @@ namespace DotNet3dsToolkit.Tests
                     {
                         exeFsDirName = null;
                     }
-
-                    using var newPartition = await NcchPartition.Build(headerFilename, exHeaderFilename, exeFsDirName, romFsDirName, originalRom);
-                    using var newRom = new ThreeDsRom(newPartition, i);
-                    if (romFsDirName != null)
+                    if (!originalRomFs.DirectoryExists(plainRegionFilename))
                     {
-                        await AssertDirectoriesEqual(romFsDirName, originalRom, romFsDirName, newRom);
+                        plainRegionFilename = null;
                     }
-                    if (exeFsDirName != null)
+                    if (!originalRomFs.DirectoryExists(logoFilename))
                     {
-                        await AssertDirectoriesEqual(exeFsDirName, originalRom, exeFsDirName, newRom);
+                        logoFilename = null;
                     }
 
-                    var originalHeader = (originalRom as IFileSystem).ReadAllBytes($"/Header-{i}.bin");
-                    var newHeader = (newRom as IFileSystem).ReadAllBytes($"/Header-{i}.bin");
-                    UnsafeCompare(originalHeader, newHeader).Should().BeTrue();
-
-                    if (exHeaderFilename != null)
+                    var tempFilename = "ncch-rebuild-" + Path.GetFileName(filename) + ".cxi";
+                    try
                     {
-                        var originalExHeader = (originalRom as IFileSystem).ReadAllBytes($"/ExHeader-{i}.bin");
-                        var newExHeader = (newRom as IFileSystem).ReadAllBytes($"/ExHeader-{i}.bin");
-                        UnsafeCompare(originalExHeader, newExHeader).Should().BeTrue();
+                        using var newPartition = await NcchPartition.Build(headerFilename, exHeaderFilename, exeFsDirName, romFsDirName, plainRegionFilename, logoFilename, originalRom);
+                        using var savedPartitionStream = new FileStream(tempFilename, FileMode.OpenOrCreate);
+                        using var savedPartitionFile = new BinaryFile(savedPartitionStream);
+                        long fileSize = (long)Math.Pow(2, Math.Ceiling(Math.Log(newPartition.Header.RomFsSize * 0x200) / Math.Log(2)));
+                        savedPartitionFile.SetLength(fileSize);
+                        await newPartition.WriteBinary(savedPartitionFile);
+
+                        using var rebuiltPartition = await NcchPartition.Load(savedPartitionFile);
+
+                        using var newRom = new ThreeDsRom(rebuiltPartition, i);
+                        if (romFsDirName != null)
+                        {
+                            await AssertDirectoriesEqual(romFsDirName, originalRom, romFsDirName, newRom);
+                        }
+                        if (exeFsDirName != null)
+                        {
+                            await AssertDirectoriesEqual(exeFsDirName, originalRom, exeFsDirName, newRom);
+                        }
+
+                        if (exHeaderFilename != null)
+                        {
+                            var originalFile = (originalRom as IFileSystem).ReadAllBytes(exHeaderFilename);
+                            var newFile = (newRom as IFileSystem).ReadAllBytes(exHeaderFilename);
+                            UnsafeCompare(originalFile, newFile).Should().BeTrue();
+                        }
+                        if (plainRegionFilename != null)
+                        {
+                            var originalFile = (originalRom as IFileSystem).ReadAllBytes(plainRegionFilename);
+                            var newFile = (newRom as IFileSystem).ReadAllBytes(plainRegionFilename);
+                            UnsafeCompare(originalFile, newFile).Should().BeTrue();
+                        }
+                        if (logoFilename != null)
+                        {
+                            var originalFile = (originalRom as IFileSystem).ReadAllBytes(logoFilename);
+                            var newFile = (newRom as IFileSystem).ReadAllBytes(logoFilename);
+                            UnsafeCompare(originalFile, newFile).Should().BeTrue();
+                        }
                     }
+                    finally
+                    {
+                        if (File.Exists(tempFilename))
+                        {
+                            // Comment this line out to keep it around for debugging purposes
+                            //File.Delete(tempFilename);
+                        }
+                    }                   
                 }
             }
         }
@@ -279,7 +318,7 @@ namespace DotNet3dsToolkit.Tests
 
                 data1.Length.Should().Be(data2.Length, $"because file '{file}' should have the same size as file '{otherFile}' in both directories");
 
-                UnsafeCompare(data1, data2).Should().BeTrue();
+                UnsafeCompare(data1, data2).Should().BeTrue($"because file '{file}' should have the same contents as '{otherFile}'");
             });
         }
 

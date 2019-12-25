@@ -184,7 +184,7 @@ namespace DotNet3dsToolkit.Ctr
                 fileIndex += 1;
             }
 
-            data.InsertRange(0, data);
+            data.InsertRange(0, header);
             return data.ToArray();
         }
 

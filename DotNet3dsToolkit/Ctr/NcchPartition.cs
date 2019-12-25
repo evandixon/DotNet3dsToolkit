@@ -4,6 +4,7 @@ using SkyEditor.IO.FileSystem;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -48,7 +49,7 @@ namespace DotNet3dsToolkit.Ctr
         /// </summary>
         /// <param name="fileSystem">File system from which to load the files</param>
         /// <returns>A newly built NCCH partition</returns>
-        public static async Task<NcchPartition> Build(string headerFilename, string exHeaderFilename, string? exeFsDirectory, string? romFsDiretory, IFileSystem fileSystem, ExtractionProgressedToken progressToken = null)
+        public static async Task<NcchPartition> Build(string headerFilename, string exHeaderFilename, string? exeFsDirectory, string? romFsDiretory, string? plainRegionFilename, string? logoFilename, IFileSystem fileSystem, ExtractionProgressedToken progressToken = null)
         {
             ExtractionProgressedToken exefsToken = null;
             ExtractionProgressedToken romfsToken = null;
@@ -93,18 +94,26 @@ namespace DotNet3dsToolkit.Ctr
 
             var header = new NcchHeader(fileSystem.ReadAllBytes(headerFilename));
 
-            NcchExtendedHeader exHeader;
+            NcchExtendedHeader exHeader = null;
             if (!string.IsNullOrEmpty(exHeaderFilename))
             {
                 using var exHeaderData = new BinaryFile(fileSystem.ReadAllBytes(exHeaderFilename));
                 exHeader = await NcchExtendedHeader.Load(exHeaderData);
             }
-            else
-            {
-                exHeader = null;
-            }           
 
-            return new NcchPartition(await romFsTask, await exeFsTask, header, exHeader);
+            string plainRegion = null;
+            if (!string.IsNullOrEmpty(plainRegionFilename))
+            {
+                plainRegion = fileSystem.ReadAllText(plainRegionFilename);
+            }
+
+            byte[] logo = null;
+            if (!string.IsNullOrEmpty(logoFilename))
+            {
+                logo = fileSystem.ReadAllBytes(logoFilename);
+            }
+
+            return new NcchPartition(await romFsTask, await exeFsTask, header, exHeader, plainRegion, logo);
         }
 
         public NcchPartition(NcchHeader header)
@@ -112,12 +121,14 @@ namespace DotNet3dsToolkit.Ctr
             Header = header;
         }
 
-        public NcchPartition(RomFs romfs = null, ExeFs exefs = null, NcchHeader header = null, NcchExtendedHeader exheader = null)
+        public NcchPartition(RomFs romfs = null, ExeFs exefs = null, NcchHeader header = null, NcchExtendedHeader exheader = null, string plainRegion = null, byte[] logo = null)
         {
             RomFs = romfs;
             ExeFs = exefs;
             Header = header;
             ExHeader = exheader;
+            PlainRegion = plainRegion;
+            Logo = logo;
         }
 
         public async Task Initialize(IReadOnlyBinaryDataAccessor data)
@@ -179,11 +190,14 @@ namespace DotNet3dsToolkit.Ctr
             if (exheader != null)
             {
                 await data.WriteAsync(offset, exheader);
+                offset += exheader.Length;
             }
             if (plainRegion != null)
             {
                 plainRegionOffset = offset;
                 await data.WriteAsync(offset, plainRegion);
+                offset += plainRegion.Length;
+
                 var padding = new byte[0x200 - plainRegion.Length % 0x200];
                 await data.WriteAsync(offset, padding);
                 offset += padding.Length;
@@ -192,6 +206,8 @@ namespace DotNet3dsToolkit.Ctr
             {
                 logoRegionOffset = offset;
                 await data.WriteAsync(offset, Logo);
+                offset += Logo.Length;
+
                 var padding = new byte[0x200 - Logo.Length % 0x200];
                 await data.WriteAsync(offset, padding);
                 offset += padding.Length;
@@ -224,7 +240,7 @@ namespace DotNet3dsToolkit.Ctr
             }
 
             // Create a new header
-            using var sha = System.Security.Cryptography.SHA256.Create();
+            using var sha = SHA256.Create();
 
             var header = NcchHeader.Copy(this.Header);
             header.Signature = new byte[0x100]; // We lack the 3DS's private key, so leave out the signature
@@ -234,8 +250,22 @@ namespace DotNet3dsToolkit.Ctr
             {
                 header.LogoRegionHash = sha.ComputeHash(Logo);
             }
-            header.ExHeaderHash = NcchExtendedHeader.GetSuperblockHash(sha, exheader);
-            header.ExHeaderSize = NcchExtendedHeader.ExHeaderDataSize;
+            else
+            {
+                header.LogoRegionHash = new byte[0x20];
+            }
+
+            if (exheader != null)
+            {
+                header.ExHeaderHash = NcchExtendedHeader.GetSuperblockHash(sha, exheader);
+                header.ExHeaderSize = NcchExtendedHeader.ExHeaderDataSize;
+            }
+            else
+            {
+                header.ExHeaderHash = new byte[0x20];
+                header.ExHeaderSize = 0;
+            }
+
             header.PlainRegionOffset = (plainRegionOffset + MediaUnitSize - 1) / MediaUnitSize;
             header.PlainRegionSize = ((plainRegion?.Length ?? 0) + MediaUnitSize - 1) / MediaUnitSize;
             header.LogoRegionOffset = (logoRegionOffset + MediaUnitSize - 1) / MediaUnitSize;
@@ -246,10 +276,10 @@ namespace DotNet3dsToolkit.Ctr
             header.RomFsOffset = (romFsOffset + MediaUnitSize - 1) / MediaUnitSize;
             header.RomFsSize = ((int)(romFs?.Length ?? 0) + MediaUnitSize - 1) / MediaUnitSize;
             header.RomFsHashRegionSize = ((RomFs?.Header?.MasterHashSize ?? 0) + MediaUnitSize - 1) / MediaUnitSize;
-            header.ExeFsSuperblockHash = ExeFs?.GetSuperblockHash() ?? new byte[0];
-            header.RomFsSuperblockHash = RomFs != null ? await RomFs.GetSuperblockHash(sha, romFs, RomFs.Header) : new byte[0];
+            header.ExeFsSuperblockHash = ExeFs?.GetSuperblockHash() ?? new byte[0x20];
+            header.RomFsSuperblockHash = RomFs != null ? await RomFs.GetSuperblockHash(sha, romFs, RomFs.Header) : new byte[0x20];
 
-            var headerData = await Header.ToBinary().ReadArrayAsync();
+            var headerData = await header.ToBinary().ReadArrayAsync();
             await data.WriteAsync(0, headerData);
         }
 

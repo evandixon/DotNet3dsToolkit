@@ -311,6 +311,28 @@ namespace DotNet3dsToolkit
             }
         }
 
+        public static string GetPlainRegionFileName(int partitionId)
+        {
+            switch (partitionId)
+            {
+                case 0:
+                    return "PlainRegion.txt";
+                default:
+                    return "PlainRegion-" + partitionId.ToString() + ".txt";
+            }
+        }
+
+        public static string GetLogoFileName(int partitionId)
+        {
+            switch (partitionId)
+            {
+                case 0:
+                    return "Logo.bin";
+                default:
+                    return "Logo-" + partitionId.ToString() + ".bin";
+            }
+        }
+
         #region IDisposable Support
         private bool disposedValue = false; // To detect redundant calls
 
@@ -564,8 +586,14 @@ namespace DotNet3dsToolkit
                 case "header.bin":
                     dataReference = GetPartitionOrDefault(0)?.Header?.ToBinary();
                     break;
-                case "exheader.bin":                    
+                case "exheader.bin":
                     dataReference = GetPartitionOrDefault(0)?.ExHeader != null ? new BinaryFile(GetPartitionOrDefault(0)?.ExHeader.ToByteArray()) : null;
+                    break;
+                case "plainregion.txt":
+                    dataReference = GetPartitionOrDefault(0)?.PlainRegion != null ? new BinaryFile(Encoding.ASCII.GetBytes(GetPartitionOrDefault(0).PlainRegion)) : null;
+                    break;
+                case "logo.bin":
+                    dataReference = GetPartitionOrDefault(0)?.Logo != null ? new BinaryFile(GetPartitionOrDefault(0).Logo) : null;
                     break;
                 default:
                     if (firstDirectory.StartsWith("romfs-"))
@@ -598,6 +626,22 @@ namespace DotNet3dsToolkit
                         if (int.TryParse(partitionNumRaw, out var partitionNum))
                         {
                             dataReference = GetPartitionOrDefault(partitionNum)?.ExHeader != null ? new BinaryFile(GetPartitionOrDefault(partitionNum)?.ExHeader.ToByteArray()) : null;
+                        }
+                    }
+                    else if (firstDirectory.StartsWith("plainregion-"))
+                    {
+                        var partitionNumRaw = firstDirectory.Split("-".ToCharArray(), 2)[1].Split(".".ToCharArray(), 2)[0];
+                        if (int.TryParse(partitionNumRaw, out var partitionNum))
+                        {
+                            dataReference = GetPartitionOrDefault(partitionNum)?.PlainRegion != null ? new BinaryFile(Encoding.ASCII.GetBytes(GetPartitionOrDefault(partitionNum)?.PlainRegion)) : null;
+                        }
+                    }
+                    else if (firstDirectory.StartsWith("logo-"))
+                    {
+                        var partitionNumRaw = firstDirectory.Split("-".ToCharArray(), 2)[1].Split(".".ToCharArray(), 2)[0];
+                        if (int.TryParse(partitionNumRaw, out var partitionNum))
+                        {
+                            dataReference = GetPartitionOrDefault(partitionNum)?.Logo != null ? new BinaryFile(GetPartitionOrDefault(partitionNum)?.Logo) : null;
                         }
                     }
                     break;
@@ -829,6 +873,22 @@ namespace DotNet3dsToolkit
                                 if (!searchPatternRegex.IsMatch(exheaderName))
                                 {
                                     output.Add(exheaderName);
+                                }
+                            }
+                            if (Partitions[i].PlainRegion != null)
+                            {
+                                var plainRegionName = GetPlainRegionFileName(i);
+                                if (!searchPatternRegex.IsMatch(plainRegionName))
+                                {
+                                    output.Add(plainRegionName);
+                                }
+                            }
+                            if (Partitions[i].Logo != null)
+                            {
+                                var logoName = GetLogoFileName(i);
+                                if (!searchPatternRegex.IsMatch(logoName))
+                                {
+                                    output.Add(logoName);
                                 }
                             }
                             if (Partitions[i].ExeFs != null)
