@@ -6,6 +6,9 @@ namespace DotNet3dsToolkit.Ctr
 {
     public struct NcsdPartitionInfo
     {
+        /// <summary>
+        /// Partitions FS type (0=None, 1=Normal, 3=FIRM, 4=AGB_FIRM save)
+        /// </summary>
         public byte CryptType { get; set; }
 
         /// <summary>
@@ -17,14 +20,5 @@ namespace DotNet3dsToolkit.Ctr
         /// Data length in media units (1 media unit = 0x200 bytes)
         /// </summary>
         public int Length { get; set; }
-
-        public byte[] ToByteArray()
-        {
-            var buffer = new byte[9];
-            buffer[0] = CryptType;
-            BitConverter.GetBytes(Offset).CopyTo(buffer, 1);
-            BitConverter.GetBytes(Length).CopyTo(buffer, 5);
-            return buffer;
-        }
     }
 }

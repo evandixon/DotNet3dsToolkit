@@ -88,7 +88,9 @@ namespace DotNet3dsToolkit.Ctr
             BitConverter.GetBytes(PartitionsFsType).CopyTo(buffer, 0x110);
             for (int i = 0; i < Partitions.Length; i++)
             {
-                Partitions[i].ToByteArray().CopyTo(buffer, 0x118);
+                buffer[0x118 + i] = Partitions[i].CryptType;
+                BitConverter.GetBytes(Partitions[i].Offset).CopyTo(buffer, 0x120 + (i * 2) * 4);
+                BitConverter.GetBytes(Partitions[i].Length).CopyTo(buffer, 0x120 + (i * 2 + 1) * 4);
             }
             return buffer;
         }

@@ -81,9 +81,39 @@ namespace DotNet3dsToolkit.Ctr
         /// Writes the current state of the NCSD partition to the given binary data accessor
         /// </summary>
         /// <param name="data">Data accessor to receive the binary data</param>
-        public async Task WriteBinary(IWriteOnlyBinaryDataAccessor data)
+        public async Task WriteBinary(IBinaryDataAccessor data)
         {
-            throw new NotImplementedException();
+            long offset = 0x4000;
+            var partitionHeaders = new List<NcsdPartitionInfo>();
+            for (int i = 0; i < Partitions.Length; i++)
+            {
+                if (Partitions[i] != null)
+                {
+                    var bytesWritten = await Partitions[i].WriteBinary(data.GetDataReference(offset, data.Length));
+                    partitionHeaders.Add(new NcsdPartitionInfo
+                    {
+                        CryptType = 0,
+                        Length = (int)((bytesWritten + 0x200 - 1) / 0x200),
+                        Offset = (int)((offset + 0x200 - 1) / 0x200)
+                    });
+                    offset += bytesWritten + (0x200 - (bytesWritten % 0x200));
+                }
+                else
+                {
+                    partitionHeaders.Add(new NcsdPartitionInfo
+                    {
+                        CryptType = 0,
+                        Length = 0,
+                        Offset = 0
+                    });
+                }
+            }
+
+            Header.Partitions = partitionHeaders.ToArray();
+
+            var headerData = Header.ToByteArray();
+            await data.WriteAsync(0, headerData);
+            await data.WriteAsync(headerData.Length, Enumerable.Repeat<byte>(0xFF, 0x4000 - headerData.Length).ToArray());
         }
 
         public void Dispose()

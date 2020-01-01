@@ -170,7 +170,8 @@ namespace DotNet3dsToolkit.Ctr
         /// Writes the current state of the NCCH partition to the given binary data accessor
         /// </summary>
         /// <param name="data">Data accessor to receive the binary data</param>
-        public async Task WriteBinary(IWriteOnlyBinaryDataAccessor data)
+        /// <returns>A long representing the total length of data written</returns>
+        public async Task<long> WriteBinary(IWriteOnlyBinaryDataAccessor data)
         {
             // Get the data
             var exheader = ExHeader?.ToByteArray();
@@ -281,6 +282,8 @@ namespace DotNet3dsToolkit.Ctr
 
             var headerData = await header.ToBinary().ReadArrayAsync();
             await data.WriteAsync(0, headerData);
+
+            return offset;
         }
 
         public void Dispose()
