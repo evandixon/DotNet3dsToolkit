@@ -14,14 +14,14 @@ namespace DotNet3dsToolkit.RomFsBuilder
     {
         private const int PADDING_ALIGN = 16;
 
-        public static void BuildRomFS(string rootDirectory, IFileSystem fileSystem, Stream outputStream, ExtractionProgressedToken progressToken = null)
+        public static void BuildRomFS(string rootDirectory, IFileSystem fileSystem, Stream outputStream, ProcessingProgressedToken progressToken = null)
         {
             var RomFiles = RomfsFile.LoadFromFileSystem(rootDirectory, fileSystem);
             var metadata = RomFsMetadataBuilder.BuildRomFSHeader(RomFiles, rootDirectory, fileSystem);
             MakeRomFSData(outputStream, fileSystem, RomFiles, metadata, progressToken);
         }
 
-        private static void MakeRomFSData(Stream outputStream, IFileSystem fileSystem, List<RomfsFile> RomFiles, byte[] metadata, ExtractionProgressedToken progressToken = null)
+        private static void MakeRomFSData(Stream outputStream, IFileSystem fileSystem, List<RomfsFile> RomFiles, byte[] metadata, ProcessingProgressedToken progressToken = null)
         {
             // Computing IVFC Header Data...
             var ivfcLevels = new IvfcLevelLocation[3];
@@ -68,7 +68,7 @@ namespace DotNet3dsToolkit.RomFsBuilder
             // The maximum will be the total file count and each ivfc block
             if (progressToken != null)
             {
-                progressToken.ExtractedFileCount = 0;
+                progressToken.ProcessedFileCount = 0;
                 progressToken.TotalFileCount = RomFiles.Count + ivfcLevels.Select(l => (int)(l.DataSize / l.HashBlockSize)).Sum();
             }
 
@@ -88,7 +88,7 @@ namespace DotNet3dsToolkit.RomFsBuilder
 
                 if (progressToken != null)
                 {
-                    progressToken.ExtractedFileCount += 1;
+                    progressToken.ProcessedFileCount += 1;
                 }
             }
 
@@ -102,7 +102,7 @@ namespace DotNet3dsToolkit.RomFsBuilder
                 byte[] buffer = new byte[(int)ivfcLevels[i].HashBlockSize];
                 if (progressToken != null)
                 {
-                    progressToken.ExtractedFileCount = 0;
+                    progressToken.ProcessedFileCount = 0;
                     progressToken.TotalFileCount = (int)(ivfcLevels[i].DataSize / ivfcLevels[i].HashBlockSize);
                 }
                 for (long ofs = 0; ofs < (long)ivfcLevels[i].DataSize; ofs += ivfcLevels[i].HashBlockSize)
@@ -117,7 +117,7 @@ namespace DotNet3dsToolkit.RomFsBuilder
 
                     if (progressToken != null)
                     {
-                        progressToken.ExtractedFileCount += 1;
+                        progressToken.ProcessedFileCount += 1;
                     }
                 }
                 if (i == 2)

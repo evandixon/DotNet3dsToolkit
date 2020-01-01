@@ -4,7 +4,7 @@
 It is currently being rewritten in .Net Core 2.2 (and .Net Standard 2.1 once it's out). Please see the Old folder for the original source and details.
 
 Current features:
-* Extract decrypted CCI files
+* Extract & Rebuild decrypted CCI (aka .3ds) files
 * Extract decrypted CIA files
 * Extract & Rebuild decrypted CXI files
 * Extract & Rebuild decrypted RomFS files
@@ -12,9 +12,12 @@ Current features:
 * Allow reading data of individual files for all above formats without extraction
 
 Planned features:
+* Virtual file system to allow (the illusion of) in-place editing of ROMs through IFileSystem interface
 * Console interface
 * GUI
-* Build ROMs
+* Rebuild CIA files
+* Allow converting between CCI/CIA 
+* Extract & Rebuild CSU files
 
 ## Credits
 

@@ -56,7 +56,7 @@ namespace DotNet3dsToolkit.Ctr
         /// <param name="directory">Directory from which to load the files</param>
         /// <param name="fileSystem">File system from which to load the files</param>
         /// <returns>A newly built ROM file system</returns>
-        public static async Task<RomFs> Build(string directory, IFileSystem fileSystem, ExtractionProgressedToken progressToken = null)
+        public static async Task<RomFs> Build(string directory, IFileSystem fileSystem, ProcessingProgressedToken progressToken = null)
         {
             Stream stream = null;
             string tempFilename = null;
@@ -184,7 +184,7 @@ namespace DotNet3dsToolkit.Ctr
 
         private long BodySize { get; }
 
-        public async Task ExtractFiles(string directoryName, IFileSystem fileSystem, ExtractionProgressedToken progressReportToken = null)
+        public async Task ExtractFiles(string directoryName, IFileSystem fileSystem, ProcessingProgressedToken progressReportToken = null)
         {
             if (progressReportToken != null)
             {
@@ -210,7 +210,7 @@ namespace DotNet3dsToolkit.Ctr
                         fileSystem.WriteAllBytes(Path.Combine(destDirectory, f.Name), await f.GetDataReference().ReadArrayAsync());
                         if (progressReportToken != null)
                         {
-                            progressReportToken.IncrementExtractedFileCount();
+                            progressReportToken.IncrementProcessedFileCount();
                         }
                     })),
                     Task.WhenAll(dir.ChildDirectories.Select(async d => {
