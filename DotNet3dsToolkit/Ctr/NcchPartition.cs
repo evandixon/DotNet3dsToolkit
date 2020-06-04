@@ -33,7 +33,7 @@ namespace DotNet3dsToolkit.Ctr
 
         public static async Task<NcchPartition> Load(IReadOnlyBinaryDataAccessor data)
         {
-            NcchHeader header = null;
+            NcchHeader? header = null;
             if (data.Length > 0)
             {
                 header = new NcchHeader(await data.ReadArrayAsync(0, 0x200));
@@ -49,10 +49,10 @@ namespace DotNet3dsToolkit.Ctr
         /// </summary>
         /// <param name="fileSystem">File system from which to load the files</param>
         /// <returns>A newly built NCCH partition</returns>
-        public static async Task<NcchPartition> Build(string headerFilename, string exHeaderFilename, string? exeFsDirectory, string? romFsDiretory, string? plainRegionFilename, string? logoFilename, IFileSystem fileSystem, ExtractionProgressedToken progressToken = null)
+        public static async Task<NcchPartition> Build(string headerFilename, string exHeaderFilename, string? exeFsDirectory, string? romFsDiretory, string? plainRegionFilename, string? logoFilename, IFileSystem fileSystem, ExtractionProgressedToken? progressToken = null)
         {
-            ExtractionProgressedToken exefsToken = null;
-            ExtractionProgressedToken romfsToken = null;
+            ExtractionProgressedToken? exefsToken = null;
+            ExtractionProgressedToken? romfsToken = null;
             void ReportProgress()
             {
                 if (progressToken != null)
@@ -116,12 +116,12 @@ namespace DotNet3dsToolkit.Ctr
             return new NcchPartition(await romFsTask, await exeFsTask, header, exHeader, plainRegion, logo);
         }
 
-        public NcchPartition(NcchHeader header)
+        public NcchPartition(NcchHeader? header)
         {
             Header = header;
         }
 
-        public NcchPartition(RomFs romfs = null, ExeFs exefs = null, NcchHeader header = null, NcchExtendedHeader exheader = null, string plainRegion = null, byte[] logo = null)
+        public NcchPartition(RomFs? romfs = null, ExeFs? exefs = null, NcchHeader? header = null, NcchExtendedHeader? exheader = null, string? plainRegion = null, byte[]? logo = null)
         {
             RomFs = romfs;
             ExeFs = exefs;
@@ -138,15 +138,15 @@ namespace DotNet3dsToolkit.Ctr
             {
                 if (Header.ExeFsOffset > 0 && Header.ExeFsSize > 0)
                 {
-                    ExeFs = await ExeFs.Load(data.GetReadOnlyDataReference((long)Header.ExeFsOffset * MediaUnitSize, (long)Header.ExeFsSize * MediaUnitSize));
+                    ExeFs = await ExeFs.Load(data.Slice((long)Header.ExeFsOffset * MediaUnitSize, (long)Header.ExeFsSize * MediaUnitSize));
                 }
                 if (Header.RomFsOffset > 0 && Header.RomFsOffset > 0)
                 {
-                    RomFs = await RomFs.Load(data.GetReadOnlyDataReference((long)Header.RomFsOffset * MediaUnitSize, (long)Header.RomFsSize * MediaUnitSize));
+                    RomFs = await RomFs.Load(data.Slice((long)Header.RomFsOffset * MediaUnitSize, (long)Header.RomFsSize * MediaUnitSize));
                 }
                 if (Header.ExHeaderSize > 0)
                 {
-                    ExHeader = await NcchExtendedHeader.Load(data.GetReadOnlyDataReference(0x200, Header.ExHeaderSize));
+                    ExHeader = await NcchExtendedHeader.Load(data.Slice(0x200, Header.ExHeaderSize));
                 }
 
                 PlainRegion = await data.ReadStringAsync(Header.PlainRegionOffset * MediaUnitSize, Header.PlainRegionSize * MediaUnitSize, Encoding.ASCII);
@@ -156,11 +156,11 @@ namespace DotNet3dsToolkit.Ctr
 
         public IReadOnlyBinaryDataAccessor RawData { get; set; }
 
-        public NcchHeader Header { get; } // Could be null if this is an empty partition
+        public NcchHeader? Header { get; } // Could be null if this is an empty partition
 
-        public ExeFs ExeFs { get; private set; } // Could be null if not applicable
-        public RomFs RomFs { get; private set; } // Could be null if not applicable
-        public NcchExtendedHeader ExHeader { get; private set; } // Could be null if not applicable
+        public ExeFs? ExeFs { get; private set; } // Could be null if not applicable
+        public RomFs? RomFs { get; private set; } // Could be null if not applicable
+        public NcchExtendedHeader? ExHeader { get; private set; } // Could be null if not applicable
 
         public string PlainRegion { get; private set; }
 

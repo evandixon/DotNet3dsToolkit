@@ -25,11 +25,11 @@ namespace DotNet3dsToolkit.Ctr
                 Reserved1 = await data.ReadArrayAsync(8, 5),
                 Flag = await data.ReadByteAsync(0xD),
                 RemasterVersion = await data.ReadInt16Async(0xE),
-                TextCodeSetInfo = await CodeSetInfo.Load(data.GetReadOnlyDataReference(0x10, 0xC)),
+                TextCodeSetInfo = await CodeSetInfo.Load(data.Slice(0x10, 0xC)),
                 StackSize = await data.ReadInt32Async(0x1C),
-                ReadOnlyCodeSetInfo = await CodeSetInfo.Load(data.GetReadOnlyDataReference(0x20, 0xC)),
+                ReadOnlyCodeSetInfo = await CodeSetInfo.Load(data.Slice(0x20, 0xC)),
                 Reserved2 = await data.ReadInt32Async(0x2C),
-                DataCodeSetInfo = await CodeSetInfo.Load(data.GetReadOnlyDataReference(0x30, 0xC)),
+                DataCodeSetInfo = await CodeSetInfo.Load(data.Slice(0x30, 0xC)),
                 BssSize = await data.ReadInt32Async(0x3C)
             };
 
@@ -40,10 +40,10 @@ namespace DotNet3dsToolkit.Ctr
             });
             header.DependencyModuleIds = moduleIds;
 
-            header.SystemInformation = await SystemInfo.Load(data.GetReadOnlyDataReference(0x1C0, 0x40));
-            header.LocalSystemCapabilities = await Arm11LocalSystemCapabilities.Load(data.GetReadOnlyDataReference(0x200, 0x170));
-            header.KernelCapabilities = await Arm11KernelCapabilities.Load(data.GetReadOnlyDataReference(0x370, 0x80));
-            header.AccessControl = await Arm9AccessControl.Load(data.GetReadOnlyDataReference(0x3F0, 0x10));
+            header.SystemInformation = await SystemInfo.Load(data.Slice(0x1C0, 0x40));
+            header.LocalSystemCapabilities = await Arm11LocalSystemCapabilities.Load(data.Slice(0x200, 0x170));
+            header.KernelCapabilities = await Arm11KernelCapabilities.Load(data.Slice(0x370, 0x80));
+            header.AccessControl = await Arm9AccessControl.Load(data.Slice(0x3F0, 0x10));
             header.AccessDescSignature = await data.ReadArrayAsync(0x400, 0x100);
             header.NcchHdrPublicKey = await data.ReadArrayAsync(0x500, 0x100);
             header.Aci = await data.ReadArrayAsync(0x600, 0x200);
@@ -211,7 +211,7 @@ namespace DotNet3dsToolkit.Ctr
                     Flag0 = await data.ReadByteAsync(0xE),
                     Priority = await data.ReadByteAsync(0xF),
                     ResourceLimitDescriptors = await data.ReadArrayAsync(0x10, 0x20),
-                    StorageInformation = await StorageInfo.Load(data.GetReadOnlyDataReference(0x30, 0x20)),
+                    StorageInformation = await StorageInfo.Load(data.Slice(0x30, 0x20)),
 
                 };
 

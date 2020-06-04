@@ -3,6 +3,7 @@ using DotNet3dsToolkit.Infrastructure;
 using SkyEditor.IO;
 using SkyEditor.IO.Binary;
 using SkyEditor.IO.FileSystem;
+using SkyEditor.IO.FileSystem.Internal;
 using SkyEditor.Utilities.AsyncFor;
 using System;
 using System.Collections.Generic;
@@ -14,7 +15,7 @@ using System.Threading.Tasks;
 
 namespace DotNet3dsToolkit
 {
-    public class ThreeDsRom : IFileSystem, IDisposable
+    public class ThreeDsRom : IExtendedFileSystem, IDisposable
     {
         private const int MediaUnitSize = 0x200;
 
@@ -67,7 +68,7 @@ namespace DotNet3dsToolkit
 
         public NcchPartition[] Partitions => Container.Partitions;
 
-        private BinaryFile RawData { get; set; }
+        private BinaryFile? RawData { get; set; }
 
         private IFileSystem CurrentFileSystem { get; set; }
 
@@ -133,7 +134,7 @@ namespace DotNet3dsToolkit
             await this.OpenFile(filename, CurrentFileSystem);
         }
 
-        public NcchPartition GetPartitionOrDefault(int partitionIndex)
+        public NcchPartition? GetPartitionOrDefault(int partitionIndex)
         {
             if (Partitions.Length > partitionIndex)
             {
@@ -145,9 +146,9 @@ namespace DotNet3dsToolkit
             }
         }
 
-        public async Task ExtractFiles(string directoryName, IFileSystem fileSystem, ProgressReportToken progressReportToken = null)
+        public async Task ExtractFiles(string directoryName, IFileSystem fileSystem, ProgressReportToken? progressReportToken = null)
         {
-            List<ExtractionProgressedToken> extractionProgressedTokens = null;
+            List<ExtractionProgressedToken>? extractionProgressedTokens = null;
             if (progressReportToken != null)
             {
                 extractionProgressedTokens = new List<ExtractionProgressedToken>();
@@ -179,8 +180,8 @@ namespace DotNet3dsToolkit
 
                 if (partition.ExeFs != null)
                 {
-                    ExtractionProgressedToken exefsExtractionProgressedToken = null;
-                    if (exefsExtractionProgressedToken != null)
+                    ExtractionProgressedToken? exefsExtractionProgressedToken = null;
+                    if (exefsExtractionProgressedToken != null && extractionProgressedTokens != null)
                     {
                         exefsExtractionProgressedToken = new ExtractionProgressedToken();
                         exefsExtractionProgressedToken.FileCountChanged += onExtractionTokenProgressed;
@@ -191,8 +192,8 @@ namespace DotNet3dsToolkit
 
                 if (partition.Header != null)
                 {
-                    ExtractionProgressedToken exefsExtractionProgressedToken = null;
-                    if (exefsExtractionProgressedToken != null)
+                    ExtractionProgressedToken? exefsExtractionProgressedToken = null;
+                    if (exefsExtractionProgressedToken != null && extractionProgressedTokens != null)
                     {
                         exefsExtractionProgressedToken = new ExtractionProgressedToken();
                         exefsExtractionProgressedToken.TotalFileCount = 1;
@@ -208,8 +209,8 @@ namespace DotNet3dsToolkit
 
                 if (partition.ExHeader != null)
                 {
-                    ExtractionProgressedToken exefsExtractionProgressedToken = null;
-                    if (exefsExtractionProgressedToken != null)
+                    ExtractionProgressedToken? exefsExtractionProgressedToken = null;
+                    if (exefsExtractionProgressedToken != null && extractionProgressedTokens != null)
                     {
                         exefsExtractionProgressedToken = new ExtractionProgressedToken();
                         exefsExtractionProgressedToken.TotalFileCount = 1;
@@ -225,15 +226,15 @@ namespace DotNet3dsToolkit
 
                 if (partition.RomFs != null)
                 {
-                    ExtractionProgressedToken romfsExtractionProgressedToken = null;
-                    if (romfsExtractionProgressedToken != null)
+                    ExtractionProgressedToken? romfsExtractionProgressedToken = null;
+                    if (romfsExtractionProgressedToken != null && extractionProgressedTokens != null)
                     {
                         romfsExtractionProgressedToken = new ExtractionProgressedToken();
                         romfsExtractionProgressedToken.FileCountChanged += onExtractionTokenProgressed;
                         extractionProgressedTokens.Add(romfsExtractionProgressedToken);
                     }
 
-                    tasks.Add(partition.RomFs.ExtractFiles(Path.Combine(directoryName, GetRomFsDirectoryName(i)), fileSystem, romfsExtractionProgressedToken));
+                    tasks.Add(Task.Run(() => partition.RomFs.ExtractFiles(Path.Combine(directoryName, GetRomFsDirectoryName(i)), fileSystem, romfsExtractionProgressedToken)));
                 }
 
             }
@@ -247,7 +248,7 @@ namespace DotNet3dsToolkit
             }
         }
 
-        public async Task ExtractFiles(string directoryName, ProgressReportToken progressReportToken = null)
+        public async Task ExtractFiles(string directoryName, ProgressReportToken? progressReportToken = null)
         {
             await ExtractFiles(directoryName, this.CurrentFileSystem, progressReportToken);
         }
@@ -260,77 +261,61 @@ namespace DotNet3dsToolkit
             }
             else
             {
-                switch (partitionId)
+                return partitionId switch
                 {
-                    case 0:
-                        return "RomFS";
-                    case 1:
-                        return "Manual";
-                    case 2:
-                        return "DownloadPlay";
-                    case 6:
-                        return "N3DSUpdate";
-                    case 7:
-                        return "O3DSUpdate";
-                    default:
-                        return "RomFS-" + partitionId.ToString();
-                }
+                    0 => "RomFS",
+                    1 => "Manual",
+                    2 => "DownloadPlay",
+                    6 => "N3DSUpdate",
+                    7 => "O3DSUpdate",
+                    _ => "RomFS-" + partitionId.ToString(),
+                };
             }
         }
 
         public static string GetExeFsDirectoryName(int partitionId)
         {
-            switch (partitionId)
+            return partitionId switch
             {
-                case 0:
-                    return "ExeFS";
-                default:
-                    return "ExeFS-" + partitionId.ToString();
-            }
+                0 => "ExeFS",
+                _ => "ExeFS-" + partitionId.ToString(),
+            };
         }
 
         public static string GetHeaderFileName(int partitionId)
         {
-            switch (partitionId)
+            return partitionId switch
             {
-                case 0:
-                    return "Header.bin";
-                default:
-                    return "Header-" + partitionId.ToString() + ".bin";
-            }
+                0 => "Header.bin",
+                _ => "Header-" + partitionId.ToString() + ".bin",
+            };
         }
 
         public static string GetExHeaderFileName(int partitionId)
         {
-            switch (partitionId)
+            return partitionId switch
             {
-                case 0:
-                    return "ExHeader.bin";
-                default:
-                    return "ExHeader-" + partitionId.ToString() + ".bin";
-            }
+                0 => "ExHeader.bin",
+                _ => "ExHeader-" + partitionId.ToString() + ".bin",
+            };
         }
 
         public static string GetPlainRegionFileName(int partitionId)
         {
-            switch (partitionId)
+            return partitionId switch
             {
-                case 0:
-                    return "PlainRegion.txt";
-                default:
-                    return "PlainRegion-" + partitionId.ToString() + ".txt";
-            }
+                0 => "PlainRegion.txt",
+                _ => "PlainRegion-" + partitionId.ToString() + ".txt",
+            };
         }
 
         public static string GetLogoFileName(int partitionId)
         {
-            switch (partitionId)
+            return partitionId switch
             {
-                case 0:
-                    return "Logo.bin";
-                default:
-                    return "Logo-" + partitionId.ToString() + ".bin";
-            }
+                0 => "Logo.bin",
+                _ => "Logo-" + partitionId.ToString() + ".bin",
+            };
         }
 
         #region IDisposable Support
@@ -385,7 +370,7 @@ namespace DotNet3dsToolkit
             foreach (var item in parts)
             {
                 regexString.Append(Regex.Escape(item));
-                if (item != parts[parts.Length - 1])
+                if (item != parts.Last())
                 {
                     regexString.Append(".?");
                 }
@@ -439,7 +424,7 @@ namespace DotNet3dsToolkit
             get
             {
                 var path = new StringBuilder();
-                foreach (var item in _workingDirectoryParts)
+                foreach (var item in _workingDirectoryParts ?? Enumerable.Empty<string>())
                 {
                     if (!string.IsNullOrEmpty(item))
                     {
@@ -455,14 +440,14 @@ namespace DotNet3dsToolkit
                 _workingDirectoryParts = GetPathParts(value);
             }
         }
-        private string[] _workingDirectoryParts;
+        private string[]? _workingDirectoryParts;
 
         protected string[] GetPathParts(string path)
         {
             var parts = new List<string>();
 
             path = path.Replace('\\', '/');
-            if (!path.StartsWith("/") && !(_workingDirectoryParts.Length == 1 && _workingDirectoryParts[0] == string.Empty))
+            if (!path.StartsWith("/") && !(_workingDirectoryParts?.Length == 1 && _workingDirectoryParts[0] == string.Empty))
             {
                 parts.AddRange(_workingDirectoryParts);
             }
@@ -509,7 +494,7 @@ namespace DotNet3dsToolkit
             }
         }
 
-        private string GetVirtualPath(string path)
+        private string? GetVirtualPath(string path)
         {
             if (VirtualPath == null)
             {
@@ -518,7 +503,7 @@ namespace DotNet3dsToolkit
             return Path.Combine(VirtualPath, path.TrimStart('/'));
         }
 
-        private IReadOnlyBinaryDataAccessor GetDataReference(string[] parts, bool throwIfNotFound = true)
+        private IReadOnlyBinaryDataAccessor? GetDataReference(string[] parts, bool throwIfNotFound = true)
         {
             IReadOnlyBinaryDataAccessor getExeFsDataReference(string[] pathParts, int partitionId)
             {
@@ -530,7 +515,7 @@ namespace DotNet3dsToolkit
                 return null;
             }
 
-            IReadOnlyBinaryDataAccessor getRomFsDataReference(string[] pathParts, int partitionId)
+            IReadOnlyBinaryDataAccessor? getRomFsDataReference(string[] pathParts, int partitionId)
             {
                 var currentDirectory = Partitions[partitionId]?.RomFs?.Level3.RootDirectoryMetadataTable;
                 for (int i = 1; i < pathParts.Length - 1; i += 1)
@@ -542,7 +527,7 @@ namespace DotNet3dsToolkit
                     if (ReferenceEquals(currentDirectory, Partitions[partitionId].RomFs.Level3.RootDirectoryMetadataTable))
                     {
                         // The root RomFS directory doesn't contain files; those are located in the level 3
-                        return GetPartitionOrDefault(partitionId).RomFs.Level3.RootFiles.FirstOrDefault(f => string.Compare(f.Name, pathParts.Last(), true) == 0)?.GetDataReference();
+                        return GetPartitionOrDefault(partitionId)?.RomFs?.Level3?.RootFiles?.FirstOrDefault(f => string.Compare(f.Name, pathParts.Last(), true) == 0)?.GetDataReference();
                     }
                     else
                     {
@@ -554,7 +539,7 @@ namespace DotNet3dsToolkit
                 return null;
             }
 
-            IReadOnlyBinaryDataAccessor dataReference = null;
+            IReadOnlyBinaryDataAccessor? dataReference = null;
 
             var firstDirectory = parts[0].ToLower();
             switch (firstDirectory)
@@ -663,12 +648,12 @@ namespace DotNet3dsToolkit
             }
         }
 
-        long IFileSystem.GetFileLength(string filename)
+        long IReadOnlyFileSystem.GetFileLength(string filename)
         {
             return GetDataReference(GetPathParts(filename)).Length;
         }
 
-        bool IFileSystem.FileExists(string filename)
+        bool IReadOnlyFileSystem.FileExists(string filename)
         {
             var virtualPath = GetVirtualPath(filename);
             return (CurrentFileSystem != null && !string.IsNullOrEmpty(virtualPath) && CurrentFileSystem.FileExists(virtualPath))
@@ -777,7 +762,7 @@ namespace DotNet3dsToolkit
             }
         }
 
-        bool IFileSystem.DirectoryExists(string path)
+        bool IReadOnlyFileSystem.DirectoryExists(string path)
         {
             var virtualPath = GetVirtualPath(path);
             return !BlacklistedPaths.Contains(FixPath(path))
@@ -805,7 +790,7 @@ namespace DotNet3dsToolkit
             }
         }
 
-        string[] IFileSystem.GetFiles(string path, string searchPattern, bool topDirectoryOnly)
+        string[] IReadOnlyFileSystem.GetFiles(string path, string searchPattern, bool topDirectoryOnly)
         {
             var searchPatternRegex = new Regex(GetFileSearchRegex(searchPattern), RegexOptions.Compiled | RegexOptions.IgnoreCase);
             var parts = GetPathParts(path);
@@ -971,7 +956,7 @@ namespace DotNet3dsToolkit
             return output.ToArray();
         }
 
-        string[] IFileSystem.GetDirectories(string path, bool topDirectoryOnly)
+        string[] IReadOnlyFileSystem.GetDirectories(string path, bool topDirectoryOnly)
         {
             var parts = GetPathParts(path);
             var output = new List<string>();
@@ -1078,7 +1063,7 @@ namespace DotNet3dsToolkit
             return output.ToArray();
         }
 
-        byte[] IFileSystem.ReadAllBytes(string filename)
+        byte[] IReadOnlyFileSystem.ReadAllBytes(string filename)
         {
             var fixedPath = FixPath(filename);
             if (BlacklistedPaths.Contains(fixedPath))
@@ -1121,12 +1106,7 @@ namespace DotNet3dsToolkit
             }
         }
 
-        string IFileSystem.ReadAllText(string filename)
-        {
-            return Encoding.UTF8.GetString((this as IFileSystem).ReadAllBytes(filename));
-        }
-
-        void IFileSystem.WriteAllBytes(string filename, byte[] data)
+        void IExtendedFileSystem.WriteAllBytes(string filename, byte[] data)
         {
             if (CurrentFileSystem == null)
             {
@@ -1149,11 +1129,6 @@ namespace DotNet3dsToolkit
 
                 CurrentFileSystem.WriteAllBytes(virtualPath, data);
             }
-        }
-
-        void IFileSystem.WriteAllText(string filename, string data)
-        {
-            (this as IFileSystem).WriteAllBytes(filename, Encoding.UTF8.GetBytes(data));
         }
 
         void IFileSystem.CopyFile(string sourceFilename, string destinationFilename)
@@ -1213,7 +1188,7 @@ namespace DotNet3dsToolkit
 
         Stream IFileSystem.OpenFile(string filename)
         {
-            if (CurrentFileSystem != null)
+            if (CurrentFileSystem == null)
             {
                 throw new NotSupportedException("Cannot open a file as a stream without an IO provider.");
             }
@@ -1231,9 +1206,9 @@ namespace DotNet3dsToolkit
             return CurrentFileSystem.OpenFile(filename);
         }
 
-        Stream IFileSystem.OpenFileReadOnly(string filename)
+        Stream IReadOnlyFileSystem.OpenFileReadOnly(string filename)
         {
-            if (CurrentFileSystem != null)
+            if (CurrentFileSystem == null)
             {
                 if ((this as IFileSystem).FileExists(filename))
                 {
@@ -1261,7 +1236,7 @@ namespace DotNet3dsToolkit
 
         Stream IFileSystem.OpenFileWriteOnly(string filename)
         {
-            if (CurrentFileSystem != null)
+            if (CurrentFileSystem == null)
             {
                 throw new NotSupportedException("Cannot open a file as a stream without an IO provider.");
             }
@@ -1279,6 +1254,23 @@ namespace DotNet3dsToolkit
             return CurrentFileSystem.OpenFileWriteOnly(filename);
         }
 
-        #endregion     
+        void IExtendedFileSystem.WriteAllText(string filename, string data, Encoding encoding)
+        {
+            (this as IExtendedFileSystem).WriteAllBytes(filename, encoding.GetBytes(data));
+        }
+
+        Task IExtendedFileSystem.WriteAllTextAsync(string filename, string data, Encoding encoding)
+        {
+            (this as IExtendedFileSystem).WriteAllText(filename, data, encoding);
+            return Task.CompletedTask;
+        }
+
+        Task IExtendedFileSystem.WriteAllBytesAsync(string filename, byte[] data)
+        {
+            (this as IExtendedFileSystem).WriteAllBytes(filename, data);
+            return Task.CompletedTask;
+        }
+
+        #endregion
     }
 }

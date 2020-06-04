@@ -52,7 +52,7 @@ namespace DotNet3dsToolkit.Ctr
             {
                 var partitionStart = (long)Header.Partitions[i].Offset * MediaUnitSize;
                 var partitionLength = (long)Header.Partitions[i].Length * MediaUnitSize;
-                Partitions[i] = await NcchPartition.Load(NcsdData.GetReadOnlyDataReference(partitionStart, partitionLength));
+                Partitions[i] = await NcchPartition.Load(NcsdData.Slice(partitionStart, partitionLength));
             }));
         }
 

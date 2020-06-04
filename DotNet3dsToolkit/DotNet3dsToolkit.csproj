@@ -1,12 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net462;netcoreapp2.2</TargetFrameworks>
+    <TargetFrameworks>netstandard2.1;netstandard2.0</TargetFrameworks>
     <LangVersion>8</LangVersion>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="SkyEditor.IO" Version="5.0.8" />
+    <PackageReference Include="SkyEditor.IO" Version="5.1.14" />
     <PackageReference Include="SkyEditor.Utilities.AsyncFor" Version="5.0.0" />
   </ItemGroup>
 

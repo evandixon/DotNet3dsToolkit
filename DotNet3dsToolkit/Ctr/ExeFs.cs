@@ -50,7 +50,7 @@ namespace DotNet3dsToolkit.Ctr
         /// <param name="directory">Directory from which to load the files</param>
         /// <param name="fileSystem">File system from which to load the files</param>
         /// <returns>A newly built executable file system</returns>
-        public static async Task<ExeFs> Build(string directory, IFileSystem fileSystem, ExtractionProgressedToken progressReportToken = null)
+        public static async Task<ExeFs> Build(string directory, IFileSystem fileSystem, ExtractionProgressedToken? progressReportToken = null)
         {
             var files = fileSystem.GetFiles(directory, "*", true).ToList();
             if (files.Count > 10)
@@ -82,7 +82,7 @@ namespace DotNet3dsToolkit.Ctr
 
         public ExeFs()
         {
-            Files = new Dictionary<string, ExeFsEntry>(StringComparer.OrdinalIgnoreCase);
+            Files = new Dictionary<string, ExeFsEntry?>(StringComparer.OrdinalIgnoreCase);
         }
 
         public ExeFs(IReadOnlyBinaryDataAccessor exeFsData) : this()
@@ -101,7 +101,7 @@ namespace DotNet3dsToolkit.Ctr
                 hashes[i] = await ExeFsData.ReadArrayAsync(0xC0 + ((9 - i) * 32), 32).ConfigureAwait(false); // Hashes are stored in reverse order from headers
                 if (headers[i].FileSize > 0)
                 {
-                    fileData[i] = await ExeFsData.GetReadOnlyDataReference(headers[i].Offset + 0x200, headers[i].FileSize).ReadArrayAsync().ConfigureAwait(false);
+                    fileData[i] = await ExeFsData.Slice(headers[i].Offset + 0x200, headers[i].FileSize).ReadArrayAsync().ConfigureAwait(false);
                 }
             })).ConfigureAwait(false);
 
@@ -112,18 +112,14 @@ namespace DotNet3dsToolkit.Ctr
                 var hash = hashes[i];
                 if (header.FileSize > 0)
                 {
-                    Files.Add(header.Filename, new ExeFsEntry
-                    {
-                        RawData = data,
-                        Hash = hash
-                    });
+                    Files.Add(header.Filename, new ExeFsEntry(data, hash));
                 }
             }
         }
 
         protected IReadOnlyBinaryDataAccessor ExeFsData { get; set; }
 
-        public Dictionary<string, ExeFsEntry> Files { get; set; }
+        public Dictionary<string, ExeFsEntry?> Files { get; set; }
 
         /// <summary>
         /// Saves all files in the executable file system to the specified file system
@@ -242,14 +238,16 @@ namespace DotNet3dsToolkit.Ctr
 
         public class ExeFsEntry
         {
-            public ExeFsEntry()
-            {
-            }
-
             public ExeFsEntry(byte[] rawData)
             {
                 RawData = rawData ?? throw new ArgumentNullException(nameof(rawData));
                 Hash = ComputeHash();
+            }
+
+            public ExeFsEntry(byte[] rawData, byte[] hash)
+            {
+                RawData = rawData ?? throw new ArgumentNullException(nameof(rawData));
+                Hash = hash ?? throw new ArgumentNullException(nameof(hash));
             }
 
             public byte[] RawData { get; set; }
@@ -257,10 +255,8 @@ namespace DotNet3dsToolkit.Ctr
 
             private byte[] ComputeHash()
             {
-                using (var sha = SHA256.Create())
-                {
-                    return sha.ComputeHash(RawData);
-                }
+                using var sha = SHA256.Create();
+                return sha.ComputeHash(RawData);
             }
 
             public bool IsFileHashValid()

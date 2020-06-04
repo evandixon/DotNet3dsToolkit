@@ -14,14 +14,14 @@ namespace DotNet3dsToolkit.RomFsBuilder
     {
         private const int PADDING_ALIGN = 16;
 
-        public static void BuildRomFS(string rootDirectory, IFileSystem fileSystem, Stream outputStream, ExtractionProgressedToken progressToken = null)
+        public static void BuildRomFS(string rootDirectory, IFileSystem fileSystem, Stream outputStream, ExtractionProgressedToken? progressToken = null)
         {
             var RomFiles = RomfsFile.LoadFromFileSystem(rootDirectory, fileSystem);
             var metadata = RomFsMetadataBuilder.BuildRomFSHeader(RomFiles, rootDirectory, fileSystem);
             MakeRomFSData(outputStream, fileSystem, RomFiles, metadata, progressToken);
         }
 
-        private static void MakeRomFSData(Stream outputStream, IFileSystem fileSystem, List<RomfsFile> RomFiles, byte[] metadata, ExtractionProgressedToken progressToken = null)
+        private static void MakeRomFSData(Stream outputStream, IFileSystem fileSystem, List<RomfsFile> RomFiles, byte[] metadata, ExtractionProgressedToken? progressToken = null)
         {
             // Computing IVFC Header Data...
             var ivfcLevels = new IvfcLevelLocation[3];
@@ -176,10 +176,10 @@ namespace DotNet3dsToolkit.RomFsBuilder
             return list;
         }
 
-        public string PathName { get; set; }
+        public string PathName { get; set; } = default!;
         public long Offset { get; set; }
         public long Size { get; set; }
-        public string FullName { get; set; }
+        public string FullName { get; set; } = default!;
 
         public static long GetDataBlockLength(List<RomfsFile> files, long PreData)
         {

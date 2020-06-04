@@ -38,7 +38,7 @@ namespace DotNet3dsToolkit.Ctr
             var contentOffset = BitMath.Align(tmdOffset + CiaHeader.TmdFileSize, 64);
             var metaOffset = BitMath.Align(contentOffset + CiaHeader.ContentSize, 64);
 
-            TmdMetadata = await TmdMetadata.Load(CiaData.GetReadOnlyDataReference(tmdOffset, CiaHeader.TmdFileSize));
+            TmdMetadata = await TmdMetadata.Load(CiaData.Slice(tmdOffset, CiaHeader.TmdFileSize));
 
             Partitions = new NcchPartition[TmdMetadata.ContentChunkRecords.Length];
             long partitionStart = contentOffset;
@@ -48,7 +48,7 @@ namespace DotNet3dsToolkit.Ctr
                 var partitionLength = chunkRecord.ContentSize;
                 int contentIndex = chunkRecord.ContentIndex;
 
-                Partitions[i] = await NcchPartition.Load(CiaData.GetReadOnlyDataReference(partitionStart, partitionLength));
+                Partitions[i] = await NcchPartition.Load(CiaData.Slice(partitionStart, partitionLength));
 
                 partitionStart += partitionLength;
             }

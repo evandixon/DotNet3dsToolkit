@@ -56,10 +56,10 @@ namespace DotNet3dsToolkit.Ctr
         /// <param name="directory">Directory from which to load the files</param>
         /// <param name="fileSystem">File system from which to load the files</param>
         /// <returns>A newly built ROM file system</returns>
-        public static async Task<RomFs> Build(string directory, IFileSystem fileSystem, ExtractionProgressedToken progressToken = null)
+        public static async Task<RomFs> Build(string directory, IFileSystem fileSystem, ExtractionProgressedToken? progressToken = null)
         {
-            Stream stream = null;
-            string tempFilename = null;
+            Stream? stream = null;
+            string? tempFilename = null;
             try
             {
                 // A memory stream is faster, but an internal limitation means it's unsuitable for files larger than 2GB
@@ -184,7 +184,7 @@ namespace DotNet3dsToolkit.Ctr
 
         private long BodySize { get; }
 
-        public async Task ExtractFiles(string directoryName, IFileSystem fileSystem, ExtractionProgressedToken progressReportToken = null)
+        public async Task ExtractFiles(string directoryName, IFileSystem fileSystem, ExtractionProgressedToken? progressReportToken = null)
         {
             if (progressReportToken != null)
             {
@@ -516,7 +516,7 @@ namespace DotNet3dsToolkit.Ctr
 
             public IReadOnlyBinaryDataAccessor GetDataReference()
             {
-                return LevelData.GetReadOnlyDataReference(Header.FileDataOffset + FileDataOffset, FileDataLength);
+                return LevelData.Slice(Header.FileDataOffset + FileDataOffset, FileDataLength);
             }
 
             public override string ToString()
@@ -587,7 +587,7 @@ namespace DotNet3dsToolkit.Ctr
             public static async Task<IvfcLevel> Load(IReadOnlyBinaryDataAccessor romfsData, IvfcLevelLocation location)
             {
                 var header = new IvfcLevelHeader(await romfsData.ReadArrayAsync(location.DataOffset, 0x28));
-                var level = new IvfcLevel(romfsData.GetReadOnlyDataReference(location.DataOffset, location.DataSize), header);
+                var level = new IvfcLevel(romfsData.Slice(location.DataOffset, location.DataSize), header);
                 await level.Initialize();
                 return level;
             }

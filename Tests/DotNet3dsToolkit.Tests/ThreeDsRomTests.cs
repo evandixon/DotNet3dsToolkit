@@ -15,9 +15,11 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Xunit;
 
+[assembly: CollectionBehavior(DisableTestParallelization = true)]  // Required to run tests synchronously (can't open multiple memory mapped file instances with the current implementation)
+
 namespace DotNet3dsToolkit.Tests
 {
-    [Collection("3DS ROM Tests")] // Required to run tests synchronously (can't open multiple memory mapped file instances with the current implementation)
+    [Collection("3DS ROM Tests")]
     public class ThreeDsRomTests
     {
         public static IEnumerable<object[]> NcsdTestData()
