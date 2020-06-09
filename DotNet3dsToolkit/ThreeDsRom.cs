@@ -61,6 +61,7 @@ namespace DotNet3dsToolkit
         public ThreeDsRom(BinaryFile file)
         {
             RawData = file;
+            CurrentFileSystem = new PhysicalFileSystem();
         }
 
         public ThreeDsRom(RomFs romFs, int partitionIndex = 0)
