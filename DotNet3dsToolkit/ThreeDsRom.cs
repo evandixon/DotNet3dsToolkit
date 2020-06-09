@@ -16,7 +16,7 @@ using System.Threading.Tasks;
 namespace DotNet3dsToolkit
 {
     public class ThreeDsRom : IExtendedFileSystem, IDisposable
-    {
+    {        
         public static async Task<ThreeDsRom> Load(string filename)
         {
             var rom = new ThreeDsRom();
@@ -31,9 +31,20 @@ namespace DotNet3dsToolkit
             return rom;
         }
 
+        public static async Task<ThreeDsRom> Load(BinaryFile file)
+        {
+            var rom = new ThreeDsRom(file);
+            await rom.OpenFile(file);
+            return rom;
+        }
+
         public static async Task<bool> IsThreeDsRom(BinaryFile file)
         {
-            return await NcsdFile.IsNcsd(file) || await CiaFile.IsCia(file) || await NcchPartition.IsNcch(file) || await RomFs.IsRomFs(file) || await ExeFs.IsExeFs(file);
+            return await NcsdFile.IsNcsd(file) 
+                || await CiaFile.IsCia(file) 
+                || await NcchPartition.IsNcch(file) 
+                || await RomFs.IsRomFs(file) 
+                || await ExeFs.IsExeFs(file);
         }
 
         public ThreeDsRom()
@@ -45,6 +56,11 @@ namespace DotNet3dsToolkit
         public ThreeDsRom(IFileSystem fileSystem)
         {
             CurrentFileSystem = fileSystem;
+        }
+
+        public ThreeDsRom(BinaryFile file)
+        {
+            RawData = file;
         }
 
         public ThreeDsRom(RomFs romFs, int partitionIndex = 0)
@@ -63,11 +79,8 @@ namespace DotNet3dsToolkit
         }
 
         private INcchPartitionContainer? Container { get; set; }
-
         public NcchPartition[] Partitions => Container?.Partitions ?? throw new InvalidOperationException("ROM has not yet been initialized");
-
         private BinaryFile? RawData { get; set; }
-
         private IFileSystem? CurrentFileSystem { get; set; }
 
         public async Task OpenFile(string filename, IFileSystem fileSystem)
