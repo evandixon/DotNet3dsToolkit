@@ -4,8 +4,11 @@ using System.Text;
 
 namespace DotNet3dsToolkit.Ctr
 {
-    public class NcsdPartitionInfo
+    public struct NcsdPartitionInfo
     {
+        /// <summary>
+        /// Partitions FS type (0=None, 1=Normal, 3=FIRM, 4=AGB_FIRM save)
+        /// </summary>
         public byte CryptType { get; set; }
 
         /// <summary>

@@ -6,6 +6,11 @@ namespace DotNet3dsToolkit.Ctr
 {
     public class CartridgeNcsdHeader : NcsdHeader
     {
+        public CartridgeNcsdHeader() : base()
+        {
+            MediaId = 1;
+        }
+
         public CartridgeNcsdHeader(byte[] header) : base(header)
         {
             ExheaderHash = new byte[0x20];
@@ -45,10 +50,10 @@ namespace DotNet3dsToolkit.Ctr
             Array.Copy(header, 0x1010, EncryptedCardSeed, 0, 0x10);
 
             CardSeedAESMAC = new byte[0x10];
-            Array.Copy(header, 0x1010, CardSeedAESMAC, 0, 0x10);
+            Array.Copy(header, 0x1020, CardSeedAESMAC, 0, 0x10);
 
             CardSeedNonce = new byte[0x10];
-            Array.Copy(header, 0x1020, CardSeedNonce, 0, 0x10);
+            Array.Copy(header, 0x1030, CardSeedNonce, 0, 0xC);
 
             Reserved5 = new byte[0xC4];
             Array.Copy(header, 0x103C, Reserved5, 0, 0xC4);
@@ -69,15 +74,15 @@ namespace DotNet3dsToolkit.Ctr
         /// <summary>
         /// Exheader SHA-256 hash
         /// </summary>
-        public byte[] ExheaderHash { get; private set; } // Offset: 0x160, Size: 0x20
+        public byte[] ExheaderHash { get; protected set; } // Offset: 0x160, Size: 0x20
 
-        public int AdditionalHeaderSize { get; private set; } // Offset: 0x180, Size: 0x4
+        public int AdditionalHeaderSize { get; protected set; } // Offset: 0x180, Size: 0x4
 
-        public int SectorZeroOffset { get; private set; } // Offset: 0x184, Size: 0x4
+        public int SectorZeroOffset { get; protected set; } // Offset: 0x184, Size: 0x4
 
-        public long PartitionFlags { get; private set; } // Offset: 0x188, Size: 0x8
+        public long PartitionFlags { get; protected set; } // Offset: 0x188, Size: 0x8
 
-        public byte[] PartitionIdTable { get; private set; } // Offset: 0x190, Size: 8*8
+        public byte[] PartitionIdTable { get; protected set; } // Offset: 0x190, Size: 8*8
 
         protected byte[] Reserved1 { get; set; } // Offset: 0x1D0, Size: 0x20
 
@@ -102,16 +107,16 @@ namespace DotNet3dsToolkit.Ctr
         /// <summary>
         /// Writable address of the CARD2 on-chip savedata, or -1 if the cartridge is CARD1
         /// </summary>
-        public int Card2SaveAddress { get; private set; } // Offset: 0x200, Size: 4
+        public int Card2SaveAddress { get; protected set; } // Offset: 0x200, Size: 4
 
-        public int CardInfoBitmask { get; private set; } // Offset: 0x204, Size: 4
+        public int CardInfoBitmask { get; protected set; } // Offset: 0x204, Size: 4
 
         // Called Reserved1 in 3dbrew
         protected byte[] Reserved3 { get; set; } // Offset: 0x208, size: 0x108
 
-        public short TitleVersion { get; private set; } // Offset: 0x310, size: 2
+        public short TitleVersion { get; protected set; } // Offset: 0x310, size: 2
 
-        public short CardRevision { get; private set; } // Offset: 0x312, size: 2
+        public short CardRevision { get; protected set; } // Offset: 0x312, size: 2
 
         // Called Reserved2 in 3dbrew
         // 3dbrew lists same offset as Reserved1 (aka Reserved3). This offset is based on math and may be inaccurate.
@@ -120,19 +125,19 @@ namespace DotNet3dsToolkit.Ctr
         /// <summary>
         /// Card seed keyY (first u64 is Media ID (same as first NCCH partitionId))
         /// </summary>
-        public byte[] CardSeedY { get; private set; } // Offset: 0x1000, size: 0x10
+        public byte[] CardSeedY { get; protected set; } // Offset: 0x1000, size: 0x10
 
         /// <summary>
         /// Encrypted card seed (AES-CCM, keyslot 0x3B for retail cards, see CTRCARD_SECSEED)
         /// </summary>
-        public byte[] EncryptedCardSeed { get; private set; } // Offset: 0x1010, size: 0x10
+        public byte[] EncryptedCardSeed { get; protected set; } // Offset: 0x1010, size: 0x10
 
         /// <summary>
         /// Card seed AES-MAC
         /// </summary>
-        public byte[] CardSeedAESMAC { get; private set; } // Offset: 0x1020, size: 0x10
+        public byte[] CardSeedAESMAC { get; protected set; } // Offset: 0x1020, size: 0x10
 
-        public byte[] CardSeedNonce { get; private set; } // Offset: 0x1030, size: 0xC
+        public byte[] CardSeedNonce { get; protected set; } // Offset: 0x1030, size: 0xC
 
         // Called Reserved3 in 3dbrew
         protected byte[] Reserved5 { get; set; } // Offset: 0x103C, size: 0xC4
@@ -144,11 +149,40 @@ namespace DotNet3dsToolkit.Ctr
 
         // "private headers" stored in this area
 
-        public byte[] CardDeviceReserved1 { get; private set; } // Offset: 0x1200, Size: 0x200
+        public byte[] CardDeviceReserved1 { get; protected set; } // Offset: 0x1200, Size: 0x200
 
         public byte[] TitleKey { get; private set; } // Offset: 0x1400, Size: 0x10
 
-        public byte[] CardDeviceReserved2 { get; private set; } // Offset: 0x1410, Size: 0xF0
+        public byte[] CardDeviceReserved2 { get; protected set; } // Offset: 0x1410, Size: 0xF0
+
+        public override byte[] ToByteArray()
+        {
+            var buffer = new byte[0x1500];
+            base.ToByteArray().CopyTo(buffer, 0);
+            ExheaderHash.CopyTo(buffer, 0x160);
+            BitConverter.GetBytes(AdditionalHeaderSize).CopyTo(buffer, 0x180);
+            BitConverter.GetBytes(SectorZeroOffset).CopyTo(buffer, 0x184);
+            BitConverter.GetBytes(PartitionFlags).CopyTo(buffer, 0x188);
+            PartitionIdTable.CopyTo(buffer, 0x190);
+            Reserved1.CopyTo(buffer, 0x1D0);
+            Reserved2.CopyTo(buffer, 0x1F0);
+            BitConverter.GetBytes(Card2SaveAddress).CopyTo(buffer, 0x200);
+            BitConverter.GetBytes(CardInfoBitmask).CopyTo(buffer, 0x204);
+            Reserved3.CopyTo(buffer, 0x208);
+            BitConverter.GetBytes(TitleVersion).CopyTo(buffer, 0x310);
+            BitConverter.GetBytes(CardRevision).CopyTo(buffer, 0x312);
+            Reserved4.CopyTo(buffer, 0x314);
+            CardSeedY.CopyTo(buffer, 0x1000);
+            EncryptedCardSeed.CopyTo(buffer, 0x1010);
+            CardSeedAESMAC.CopyTo(buffer, 0x1020);
+            CardSeedNonce.CopyTo(buffer, 0x1030);
+            Reserved5.CopyTo(buffer, 0x103C);
+            FirstNcchHeader.CopyTo(buffer, 0x1100);
+            CardDeviceReserved1.CopyTo(buffer, 0x1200);
+            TitleKey.CopyTo(buffer, 0x1400);
+            CardDeviceReserved2.CopyTo(buffer, 0x1410);
+            return buffer;
+        }
     }
 
 }

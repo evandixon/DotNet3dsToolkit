@@ -289,6 +289,14 @@ namespace DotNet3dsToolkit.Tests
             }
         }
 
+        [Theory]
+        [MemberData(nameof(NcsdTestData))]
+        [MemberData(nameof(CiaTestData))]
+        public async Task CanRebuildNcsdPartitions(string filename)
+        {
+            throw new NotImplementedException();
+        }
+
         //[Theory]
         //[MemberData(nameof(NcsdTestData))]
         //[MemberData(nameof(CiaTestData))]

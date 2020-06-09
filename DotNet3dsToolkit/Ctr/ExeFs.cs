@@ -50,7 +50,7 @@ namespace DotNet3dsToolkit.Ctr
         /// <param name="directory">Directory from which to load the files</param>
         /// <param name="fileSystem">File system from which to load the files</param>
         /// <returns>A newly built executable file system</returns>
-        public static async Task<ExeFs> Build(string directory, IFileSystem fileSystem, ExtractionProgressedToken? progressReportToken = null)
+        public static async Task<ExeFs> Build(string directory, IFileSystem fileSystem, ProcessingProgressedToken? progressReportToken = null)
         {
             var files = fileSystem.GetFiles(directory, "*", true).ToList();
             if (files.Count > 10)
@@ -73,7 +73,7 @@ namespace DotNet3dsToolkit.Ctr
                 exefs.Files[Path.GetFileName(file)] = new ExeFsEntry(fileSystem.ReadAllBytes(file));
                 if (progressReportToken != null)
                 {
-                    progressReportToken.IncrementExtractedFileCount();
+                    progressReportToken.IncrementProcessedFileCount();
                 }
             }).ConfigureAwait(false);
 
@@ -127,7 +127,7 @@ namespace DotNet3dsToolkit.Ctr
         /// <param name="directoryName">Directory on the specified file system to which the files should be saved.</param>
         /// <param name="fileSystem">File system to which the files should be saved.</param>
         /// <param name="progressReportToken">Optional token to be used to track the progress of the extraction.</param>
-        public async Task ExtractFiles(string directoryName, IFileSystem fileSystem, ExtractionProgressedToken? progressReportToken = null)
+        public async Task ExtractFiles(string directoryName, IFileSystem fileSystem, ProcessingProgressedToken? progressReportToken = null)
         {
             if (progressReportToken != null)
             {
@@ -145,7 +145,7 @@ namespace DotNet3dsToolkit.Ctr
 
                 if (progressReportToken != null)
                 {
-                    progressReportToken.IncrementExtractedFileCount();
+                    progressReportToken.IncrementProcessedFileCount();
                 }
             }).ConfigureAwait(false);
         }

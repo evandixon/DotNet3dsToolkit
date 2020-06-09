@@ -49,16 +49,16 @@ namespace DotNet3dsToolkit.Ctr
         /// </summary>
         /// <param name="fileSystem">File system from which to load the files</param>
         /// <returns>A newly built NCCH partition</returns>
-        public static async Task<NcchPartition> Build(string headerFilename, string exHeaderFilename, string? exeFsDirectory, string? romFsDiretory, string? plainRegionFilename, string? logoFilename, IFileSystem fileSystem, ExtractionProgressedToken? progressToken = null)
+        public static async Task<NcchPartition> Build(string headerFilename, string exHeaderFilename, string? exeFsDirectory, string? romFsDiretory, string? plainRegionFilename, string? logoFilename, IFileSystem fileSystem, ProcessingProgressedToken? progressToken = null)
         {
-            ExtractionProgressedToken? exefsToken = null;
-            ExtractionProgressedToken? romfsToken = null;
+            ProcessingProgressedToken? exefsToken = null;
+            ProcessingProgressedToken? romfsToken = null;
             void ReportProgress()
             {
                 if (progressToken != null)
                 {
                     progressToken.TotalFileCount = (exefsToken?.TotalFileCount + romfsToken?.TotalFileCount).GetValueOrDefault();
-                    progressToken.ExtractedFileCount = (exefsToken?.ExtractedFileCount + romfsToken?.ExtractedFileCount).GetValueOrDefault();
+                    progressToken.ProcessedFileCount = (exefsToken?.ProcessedFileCount + romfsToken?.ProcessedFileCount).GetValueOrDefault();
                 }
             };
 
@@ -67,7 +67,7 @@ namespace DotNet3dsToolkit.Ctr
             {
                 if (progressToken != null)
                 {
-                    exefsToken = new ExtractionProgressedToken();
+                    exefsToken = new ProcessingProgressedToken();
                     exefsToken.FileCountChanged += (sender, e) => ReportProgress();
                 }
                 exeFsTask = Task.Run<ExeFs?>(async () => await ExeFs.Build(exeFsDirectory, fileSystem, exefsToken).ConfigureAwait(false));
@@ -82,7 +82,7 @@ namespace DotNet3dsToolkit.Ctr
             {
                 if (progressToken != null)
                 {
-                    romfsToken = new ExtractionProgressedToken();
+                    romfsToken = new ProcessingProgressedToken();
                     romfsToken.FileCountChanged += (sender, e) => ReportProgress();
                 }
                 romFsTask = Task.Run<RomFs?>(async () => await RomFs.Build(romFsDiretory, fileSystem, romfsToken).ConfigureAwait(false));
@@ -170,7 +170,8 @@ namespace DotNet3dsToolkit.Ctr
         /// Writes the current state of the NCCH partition to the given binary data accessor
         /// </summary>
         /// <param name="data">Data accessor to receive the binary data</param>
-        public async Task WriteBinary(IWriteOnlyBinaryDataAccessor data)
+        /// <returns>A long representing the total length of data written</returns>
+        public async Task<long> WriteBinary(IWriteOnlyBinaryDataAccessor data)
         {
             // Get the data
             var exheader = ExHeader?.ToByteArray();
@@ -281,6 +282,8 @@ namespace DotNet3dsToolkit.Ctr
 
             var headerData = await header.ToBinary().ReadArrayAsync();
             await data.WriteAsync(0, headerData);
+
+            return offset;
         }
 
         public void Dispose()

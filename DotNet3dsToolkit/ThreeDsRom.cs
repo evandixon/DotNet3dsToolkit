@@ -17,8 +17,6 @@ namespace DotNet3dsToolkit
 {
     public class ThreeDsRom : IExtendedFileSystem, IDisposable
     {
-        private const int MediaUnitSize = 0x200;
-
         public static async Task<ThreeDsRom> Load(string filename)
         {
             var rom = new ThreeDsRom();
@@ -158,10 +156,10 @@ namespace DotNet3dsToolkit
 
         public async Task ExtractFiles(string directoryName, IFileSystem fileSystem, ProgressReportToken? progressReportToken = null)
         {
-            List<ExtractionProgressedToken>? extractionProgressedTokens = null;
+            List<ProcessingProgressedToken>? extractionProgressedTokens = null;
             if (progressReportToken != null)
             {
-                extractionProgressedTokens = new List<ExtractionProgressedToken>();
+                extractionProgressedTokens = new List<ProcessingProgressedToken>();
                 progressReportToken.IsIndeterminate = false;
             }
 
@@ -169,7 +167,7 @@ namespace DotNet3dsToolkit
             {
                 if (progressReportToken != null)
                 {
-                    progressReportToken.Progress = (float)extractionProgressedTokens.Select(t => t.ExtractedFileCount).Sum() / extractionProgressedTokens.Select(t => t.TotalFileCount).Sum();
+                    progressReportToken.Progress = (float)extractionProgressedTokens.Select(t => t.ProcessedFileCount).Sum() / extractionProgressedTokens.Select(t => t.TotalFileCount).Sum();
                 }
             }
 
@@ -190,10 +188,10 @@ namespace DotNet3dsToolkit
 
                 if (partition.ExeFs != null)
                 {
-                    ExtractionProgressedToken? exefsExtractionProgressedToken = null;
-                    if (exefsExtractionProgressedToken != null && extractionProgressedTokens != null)
+                    ProcessingProgressedToken? exefsExtractionProgressedToken = null;
+                    if (exefsExtractionProgressedToken != null)
                     {
-                        exefsExtractionProgressedToken = new ExtractionProgressedToken();
+                        exefsExtractionProgressedToken = new ProcessingProgressedToken();
                         exefsExtractionProgressedToken.FileCountChanged += onExtractionTokenProgressed;
                         extractionProgressedTokens.Add(exefsExtractionProgressedToken);
                     }
@@ -202,10 +200,10 @@ namespace DotNet3dsToolkit
 
                 if (partition.Header != null)
                 {
-                    ExtractionProgressedToken? exefsExtractionProgressedToken = null;
-                    if (exefsExtractionProgressedToken != null && extractionProgressedTokens != null)
+                    ProcessingProgressedToken exefsExtractionProgressedToken = null;
+                    if (exefsExtractionProgressedToken != null)
                     {
-                        exefsExtractionProgressedToken = new ExtractionProgressedToken
+                        exefsExtractionProgressedToken = new ProcessingProgressedToken
                         {
                             TotalFileCount = 1
                         };
@@ -214,17 +212,17 @@ namespace DotNet3dsToolkit
                     }
                     tasks.Add(Task.Run(() =>
                     {
-                        fileSystem.WriteAllBytes(Path.Combine(directoryName, GetHeaderFileName(i)), partition.Header.ToBinary().ReadArray());
-                        exefsExtractionProgressedToken?.IncrementExtractedFileCount();
+                        File.WriteAllBytes(Path.Combine(directoryName, GetHeaderFileName(i)), partition.Header.ToBinary().ReadArray());
+                        exefsExtractionProgressedToken?.IncrementProcessedFileCount();
                     }));
                 }
 
                 if (partition.ExHeader != null)
                 {
-                    ExtractionProgressedToken? exefsExtractionProgressedToken = null;
-                    if (exefsExtractionProgressedToken != null && extractionProgressedTokens != null)
+                    ProcessingProgressedToken? exefsExtractionProgressedToken = null;
+                    if (exefsExtractionProgressedToken != null)
                     {
-                        exefsExtractionProgressedToken = new ExtractionProgressedToken
+                        exefsExtractionProgressedToken = new ProcessingProgressedToken
                         {
                             TotalFileCount = 1
                         };
@@ -233,17 +231,17 @@ namespace DotNet3dsToolkit
                     }
                     tasks.Add(Task.Run(() =>
                     {
-                        fileSystem.WriteAllBytes(Path.Combine(directoryName, GetExHeaderFileName(i)), partition.ExHeader.ToByteArray());
-                        exefsExtractionProgressedToken?.IncrementExtractedFileCount();
+                        File.WriteAllBytes(Path.Combine(directoryName, GetExHeaderFileName(i)), partition.ExHeader.ToByteArray());
+                        exefsExtractionProgressedToken?.IncrementProcessedFileCount();
                     }));
                 }
 
                 if (partition.RomFs != null)
                 {
-                    ExtractionProgressedToken? romfsExtractionProgressedToken = null;
-                    if (romfsExtractionProgressedToken != null && extractionProgressedTokens != null)
+                    ProcessingProgressedToken romfsExtractionProgressedToken = null;
+                    if (romfsExtractionProgressedToken != null)
                     {
-                        romfsExtractionProgressedToken = new ExtractionProgressedToken();
+                        romfsExtractionProgressedToken = new ProcessingProgressedToken();
                         romfsExtractionProgressedToken.FileCountChanged += onExtractionTokenProgressed;
                         extractionProgressedTokens.Add(romfsExtractionProgressedToken);
                     }
@@ -335,6 +333,16 @@ namespace DotNet3dsToolkit
                 0 => "Logo.bin",
                 _ => "Logo-" + partitionId.ToString() + ".bin",
             };
+        }
+
+        public async Task Save(string filename, IFileSystem fileSystem)
+        {
+            throw new NotImplementedException();
+        }
+
+        public async Task Save(string filename)
+        {
+            await Save(filename, PhysicalFileSystem.Instance);
         }
 
         #region IDisposable Support
@@ -575,6 +583,12 @@ namespace DotNet3dsToolkit
             var firstDirectory = parts[0].ToLower();
             switch (firstDirectory)
             {
+                case "ncsdheader.bin":
+                    if (Container is NcsdFile ncsd)
+                    {
+                        dataReference = new BinaryFile(ncsd.Header.ToByteArray());
+                    }
+                    break;
                 case "exefs-0":
                 case "exefs":
                     dataReference = getExeFsDataReference(parts, 0);
@@ -880,6 +894,10 @@ namespace DotNet3dsToolkit
                     {
                         for (int i = 0; i < Partitions.Length; i++)
                         {
+                            if (Container is NcsdFile ncsd)
+                            {
+                                output.Add("NcsdHeader.bin");
+                            }
                             if (Partitions[i].Header != null)
                             {
                                 var headerName = GetHeaderFileName(i);

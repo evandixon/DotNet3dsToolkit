@@ -17,5 +17,14 @@ namespace DotNet3dsToolkit.Ctr
 
         public byte[] Unknown { get; private set; } // Offset: 0x160, Size: 0x5E
         public byte[] EncryptedMbrPartitionTable { get; private set; } // Offset: 0x1BE, Size: 0x42
+
+        public override byte[] ToByteArray()
+        {
+            var buffer = new byte[0x200];
+            base.ToByteArray().CopyTo(buffer, 0);
+            Unknown.CopyTo(buffer, 0x160);
+            EncryptedMbrPartitionTable.CopyTo(buffer, 0x1BE);
+            return buffer;
+        }
     }
 }

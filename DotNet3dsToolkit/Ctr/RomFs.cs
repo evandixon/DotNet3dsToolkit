@@ -56,7 +56,7 @@ namespace DotNet3dsToolkit.Ctr
         /// <param name="directory">Directory from which to load the files</param>
         /// <param name="fileSystem">File system from which to load the files</param>
         /// <returns>A newly built ROM file system</returns>
-        public static async Task<RomFs> Build(string directory, IFileSystem fileSystem, ExtractionProgressedToken? progressToken = null)
+        public static async Task<RomFs> Build(string directory, IFileSystem fileSystem, ProcessingProgressedToken? progressToken = null)
         {
             Stream? stream = null;
             string? tempFilename = null;
@@ -184,7 +184,7 @@ namespace DotNet3dsToolkit.Ctr
 
         private long BodySize { get; }
 
-        public async Task ExtractFiles(string directoryName, IFileSystem fileSystem, ExtractionProgressedToken? progressReportToken = null)
+        public async Task ExtractFiles(string directoryName, IFileSystem fileSystem, ProcessingProgressedToken? progressReportToken = null)
         {
             if (progressReportToken != null)
             {
@@ -210,7 +210,7 @@ namespace DotNet3dsToolkit.Ctr
                         fileSystem.WriteAllBytes(Path.Combine(destDirectory, f.Name), await f.GetDataReference().ReadArrayAsync());
                         if (progressReportToken != null)
                         {
-                            progressReportToken.IncrementExtractedFileCount();
+                            progressReportToken.IncrementProcessedFileCount();
                         }
                     })),
                     Task.WhenAll(dir.ChildDirectories.Select(async d => {
@@ -234,6 +234,34 @@ namespace DotNet3dsToolkit.Ctr
 
             await Task.WhenAll(directoryExtractTasks);
             await Task.WhenAll(fileExtractTasks);
+        }
+
+        /// <summary>
+        /// Gets the size of all files. Metadata is not currently included, but may be included in the future.
+        /// </summary>
+        public long GetTotalFileSize()
+        {
+            long totalSize = 0;
+
+            foreach (var file in Level3.RootFiles)
+            {
+                totalSize += file.FileDataLength;
+            }
+
+            void countDirectory(DirectoryMetadata d)
+            {                
+                foreach (var file in d.ChildFiles)
+                {
+                    totalSize += file.FileDataLength;
+                }
+                foreach (var dir in d.ChildDirectories)
+                {
+                    countDirectory(dir);
+                }
+            }
+
+            countDirectory(Level3.RootDirectoryMetadataTable);
+            return totalSize;
         }
 
         public static async Task<byte[]> GetSuperblockHash(SHA256 sha, IReadOnlyBinaryDataAccessor data, RomFsHeader header)
