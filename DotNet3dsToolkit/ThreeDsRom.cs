@@ -179,6 +179,7 @@ namespace DotNet3dsToolkit
             var tasks = new List<Task>();
             for (int i = 0; i < Partitions.Length; i++)
             {
+                var partitionIndex = i; // Prevents race conditions with i changing inside Task.Run's
                 var partition = GetPartitionOrDefault(i);
 
                 if (partition == null)
@@ -189,19 +190,19 @@ namespace DotNet3dsToolkit
                 if (partition.ExeFs != null)
                 {
                     ProcessingProgressedToken? exefsExtractionProgressedToken = null;
-                    if (exefsExtractionProgressedToken != null)
+                    if (exefsExtractionProgressedToken != null && extractionProgressedTokens != null)
                     {
                         exefsExtractionProgressedToken = new ProcessingProgressedToken();
                         exefsExtractionProgressedToken.FileCountChanged += onExtractionTokenProgressed;
                         extractionProgressedTokens.Add(exefsExtractionProgressedToken);
                     }
-                    tasks.Add(partition.ExeFs.ExtractFiles(Path.Combine(directoryName, GetExeFsDirectoryName(i)), fileSystem, exefsExtractionProgressedToken));
+                    tasks.Add(partition.ExeFs.ExtractFiles(Path.Combine(directoryName, GetExeFsDirectoryName(partitionIndex)), fileSystem, exefsExtractionProgressedToken));
                 }
 
                 if (partition.Header != null)
                 {
-                    ProcessingProgressedToken exefsExtractionProgressedToken = null;
-                    if (exefsExtractionProgressedToken != null)
+                    ProcessingProgressedToken? exefsExtractionProgressedToken = null;
+                    if (exefsExtractionProgressedToken != null && extractionProgressedTokens != null)
                     {
                         exefsExtractionProgressedToken = new ProcessingProgressedToken
                         {
@@ -212,7 +213,7 @@ namespace DotNet3dsToolkit
                     }
                     tasks.Add(Task.Run(() =>
                     {
-                        File.WriteAllBytes(Path.Combine(directoryName, GetHeaderFileName(i)), partition.Header.ToBinary().ReadArray());
+                        fileSystem.WriteAllBytes(Path.Combine(directoryName, GetHeaderFileName(partitionIndex)), partition.Header.ToBinary().ReadArray());
                         exefsExtractionProgressedToken?.IncrementProcessedFileCount();
                     }));
                 }
@@ -220,7 +221,7 @@ namespace DotNet3dsToolkit
                 if (partition.ExHeader != null)
                 {
                     ProcessingProgressedToken? exefsExtractionProgressedToken = null;
-                    if (exefsExtractionProgressedToken != null)
+                    if (exefsExtractionProgressedToken != null && extractionProgressedTokens != null)
                     {
                         exefsExtractionProgressedToken = new ProcessingProgressedToken
                         {
@@ -231,24 +232,23 @@ namespace DotNet3dsToolkit
                     }
                     tasks.Add(Task.Run(() =>
                     {
-                        File.WriteAllBytes(Path.Combine(directoryName, GetExHeaderFileName(i)), partition.ExHeader.ToByteArray());
+                        fileSystem.WriteAllBytes(Path.Combine(directoryName, GetExHeaderFileName(partitionIndex)), partition.ExHeader.ToByteArray());
                         exefsExtractionProgressedToken?.IncrementProcessedFileCount();
                     }));
                 }
 
                 if (partition.RomFs != null)
                 {
-                    ProcessingProgressedToken romfsExtractionProgressedToken = null;
-                    if (romfsExtractionProgressedToken != null)
+                    ProcessingProgressedToken? romfsExtractionProgressedToken = null;
+                    if (romfsExtractionProgressedToken != null && extractionProgressedTokens != null)
                     {
                         romfsExtractionProgressedToken = new ProcessingProgressedToken();
                         romfsExtractionProgressedToken.FileCountChanged += onExtractionTokenProgressed;
                         extractionProgressedTokens.Add(romfsExtractionProgressedToken);
                     }
 
-                    tasks.Add(Task.Run(() => partition.RomFs.ExtractFiles(Path.Combine(directoryName, GetRomFsDirectoryName(i)), fileSystem, romfsExtractionProgressedToken)));
+                    tasks.Add(Task.Run(() => partition.RomFs.ExtractFiles(Path.Combine(directoryName, GetRomFsDirectoryName(partitionIndex)), fileSystem, romfsExtractionProgressedToken)));
                 }
-
             }
 
             await Task.WhenAll(tasks);
@@ -355,6 +355,10 @@ namespace DotNet3dsToolkit
                 if (disposing)
                 {
                     RawData?.Dispose();
+                    if (CurrentFileSystem != null && !string.IsNullOrEmpty(VirtualPath) && CurrentFileSystem.DirectoryExists(VirtualPath))
+                    {
+                        CurrentFileSystem.DeleteDirectory(VirtualPath);
+                    }
 
                     if (Container is IDisposable disposableContainer)
                     {
@@ -1180,9 +1184,10 @@ namespace DotNet3dsToolkit
             var virtualPath = GetVirtualPath(filename);
             if (!string.IsNullOrEmpty(virtualPath))
             {
-                if (!CurrentFileSystem.DirectoryExists(Path.GetDirectoryName(virtualPath)))
+                var virtualDir = Path.GetDirectoryName(virtualPath);
+                if (!string.IsNullOrEmpty(virtualDir) && !CurrentFileSystem.DirectoryExists(virtualDir))
                 {
-                    CurrentFileSystem.CreateDirectory(Path.GetDirectoryName(virtualPath));
+                    CurrentFileSystem.CreateDirectory(virtualDir);
                 }
 
                 CurrentFileSystem.WriteAllBytes(virtualPath, data);
@@ -1254,14 +1259,15 @@ namespace DotNet3dsToolkit
             var virtualPath = GetVirtualPath(filename);
             if (!string.IsNullOrEmpty(virtualPath))
             {
-                if (!CurrentFileSystem.DirectoryExists(virtualPath))
+                var virtualDir = Path.GetDirectoryName(virtualPath);
+                if (!string.IsNullOrEmpty(virtualDir) && !CurrentFileSystem.DirectoryExists(virtualDir))
                 {
-                    CurrentFileSystem.CreateDirectory(virtualPath);
+                    CurrentFileSystem.CreateDirectory(virtualDir);
                 }
                 CurrentFileSystem.WriteAllBytes(virtualPath, (this as IFileSystem).ReadAllBytes(filename));
             }
 
-            return CurrentFileSystem.OpenFile(filename);
+            return CurrentFileSystem.OpenFile(virtualPath!);
         }
 
         Stream IReadOnlyFileSystem.OpenFileReadOnly(string filename)
@@ -1282,14 +1288,15 @@ namespace DotNet3dsToolkit
             var virtualPath = GetVirtualPath(filename);
             if (!string.IsNullOrEmpty(virtualPath))
             {
-                if (!CurrentFileSystem.DirectoryExists(virtualPath))
+                var virtualDir = Path.GetDirectoryName(virtualPath);
+                if (!string.IsNullOrEmpty(virtualDir) && !CurrentFileSystem.DirectoryExists(virtualDir))
                 {
-                    CurrentFileSystem.CreateDirectory(virtualPath);
+                    CurrentFileSystem.CreateDirectory(virtualDir);
                 }
                 CurrentFileSystem.WriteAllBytes(virtualPath, (this as IFileSystem).ReadAllBytes(filename));
             }
 
-            return CurrentFileSystem.OpenFileReadOnly(filename);
+            return CurrentFileSystem.OpenFileReadOnly(virtualPath!);
         }
 
         Stream IFileSystem.OpenFileWriteOnly(string filename)
@@ -1302,14 +1309,15 @@ namespace DotNet3dsToolkit
             var virtualPath = GetVirtualPath(filename);
             if (!string.IsNullOrEmpty(virtualPath))
             {
-                if (!CurrentFileSystem.DirectoryExists(virtualPath))
+                var virtualDir = Path.GetDirectoryName(virtualPath);
+                if (!string.IsNullOrEmpty(virtualDir) && !CurrentFileSystem.DirectoryExists(virtualDir))
                 {
-                    CurrentFileSystem.CreateDirectory(virtualPath);
+                    CurrentFileSystem.CreateDirectory(virtualDir);
                 }
                 CurrentFileSystem.WriteAllBytes(virtualPath, (this as IFileSystem).ReadAllBytes(filename));
             }
 
-            return CurrentFileSystem.OpenFileWriteOnly(filename);
+            return CurrentFileSystem.OpenFileWriteOnly(virtualPath!);
         }
 
         void IExtendedFileSystem.WriteAllText(string filename, string data, Encoding encoding)
