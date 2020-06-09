@@ -62,7 +62,7 @@ namespace DotNet3dsToolkit.Ctr
                 }
             };
 
-            Task<ExeFs> exeFsTask;
+            Task<ExeFs?> exeFsTask;
             if (!string.IsNullOrEmpty(exeFsDirectory))
             {
                 if (progressToken != null)
@@ -70,14 +70,14 @@ namespace DotNet3dsToolkit.Ctr
                     exefsToken = new ExtractionProgressedToken();
                     exefsToken.FileCountChanged += (sender, e) => ReportProgress();
                 }
-                exeFsTask = Task.Run(() => ExeFs.Build(exeFsDirectory, fileSystem, exefsToken));
+                exeFsTask = Task.Run<ExeFs?>(async () => await ExeFs.Build(exeFsDirectory, fileSystem, exefsToken).ConfigureAwait(false));
             }
             else
             {
-                exeFsTask = Task.FromResult<ExeFs>(null);
+                exeFsTask = Task.FromResult<ExeFs?>(null);
             }
 
-            Task<RomFs> romFsTask;
+            Task<RomFs?> romFsTask;
             if (!string.IsNullOrEmpty(romFsDiretory))
             {
                 if (progressToken != null)
@@ -85,29 +85,29 @@ namespace DotNet3dsToolkit.Ctr
                     romfsToken = new ExtractionProgressedToken();
                     romfsToken.FileCountChanged += (sender, e) => ReportProgress();
                 }
-                romFsTask = Task.Run(() => RomFs.Build(romFsDiretory, fileSystem, romfsToken));
+                romFsTask = Task.Run<RomFs?>(async () => await RomFs.Build(romFsDiretory, fileSystem, romfsToken).ConfigureAwait(false));
             }
             else
             {
-                romFsTask = Task.FromResult<RomFs>(null);
+                romFsTask = Task.FromResult<RomFs?>(null);
             }
 
             var header = new NcchHeader(fileSystem.ReadAllBytes(headerFilename));
 
-            NcchExtendedHeader exHeader = null;
+            NcchExtendedHeader? exHeader = null;
             if (!string.IsNullOrEmpty(exHeaderFilename))
             {
                 using var exHeaderData = new BinaryFile(fileSystem.ReadAllBytes(exHeaderFilename));
                 exHeader = await NcchExtendedHeader.Load(exHeaderData);
             }
 
-            string plainRegion = null;
+            string? plainRegion = null;
             if (!string.IsNullOrEmpty(plainRegionFilename))
             {
                 plainRegion = fileSystem.ReadAllText(plainRegionFilename);
             }
 
-            byte[] logo = null;
+            byte[]? logo = null;
             if (!string.IsNullOrEmpty(logoFilename))
             {
                 logo = fileSystem.ReadAllBytes(logoFilename);
@@ -154,7 +154,7 @@ namespace DotNet3dsToolkit.Ctr
             }
         }
 
-        public IReadOnlyBinaryDataAccessor RawData { get; set; }
+        public IReadOnlyBinaryDataAccessor? RawData { get; set; }
 
         public NcchHeader? Header { get; } // Could be null if this is an empty partition
 
@@ -162,9 +162,9 @@ namespace DotNet3dsToolkit.Ctr
         public RomFs? RomFs { get; private set; } // Could be null if not applicable
         public NcchExtendedHeader? ExHeader { get; private set; } // Could be null if not applicable
 
-        public string PlainRegion { get; private set; }
+        public string? PlainRegion { get; private set; }
 
-        public byte[] Logo { get; private set; }
+        public byte[]? Logo { get; private set; }
 
         /// <summary>
         /// Writes the current state of the NCCH partition to the given binary data accessor

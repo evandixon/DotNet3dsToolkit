@@ -127,7 +127,7 @@ namespace DotNet3dsToolkit.Ctr
         /// <param name="directoryName">Directory on the specified file system to which the files should be saved.</param>
         /// <param name="fileSystem">File system to which the files should be saved.</param>
         /// <param name="progressReportToken">Optional token to be used to track the progress of the extraction.</param>
-        public async Task ExtractFiles(string directoryName, IFileSystem fileSystem, ExtractionProgressedToken progressReportToken = null)
+        public async Task ExtractFiles(string directoryName, IFileSystem fileSystem, ExtractionProgressedToken? progressReportToken = null)
         {
             if (progressReportToken != null)
             {

@@ -64,13 +64,13 @@ namespace DotNet3dsToolkit
             Container = new SingleNcchPartitionContainer(ncch, partitionIndex);
         }
 
-        private INcchPartitionContainer Container { get; set; }
+        private INcchPartitionContainer? Container { get; set; }
 
-        public NcchPartition[] Partitions => Container.Partitions;
+        public NcchPartition[] Partitions => Container?.Partitions ?? throw new InvalidOperationException("ROM has not yet been initialized");
 
         private BinaryFile? RawData { get; set; }
 
-        private IFileSystem CurrentFileSystem { get; set; }
+        private IFileSystem? CurrentFileSystem { get; set; }
 
         public async Task OpenFile(string filename, IFileSystem fileSystem)
         {
@@ -95,6 +95,11 @@ namespace DotNet3dsToolkit
 
         public async Task OpenFile(IReadOnlyBinaryDataAccessor file)
         {
+            if (CurrentFileSystem == null)
+            {
+                throw new InvalidOperationException("ROM has already been initialized");
+            }
+
             // Clear virtual path if it exists
             if (!string.IsNullOrEmpty(VirtualPath) && CurrentFileSystem.DirectoryExists(VirtualPath))
             {
@@ -131,6 +136,11 @@ namespace DotNet3dsToolkit
 
         public async Task OpenFile(string filename)
         {
+            if (CurrentFileSystem == null)
+            {
+                throw new InvalidOperationException("ROM has already been initialized");
+            }
+
             await this.OpenFile(filename, CurrentFileSystem);
         }
 
@@ -195,14 +205,16 @@ namespace DotNet3dsToolkit
                     ExtractionProgressedToken? exefsExtractionProgressedToken = null;
                     if (exefsExtractionProgressedToken != null && extractionProgressedTokens != null)
                     {
-                        exefsExtractionProgressedToken = new ExtractionProgressedToken();
-                        exefsExtractionProgressedToken.TotalFileCount = 1;
+                        exefsExtractionProgressedToken = new ExtractionProgressedToken
+                        {
+                            TotalFileCount = 1
+                        };
                         exefsExtractionProgressedToken.FileCountChanged += onExtractionTokenProgressed;
                         extractionProgressedTokens.Add(exefsExtractionProgressedToken);
                     }
                     tasks.Add(Task.Run(() =>
                     {
-                        File.WriteAllBytes(Path.Combine(directoryName, GetHeaderFileName(i)), partition.Header.ToBinary().ReadArray());
+                        fileSystem.WriteAllBytes(Path.Combine(directoryName, GetHeaderFileName(i)), partition.Header.ToBinary().ReadArray());
                         exefsExtractionProgressedToken?.IncrementExtractedFileCount();
                     }));
                 }
@@ -212,14 +224,16 @@ namespace DotNet3dsToolkit
                     ExtractionProgressedToken? exefsExtractionProgressedToken = null;
                     if (exefsExtractionProgressedToken != null && extractionProgressedTokens != null)
                     {
-                        exefsExtractionProgressedToken = new ExtractionProgressedToken();
-                        exefsExtractionProgressedToken.TotalFileCount = 1;
+                        exefsExtractionProgressedToken = new ExtractionProgressedToken
+                        {
+                            TotalFileCount = 1
+                        };
                         exefsExtractionProgressedToken.FileCountChanged += onExtractionTokenProgressed;
                         extractionProgressedTokens.Add(exefsExtractionProgressedToken);
                     }
                     tasks.Add(Task.Run(() =>
                     {
-                        File.WriteAllBytes(Path.Combine(directoryName, GetExHeaderFileName(i)), partition.ExHeader.ToByteArray());
+                        fileSystem.WriteAllBytes(Path.Combine(directoryName, GetExHeaderFileName(i)), partition.ExHeader.ToByteArray());
                         exefsExtractionProgressedToken?.IncrementExtractedFileCount();
                     }));
                 }
@@ -255,6 +269,11 @@ namespace DotNet3dsToolkit
 
         public string GetRomFsDirectoryName(int partitionId)
         {
+            if (Container == null)
+            {
+                throw new InvalidOperationException("ROM has not yet been initialized");
+            }
+
             if (Container.IsDlcContainer)
             {
                 return "RomFS-" + partitionId.ToString();
@@ -359,6 +378,8 @@ namespace DotNet3dsToolkit
 
         #endregion
 
+
+#pragma warning disable CS0162 // Unreachable code detected
         #region IIOProvider Implementation
         /// <summary>
         /// Gets a regular expression for the given search pattern for use with <see cref="GetFiles(string, string, bool)"/>.  Do not provide asterisks.
@@ -412,7 +433,7 @@ namespace DotNet3dsToolkit
         /// <summary>
         /// Path in the current I/O provider where temporary files are stored
         /// </summary>
-        private string VirtualPath { get; set; }
+        private string? VirtualPath { get; set; }
 
         /// <summary>
         /// Whether or not to delete <see cref="VirtualPath"/> on delete
@@ -505,11 +526,16 @@ namespace DotNet3dsToolkit
 
         private IReadOnlyBinaryDataAccessor? GetDataReference(string[] parts, bool throwIfNotFound = true)
         {
-            IReadOnlyBinaryDataAccessor getExeFsDataReference(string[] pathParts, int partitionId)
+            IReadOnlyBinaryDataAccessor? getExeFsDataReference(string[] pathParts, int partitionId)
             {
                 if (pathParts.Length == 2)
                 {
-                    return new BinaryFile(GetPartitionOrDefault(partitionId)?.ExeFs?.Files[pathParts.Last()].RawData);
+                    var data = GetPartitionOrDefault(partitionId)?.ExeFs?.Files[pathParts.Last()]?.RawData;
+                    if (data == null)
+                    {
+                        return null;
+                    }
+                    return new BinaryFile(data);
                 }
 
                 return null;
@@ -524,7 +550,13 @@ namespace DotNet3dsToolkit
                 }
                 if (currentDirectory != null)
                 {
-                    if (ReferenceEquals(currentDirectory, Partitions[partitionId].RomFs.Level3.RootDirectoryMetadataTable))
+                    var table = Partitions[partitionId].RomFs?.Level3?.RootDirectoryMetadataTable;
+                    if (table == null)
+                    {
+                        return null;
+                    }
+
+                    if (ReferenceEquals(currentDirectory, table))
                     {
                         // The root RomFS directory doesn't contain files; those are located in the level 3
                         return GetPartitionOrDefault(partitionId)?.RomFs?.Level3?.RootFiles?.FirstOrDefault(f => string.Compare(f.Name, pathParts.Last(), true) == 0)?.GetDataReference();
@@ -533,7 +565,6 @@ namespace DotNet3dsToolkit
                     {
                         return currentDirectory.ChildFiles.FirstOrDefault(f => string.Compare(f.Name, pathParts.Last(), true) == 0)?.GetDataReference();
                     }
-
                 }
 
                 return null;
@@ -572,13 +603,13 @@ namespace DotNet3dsToolkit
                     dataReference = GetPartitionOrDefault(0)?.Header?.ToBinary();
                     break;
                 case "exheader.bin":
-                    dataReference = GetPartitionOrDefault(0)?.ExHeader != null ? new BinaryFile(GetPartitionOrDefault(0)?.ExHeader.ToByteArray()) : null;
+                    dataReference = GetPartitionOrDefault(0)?.ExHeader != null ? new BinaryFile(GetPartitionOrDefault(0)!.ExHeader!.ToByteArray()) : null;
                     break;
                 case "plainregion.txt":
-                    dataReference = GetPartitionOrDefault(0)?.PlainRegion != null ? new BinaryFile(Encoding.ASCII.GetBytes(GetPartitionOrDefault(0).PlainRegion)) : null;
+                    dataReference = GetPartitionOrDefault(0)?.PlainRegion != null ? new BinaryFile(Encoding.ASCII.GetBytes(GetPartitionOrDefault(0)!.PlainRegion)) : null;
                     break;
                 case "logo.bin":
-                    dataReference = GetPartitionOrDefault(0)?.Logo != null ? new BinaryFile(GetPartitionOrDefault(0).Logo) : null;
+                    dataReference = GetPartitionOrDefault(0)?.Logo != null ? new BinaryFile(GetPartitionOrDefault(0)!.Logo) : null;
                     break;
                 default:
                     if (firstDirectory.StartsWith("romfs-"))
@@ -610,7 +641,7 @@ namespace DotNet3dsToolkit
                         var partitionNumRaw = firstDirectory.Split("-".ToCharArray(), 2)[1].Split(".".ToCharArray(), 2)[0];
                         if (int.TryParse(partitionNumRaw, out var partitionNum))
                         {
-                            dataReference = GetPartitionOrDefault(partitionNum)?.ExHeader != null ? new BinaryFile(GetPartitionOrDefault(partitionNum)?.ExHeader.ToByteArray()) : null;
+                            dataReference = GetPartitionOrDefault(partitionNum)?.ExHeader != null ? new BinaryFile(GetPartitionOrDefault(partitionNum)!.ExHeader!.ToByteArray()) : null;
                         }
                     }
                     else if (firstDirectory.StartsWith("plainregion-"))
@@ -626,7 +657,7 @@ namespace DotNet3dsToolkit
                         var partitionNumRaw = firstDirectory.Split("-".ToCharArray(), 2)[1].Split(".".ToCharArray(), 2)[0];
                         if (int.TryParse(partitionNumRaw, out var partitionNum))
                         {
-                            dataReference = GetPartitionOrDefault(partitionNum)?.Logo != null ? new BinaryFile(GetPartitionOrDefault(partitionNum)?.Logo) : null;
+                            dataReference = GetPartitionOrDefault(partitionNum)?.Logo != null ? new BinaryFile(GetPartitionOrDefault(partitionNum)!.Logo) : null;
                         }
                     }
                     break;
@@ -650,7 +681,12 @@ namespace DotNet3dsToolkit
 
         long IReadOnlyFileSystem.GetFileLength(string filename)
         {
-            return GetDataReference(GetPathParts(filename)).Length;
+            var file = GetDataReference(GetPathParts(filename));
+            if (file == null)
+            {
+                throw new FileNotFoundException(string.Format(Properties.Resources.ThreeDsRom_ErrorRomFileNotFound, filename), filename);
+            }
+            return file.Length;
         }
 
         bool IReadOnlyFileSystem.FileExists(string filename)
@@ -1080,12 +1116,16 @@ namespace DotNet3dsToolkit
                 else
                 {
                     var data = GetDataReference(GetPathParts(filename));
+                    if (data == null)
+                    {
+                        throw new FileNotFoundException(string.Format(Properties.Resources.ThreeDsRom_ErrorRomFileNotFound, filename), filename);
+                    }
                     return data.ReadArray();
                 }
             }
         }
 
-        public IReadOnlyBinaryDataAccessor GetFileReference(string filename)
+        public IReadOnlyBinaryDataAccessor? GetFileReference(string filename)
         {
             var fixedPath = FixPath(filename);
             if (BlacklistedPaths.Contains(fixedPath))
@@ -1145,7 +1185,7 @@ namespace DotNet3dsToolkit
             }
 
             var virtualPath = GetVirtualPath(filename);
-            if (CurrentFileSystem != null && CurrentFileSystem.FileExists(virtualPath))
+            if (!string.IsNullOrEmpty(virtualPath) && CurrentFileSystem != null && CurrentFileSystem.FileExists(virtualPath))
             {
                 CurrentFileSystem.DeleteFile(virtualPath);
             }
@@ -1272,5 +1312,6 @@ namespace DotNet3dsToolkit
         }
 
         #endregion
+#pragma warning restore CS0162 // Unreachable code detected
     }
 }
